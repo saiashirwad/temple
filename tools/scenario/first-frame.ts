@@ -1,16 +1,23 @@
-import { SPOTS } from '../../src/content/viewpoints.ts';
+import { z } from 'zod';
+import { spotAt } from '../../src/content/viewpoints.ts';
 import { resolveLaunch } from '../../src/game/launch.ts';
 
-export interface FirstFrame {
-  ms: number;
-  at: [number, number];
-  yaw: number;
-  pitch: number;
-  mode: string;
-  readingNote: boolean;
-  sitting: number;
-  ended: boolean;
-  guardGone: boolean;
+// Retain additional state recorded by newer game builds in capture output.
+const cameraFrame = z.looseObject({
+  at: z.tuple([z.number(), z.number()]),
+  yaw: z.number(),
+  pitch: z.number(),
+  mode: z.string(),
+  readingNote: z.boolean(),
+  sitting: z.number(),
+  ended: z.boolean(),
+  guardGone: z.boolean(),
+});
+
+export type FirstFrame = z.infer<typeof cameraFrame> & { ms: number };
+
+export function readFirstFrame(ms: number, snapshot: string): FirstFrame {
+  return { ...cameraFrame.parse(JSON.parse(snapshot)), ms };
 }
 
 /** A later passing replay cannot excuse a first frame drawn at the wrong location. */
@@ -21,7 +28,7 @@ export function verifyFirstFrame(params: URLSearchParams, frame: FirstFrame) {
   if (!camera) return;
   const [x, z, yaw, pitch] = camera;
   const gap = Math.hypot(frame.at[0] - x, frame.at[1] - z);
-  const viewpoint = !launch.bungalow && (launch.preset ? !!SPOTS[launch.preset] : launch.tour || params.has('at'));
+  const viewpoint = !launch.bungalow && (launch.preset ? !!spotAt(launch.preset) : launch.tour || params.has('at'));
 
   if (gap > (viewpoint ? 0.01 : 8)) throw new Error(`First frame was ${gap.toFixed(2)} m from its entry position`);
 

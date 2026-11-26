@@ -1,6 +1,6 @@
-import { RELOAD_PRESETS } from './boot.ts';
-import { SPOTS } from '../content/viewpoints.ts';
-import { RUNS } from './presets.ts';
+import { isReloadPreset } from './boot.ts';
+import { SPOTS, spotAt } from '../content/viewpoints.ts';
+import { encounterFor, encounterKeyFor } from './presets.ts';
 
 export const BUNGALOW_BEATS = ['veranda', 'reading-note', 'seated', 'guard-gone', 'ending'] as const;
 
@@ -12,25 +12,28 @@ export function resolveLaunch(params: URLSearchParams) {
   const chord = params.get('preset');
 
   if (name !== null && chord !== null) throw new Error('Choose one encounter or preset');
-  const key = name === null ? chord : Object.keys(RUNS).find(k => RUNS[k].id === name);
+  const key = name === null ? chord : encounterKeyFor(name);
 
   if (name !== null && !key) throw new Error('Unknown encounter: ' + name);
-  const preset = key && Object.hasOwn(RELOAD_PRESETS, key) ? null : key;
+  const preset = key && isReloadPreset(key) ? null : key;
   const scenario = params.get('scenario');
   const bungalow = scenario === 'story.bungalow-ending';
   const tour = scenario === 'world.walk' && params.get('run') === '1';
   const shots = params.getAll('shot');
   const all = Object.values(SPOTS);
   const requested = shots.includes('*') ? all : shots.flatMap(name => all.filter(spot => spot.shot === name));
-  let views = preset && SPOTS[preset] ? [SPOTS[preset]] : requested.length ? requested : [SPOTS['1']];
-  const start = params.get('from') ?? BUNGALOW_BEATS.find(name => shots.includes(name)) ?? 'veranda';
+  const selected = preset ? spotAt(preset) : undefined;
+  let views = selected ? [selected] : requested.length ? requested : [SPOTS['1']];
+  const requestedBeat = params.get('from');
+  const matched = BUNGALOW_BEATS.find(beat => beat === requestedBeat);
+  const start = matched ?? BUNGALOW_BEATS.find(beat => shots.includes(beat)) ?? 'veranda';
 
-  if (bungalow && !BUNGALOW_BEATS.some(name => name === start)) throw new Error('Unknown bungalow checkpoint: ' + start);
+  if (bungalow && requestedBeat !== null && !matched) throw new Error('Unknown bungalow checkpoint: ' + requestedBeat);
 
-  if (bungalow && shots.some(name => BUNGALOW_BEATS.some((beat, index) => beat === name && index < BUNGALOW_BEATS.indexOf(start as BungalowBeat))))
+  if (bungalow && shots.some(name => BUNGALOW_BEATS.some((beat, index) => beat === name && index < BUNGALOW_BEATS.indexOf(start))))
     throw new Error('Requested checkpoint precedes the bungalow starting state');
-  const encounter = preset && Object.hasOwn(RUNS, preset) ? RUNS[preset] : undefined;
-  const first = bungalow ? SPOTS['8'] : preset ? SPOTS[encounter?.spot ?? preset] : tour ? views[0] : undefined;
+  const encounter = preset ? encounterFor(preset) : undefined;
+  const first = bungalow ? SPOTS['8'] : preset ? spotAt(encounter?.spot ?? preset) : tour ? views[0] : undefined;
   let camera = first?.at;
   const at = params.get('at');
 
@@ -46,7 +49,7 @@ export function resolveLaunch(params: URLSearchParams) {
   }
 
   return {
-    preset, bungalow, tour, views, camera, beat: start as BungalowBeat,
+    preset, bungalow, tour, views, camera, beat: start,
     forest: !!first && first.shot !== 'town' && at === null,
     physics: (bungalow && (start === 'veranda' || start === 'reading-note')) || encounter?.physics === true,
     wildlife: encounter?.wildlife ?? (first?.shot.startsWith('herd-') ? 'herd' as const : null),

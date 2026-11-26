@@ -67,10 +67,18 @@ export function createPack(root: TgpuRoot, model: ModelData, count: number) {
   const set = instances.create(root, pool, { kind: Dhole, capacity: count * model.meshes.length, history: true });
   const hidden: V3 = [0, -60, 0];
 
-  const dogs = Array.from({ length: count }, (_, i) => {
+  type DholeAnimation = {
+    pose: ReturnType<typeof figures.add>;
+    id: ReturnType<typeof set.add>;
+    doing: 'moving' | 'stalk' | 'snarl';
+    shown: boolean;
+    scale: number;
+  };
+
+  const dogs = Array.from({ length: count }, (_, i): DholeAnimation => {
     const pose = figures.add('moving', 0, { from: i * 0.37 });
 
-    return { pose, id: set.add(body, { position: hidden, pose }), doing: 'moving' as 'moving' | 'stalk' | 'snarl', shown: false, scale: 0.94 + ((i * 0.37) % 1) * 0.14 };
+    return { pose, id: set.add(body, { position: hidden, pose }), doing: 'moving', shown: false, scale: 0.94 + ((i * 0.37) % 1) * 0.14 };
   });
 
   return {

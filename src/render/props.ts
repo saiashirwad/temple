@@ -48,7 +48,8 @@ export function placeProps(pool: meshPool.MeshPool, set: ReturnType<typeof insta
       added.set(p.name, m);
     }
 
-    set.add(m, { position: p.at, rotation: yawQ(p.yaw), scale: p.scale, ...(p.color ? { color: p.color } : {}) });
+    const placement = { position: p.at, rotation: yawQ(p.yaw), scale: p.scale };
+    set.add(m, p.color ? { ...placement, color: p.color } : placement);
   }
 
   return [...added.values()];
@@ -68,7 +69,9 @@ export const propNear = (p: PropAt, at: readonly number[]) =>
 
 /** A model is fetched once, even if several copies straddle the first view's radius. */
 export function splitProps(placed: readonly PropAt[], at?: readonly number[]) {
-  const visible = new Set(placed.filter(p => !at || propNear(p, at)).map(p => p.name));
+  const visible = new Set<string>();
+
+  for (const p of placed) if (!at || propNear(p, at)) visible.add(p.name);
 
   return { first: placed.filter(p => visible.has(p.name)), later: placed.filter(p => !visible.has(p.name)) };
 }

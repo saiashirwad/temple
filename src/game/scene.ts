@@ -69,16 +69,16 @@ type V3 = [number, number, number];
 
 const MOON = {
   sunDirection: MOON_ARRAY,
-  sunColor: [0.55, 0.68, 1] as V3,
+  sunColor: [0.55, 0.68, 1],
   sunIntensity: 0.22,
-  skyTop: [0.02, 0.035, 0.09] as V3,
-  skyBottom: [0.02, 0.014, 0.01] as V3,
+  skyTop: [0.02, 0.035, 0.09],
+  skyBottom: [0.02, 0.014, 0.01],
   skyIntensity: 0.9,
   skyReflection: 1,
-  fogColor: [0.022, 0.034, 0.07] as V3,
+  fogColor: [0.022, 0.034, 0.07],
   fogDensity: 0.016,
   fogFalloff: 0.06,
-};
+} satisfies lighting.Options['settings'];
 
 /**
  * Moonlit sky dimmed where nearby surfaces hide it, and a little of the lamplight too: an
@@ -229,8 +229,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     if (n && PROBE_STAGES) n.textContent = (n.textContent ?? '') + ` ${name}:${((performance.now() - t0) / 1000).toFixed(1)}`;
 
     if (PROBE_STAGES) {
-      const tag = document.querySelector('#stages') ?? document.body.appendChild(Object.assign(document.createElement('div'), { id: 'stages' }));
-      (tag as HTMLElement).style.cssText = 'position:fixed;left:8px;top:8px;color:#fc6;font:14px monospace;z-index:9;text-shadow:0 0 3px #000';
+      const tag = document.querySelector<HTMLElement>('#stages') ?? document.body.appendChild(Object.assign(document.createElement('div'), { id: 'stages' }));
+      tag.style.cssText = 'position:fixed;left:8px;top:8px;color:#fc6;font:14px monospace;z-index:9;text-shadow:0 0 3px #000';
       tag.textContent += ` ${name}:${((performance.now() - t0) / 1000).toFixed(2)}`;
     }
 
@@ -311,7 +311,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   // The solid world is set up just after the first picture, so it never holds up the load;
   // until it's ready the walker follows the land
   let physics: Physics | null = null;
-  const solidShape = { solids, props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
+  const collisionWorld = { solids, props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
   let framesShown = 0;
   let drewFullMaterials = false;
   let streamingWorld = false;
@@ -360,7 +360,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   let physicsLoading: Promise<void> | undefined;
 
   const requirePhysics = () =>
-    physicsLoading ??= (engine ?? loadPhysics()).then((b3) => createPhysics(solidShape, b3)).then((p) => {
+    physicsLoading ??= (engine ?? loadPhysics()).then((b3) => createPhysics(collisionWorld, b3)).then((p) => {
       stage('physics');
       physics = p;
       walker.physics = p;
@@ -376,7 +376,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       }
     });
 
-  const VEHICLE: Record<string, V3> = { scooter: [0.36, 0.6, 0.95], auto: [0.72, 0.85, 1.4], bus: [1.25, 1.5, 5.3] };
+  const VEHICLE = { scooter: [0.36, 0.6, 0.95], auto: [0.72, 0.85, 1.4], bus: [1.25, 1.5, 5.3] } satisfies Record<typeof riders[number]['kind'], V3>;
   let vehicleBodies: number[] = [];
   let herdBodies: number[] = [];
   const physicsSetup = launch.physics ? requirePhysics() : undefined;
@@ -419,7 +419,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
     for (const l of list) {
       if (l.kind !== 'oil' || out.length >= 48) continue;
-      const p = l.position as [number, number, number];
+      const p = l.position;
 
       if (out.every((q) => Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) > 0.6)) out.push(p);
     }
@@ -429,15 +429,18 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
   const lamps = table.create(root, lighting.SpotLight, { capacity: all.length + 16, defaults: { ...lighting.WHITE_SPOT } });
 
-  const ids = all.map((l) =>
-    lamps.add({
+  const ids = all.map((l) => {
+    const lamp: Parameters<typeof lamps.add>[0] = {
       position: l.position,
       color: l.color,
       intensity: l.intensity,
       range: l.range,
-      ...(l.spot ? { aim: [0, -1, 0.05] as V3, cone: lighting.cone(l.spot[0], l.spot[1]) } : {}),
-    }),
-  );
+    };
+
+    if (l.spot) return lamps.add({ ...lamp, aim: [0, -1, 0.05], cone: lighting.cone(l.spot[0], l.spot[1]) });
+
+    return lamps.add(lamp);
+  });
 
   const heads = riders.map(() => lamps.add({ position: [0, -50, 0], color: [1, 0.9, 0.75], intensity: 0, range: 26, aim: [0, -0.15, 1], cone: lighting.cone(0.22, 0.5) }));
   const tails = riders.map(() => lamps.add({ position: [0, -50, 0], color: [1, 0.08, 0.03], intensity: 0, range: 3 }));
@@ -506,7 +509,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const plants = undergrowth.renderer({ cull: true, to: Q.underTo, fade: Q.underFade, eye: view }).pipe(withTime);
   const grass = meadow.renderer({ cull: true, to: Q.grassTo, fade: Q.grassFade, eye: view }).pipe(withTime);
   const things = props.renderer({ cull: true });
-  const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
+  const foliage = [nearTrees, farMeshes, ...farCards, plants, grass];
+  const culled = [...foliage, things];
   const people = createPeople(root, folk, initialPlans, feet, random.people);
   const population = [people];
   let residents: typeof people | undefined;
@@ -607,7 +611,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   );
 
   const sim = clock.fixedStep({ step: 1 / 60 });
-  const air = createAir(root, view, sim.step, streetLights, wicksOf(all), village.chimneys);
+  const wicks = wicksOf(all);
+  const air = createAir(root, view, sim.step, streetLights, wicks, village.chimneys);
   const thingsDrawn = scene.add(things);
   const drawnNames = ['land', 'river', 'built', 'moving', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'pond', 'farLights', 'eyes', 'flames', 'sky', 'mist', 'riverAir', 'smoke', 'kitchen', 'flies', 'moths'];
   /** The groups the bench times: the big ones, so a run fits in one short check. */
@@ -618,7 +623,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     scene.add(ground.river),
     scene.add(solid),
     scene.add(passing),
-    ...culled.filter((c) => c !== things).map((c) => scene.add(c)),
+    ...foliage.map((c) => scene.add(c)),
     thingsDrawn,
     scene.add(pond.water),
     scene.add(farLights),
@@ -709,7 +714,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** While comparing, `p` leaves the props out of every pass: each list starts with them. */
   const keep = <T,>(list: T[], first = 0) => (look.props ? list : list.filter((_, i) => i !== first));
 
-  const mist = createAtmosphere(root, view, light, 'rgba16float', shared as never);
+  const mist = createAtmosphere(root, view, light, 'rgba16float', shared);
   /** Each lamp's light this frame, for choosing the halos nearest the eye. */
   const lampNow = new Float32Array(all.length);
 
@@ -840,7 +845,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   for (let z = COMPOUND.z0; z <= COMPOUND.z1; z += 5) for (const x of [-COMPOUND.x, COMPOUND.x, -CLOISTER.x, CLOISTER.x]) walls.push([x, GROUND, z]);
 
   for (let x = -COMPOUND.x; x <= COMPOUND.x; x += 5) for (const z of [COMPOUND.z0, COMPOUND.z1]) walls.push([x, GROUND, z]);
-  const sound = createSound({ homes: village.homes, walls, fires: wicksOf(all).map((w) => [w[0], w[1], w[2]] as V3) }, random.audio);
+  const sound = createSound({ homes: village.homes, walls, fires: wicks }, random.audio);
   // Your sandals, on whatever is underfoot (only on foot, not while held or flying)
   walker.onStep = (x, z, pace, foot) => walker.mode === 'walk' && sound.step(x, z, pace, foot, walker.sneaking || walker.crouching);
   // No footstep sounds: the night is crickets and the odd vehicle
@@ -1109,7 +1114,14 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
  return g && g[1] ? g[0] / g[1] : NaN; };
 
-          const wholes = BENCHED.map((_, k) => avg(2 * k)).filter((v) => v === v);
+          const wholes: number[] = [];
+
+          for (let k = 0; k < BENCHED.length; k++) {
+            const value = avg(2 * k);
+
+            if (!Number.isNaN(value)) wholes.push(value);
+          }
+
           const whole = wholes.reduce((a, b) => a + b, 0) / Math.max(1, wholes.length);
           bench.table = `all ${whole.toFixed(2)} | ` + BENCHED.map((n, k) => [n, avg(2 * k) - avg(2 * k + 1)] as const).sort((a, b) => b[1] - a[1]).map(([n, d]) => `${n} ${d.toFixed(2)}`).join(', ');
           console.log('bench', bench.table);

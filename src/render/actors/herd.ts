@@ -66,11 +66,20 @@ export function createHerd(root: TgpuRoot, model: ModelData, count: number) {
   const set = instances.create(root, pool, { kind: Elephant, capacity: count * model.meshes.length, history: true });
   const hidden: V3 = [0, -60, 0];
 
-  const herd = Array.from({ length: count }, (_, i) => {
+  type ElephantAnimation = {
+    pose: ReturnType<typeof figures.add>;
+    id: ReturnType<typeof set.add>;
+    doing: 'moving' | 'eat' | 'threat';
+    until: number;
+    shown: boolean;
+    threatT: number;
+  };
+
+  const herd = Array.from({ length: count }, (_, i): ElephantAnimation => {
     const pose = figures.add('moving', 0, { from: i * 1.7 });
     const id = set.add(body, { position: hidden, pose });
 
-    return { pose, id, doing: 'moving' as 'moving' | 'eat' | 'threat', until: 0, shown: false, threatT: -1 };
+    return { pose, id, doing: 'moving', until: 0, shown: false, threatT: -1 };
   });
 
   return {

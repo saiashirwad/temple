@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
-import { verifyFirstFrame, type FirstFrame } from './scenario/first-frame.ts';
+import { readFirstFrame, verifyFirstFrame } from './scenario/first-frame.ts';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   runs: { type: 'string', default: '3' }, dist: { type: 'string', default: 'dist' },
@@ -120,7 +120,7 @@ try {
           await writeFile(join(out!, `case-${pathIndex + 1}-run-${i + 1}.cpuprofile`), JSON.stringify(profile));
         }
 
-        const result = await page.evaluate(() => {
+        const { frameTime, snapshot, ...timings } = await page.evaluate(() => {
           const error = document.querySelector<HTMLElement>('#note[data-error]')?.dataset.error;
 
           if (error) throw new Error(error);
@@ -129,18 +129,22 @@ try {
           const fullDetail = performance.getEntriesByName('game:full-detail-frame')[0];
           const end = performance.getEntriesByName('game:first-frame')[0].startTime;
 
-          const resources = (performance.getEntriesByType('resource') as PerformanceResourceTiming[])
-            .filter(r => r.startTime < (fullDetail?.startTime ?? end)).map(r => ({
+          const resources = performance.getEntriesByType('resource').flatMap(r =>
+            r instanceof PerformanceResourceTiming && r.startTime < (fullDetail?.startTime ?? end) ? [{
               path: new URL(r.name).pathname, startMs: Math.round(r.startTime), endMs: Math.round(r.responseEnd),
               bytes: r.transferSize, finishedByReveal: r.responseEnd <= end,
-            }));
+            }] : []);
 
-          const completed = performance.getEntriesByName('startup:gpu-finished')[0] as PerformanceMark | undefined;
+          const completed = performance.getEntriesByName('startup:gpu-finished', 'mark')[0];
+          const modules = completed instanceof PerformanceMark ? completed.detail?.modules : undefined;
+
+          if (completed && (!Number.isSafeInteger(modules) || modules < 0)) throw new Error('Expected shader module count on GPU completion mark');
 
           return {
             fullDetailMs: fullDetail && Math.round(fullDetail.startTime),
-            gpu: completed && { finishedMs: Math.round(completed.startTime), shaderModules: completed.detail.modules as number },
-            frame: { ms: Math.round(end), ...JSON.parse(document.querySelector('canvas')!.dataset.firstFrame!) } as FirstFrame,
+            gpu: completed && { finishedMs: Math.round(completed.startTime), shaderModules: Number(modules) },
+            frameTime: Math.round(end),
+            snapshot: document.querySelector('canvas')!.dataset.firstFrame!,
             nextFrameMs: Math.round(performance.getEntriesByName('startup:next-frame')[0].startTime),
             stages: performance.getEntriesByType('mark').filter(m => m.name.startsWith('game:')).map(m => ({ name: m.name, ms: Math.round(m.startTime) })),
             resources,
@@ -148,6 +152,7 @@ try {
         });
 
         if (errors.length) throw new Error(errors.join('\n'));
+        const result = { ...timings, frame: readFirstFrame(frameTime, snapshot) };
         verifyFirstFrame(new URL(path, 'http://localhost').searchParams, result.frame);
         frames.push(result.frame.ms);
         nextPaints.push(result.nextFrameMs);

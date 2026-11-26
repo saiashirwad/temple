@@ -3,7 +3,7 @@
 
 import { d, std } from 'typegpu';
 
-export const grade = (color: d.v3f, uv: d.v2f) => {
+export const grade = (color: d.v3f, _uv: d.v2f) => {
   'use gpu';
   const luma = std.dot(color, d.vec3f(0.2126, 0.7152, 0.0722));
   // Split tone: cool, deep shadows; warm highlights
@@ -17,5 +17,5 @@ export const grade = (color: d.v3f, uv: d.v2f) => {
   // Lift the blacks just off zero so the night has a body to it
   c = c * 0.97 + d.vec3f(0.006, 0.008, 0.016);
 
-  return std.max(c, d.vec3f(0)) + uv.x * 0;
+  return std.max(c, d.vec3f(0));
 };

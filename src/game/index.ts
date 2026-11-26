@@ -187,7 +187,7 @@ if (!navigator.gpu) {
         if (hud.touch || walker.mode === 'above' || document.pointerLockElement) return;
 
         try {
-          const p = canvas.requestPointerLock() as unknown;
+          const p = canvas.requestPointerLock();
 
           if (p instanceof Promise) p.catch(() => {});
         } catch {}
@@ -313,7 +313,7 @@ if (!navigator.gpu) {
       note.dataset.error = String(error);
       note.textContent = 'The scene could not start on this device.';
 
-      if (boot.has('debug')) note.textContent += ' ' + String((error as Error)?.message ?? error).slice(0, 3000);
+      if (boot.has('debug')) note.textContent += ' ' + String(error instanceof Error ? error.message : error).slice(0, 3000);
     },
   });
 }

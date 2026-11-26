@@ -56,7 +56,7 @@ export function prepareVegetation(planted: Planting, models: Map<string, Model> 
     const d: number[] = [];
 
     for (const mesh of m.meshes) {
-      const p = mesh.positions as Float32Array;
+      const p = mesh.positions;
 
       for (let i = 0; i < p.length; i += 3) if (p[i + 1]! > 0.4 && p[i + 1]! < 1.3) d.push(Math.hypot(p[i]!, p[i + 2]!));
     }

@@ -3,8 +3,14 @@ import { specimens } from '../world/vegetation/specimens.ts';
 
 const models = Object.values(specimens).flat().map(specimen => [specimen.id, specimen.build()] as const);
 
-const buffers = models.flatMap(([, model]) => model.meshes.flatMap(mesh =>
-  [mesh.positions, mesh.normals, mesh.uvs, mesh.indices, mesh.extra!.pat!, mesh.extra!.col!].map(array => array.buffer as ArrayBuffer),
-));
+const buffers = new Set<ArrayBuffer>();
 
-self.postMessage(models, { transfer: buffers });
+for (const [, model] of models) {
+  for (const mesh of model.meshes) {
+    for (const array of [mesh.positions, mesh.normals, mesh.uvs, mesh.indices, ...Object.values(mesh.extra ?? {})]) {
+      if (array?.buffer instanceof ArrayBuffer) buffers.add(array.buffer);
+    }
+  }
+}
+
+self.postMessage(models, { transfer: [...buffers] });

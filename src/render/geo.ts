@@ -187,7 +187,10 @@ export class Builder {
 
   /** An unseen box the walker stands on or bumps into, from its centre and half sizes here. */
   block(c: V3, h: V3, high = false) {
-    this.solids.push({ kind: 'box', c: apply(this.t, c), h: [h[0], h[1], h[2]], yaw: this.t.yaw, ...(high ? { high } : {}) });
+    const solid: Solid = { kind: 'box', c: apply(this.t, c), h: [h[0], h[1], h[2]], yaw: this.t.yaw };
+
+    if (high) solid.high = high;
+    this.solids.push(solid);
   }
 
   private solidMat(mat: Mat) {
@@ -210,7 +213,10 @@ export class Builder {
 
   /** Sets model `name` at `at` in the current transform, turned by `yaw`. */
   prop(name: string, at: V3, yaw = 0, scale: number | V3 = 1, color?: V3) {
-    this.props.push({ name, at: apply(this.t, at), yaw: this.t.yaw + yaw, scale: typeof scale === 'number' ? [scale, scale, scale] : scale, ...(color ? { color } : {}) });
+    const prop: PropAt = { name, at: apply(this.t, at), yaw: this.t.yaw + yaw, scale: Array.isArray(scale) ? scale : [scale, scale, scale] };
+
+    if (color) prop.color = color;
+    this.props.push(prop);
   }
 
   /**
@@ -897,6 +903,8 @@ export class Builder {
     for (const p of this.parts.values()) {
       if (p.indices.length === 0) continue;
       const m = p.mat;
+      const color: [number, number, number, number] = this.merged ? [1, 1, 1, 1] : [m.color[0], m.color[1], m.color[2], 1];
+      const emission: V3 = m.emission ?? [0, 0, 0];
       out.push({
         positions: new Float32Array(p.positions),
         normals: new Float32Array(p.normals),
@@ -904,10 +912,10 @@ export class Builder {
         indices: new Uint32Array(p.indices),
         extra: { pat: new Float32Array(p.pats), col: new Float32Array(p.cols) },
         material: {
-          color: (this.merged ? [1, 1, 1, 1] : [m.color[0], m.color[1], m.color[2], 1]) as [number, number, number, number],
+          color,
           roughness: m.roughness,
           metallic: m.metallic ?? 0,
-          emission: m.emission ?? ([0, 0, 0] as V3),
+          emission,
           textures: {},
           doubleSided: m.doubleSided ?? false,
         },

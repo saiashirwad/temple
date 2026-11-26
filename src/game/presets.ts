@@ -24,7 +24,9 @@ const standAt = async (s: Scene, spot: Spot) => {
 
 const pass = (ok: boolean, why: string) => (ok ? 'PASS' : `FAIL: ${why}`);
 
-export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: boolean; wildlife?: 'herd' | 'dholes' }> = {
+type Encounter = Run & { id: string; spot?: string; physics?: boolean; wildlife?: 'herd' | 'dholes' };
+
+export const RUNS = {
   // The pack in view, held still, without physics: one standing, one stalking, one trotting, one at a gallop
   D: {
     id: 'dholes-up-close', spot: '2', wildlife: 'dholes',
@@ -129,4 +131,16 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
       setTimeout(() => s.walker.keys.delete('w'), 3000);
     },
   },
-};
+} satisfies Record<string, Encounter>;
+
+function isEncounterKey(key: string): key is keyof typeof RUNS {
+  return Object.hasOwn(RUNS, key);
+}
+
+export function encounterFor(key: string): Encounter | undefined {
+  return isEncounterKey(key) ? RUNS[key] : undefined;
+}
+
+export function encounterKeyFor(id: string): string | undefined {
+  return Object.entries(RUNS).find(([, run]) => run.id === id)?.[0];
+}

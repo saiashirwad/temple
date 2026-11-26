@@ -5,7 +5,7 @@
 
 import { boot } from '../game/boot.ts';
 
-const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const coarse = globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
 export const phone = boot.has('phone') || (!boot.has('desktop') && coarse);
 
 const DESKTOP = {

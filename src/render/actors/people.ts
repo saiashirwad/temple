@@ -53,7 +53,7 @@ function inPlace(clip: poses.ClipData) {
     return { ...ch, values: v };
   });
 
-  return { clip: { ...clip, channels } as poses.ClipData, pace };
+  return { clip: { ...clip, channels } satisfies poses.ClipData, pace };
 }
 
 /** Share the watcher's body and clips when the village joins a forest-first scene. */
@@ -163,7 +163,7 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
       const [x, z] = plan.at;
       const id = g.set.add(body, { pose, position: [x, heightAt(x, z) + (plan.lift ?? 0), z], rotation: yawQ(plan.yaw) });
 
-      return { plan, g, pose, id, slow: 0, walk: 0, metres: 0, dir: 1, speed: 0, yaw: plan.yaw, wait: 0, next: 8 + phase * 10, talking: true, lens: [0], length: 0, dodge: 0 };
+      return { plan, g, pose, id, next: 8 + phase * 10, talking: true };
     }
 
     const walker = makeWalker(plan);
@@ -172,15 +172,21 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
     const walk = files.animations.get(`${sex}_walk_neutral_01`)!.pace || 1.1;
     const id = g.set.add(body, { pose, position: [0, -50, 0] });
 
-    return { plan, g, pose, id, slow, walk, ...walker, next: 0, talking: false };
+    return { plan, g, pose, id, slow, walk, walker, next: 0, talking: false };
   });
 
   /** The man walking the dark lane with a torch: where his torch is and which way it points. */
   const torchBearer = people.find((p) => p.plan.who === 'lane_m01');
-  const torch = { on: false, position: [0, -50, 0] as V3, aim: [0, -0.5, 1] as V3 };
+
+  type Torch = { on: boolean; position: V3; aim: V3 };
+
+  const torch: Torch = { on: false, position: [0, -50, 0], aim: [0, -0.5, 1] };
   /** The forest guard: where his lantern swings, and where he is and which way he faces. */
   const guardOf = people.find((p) => p.plan.kind === 'walk' && p.plan.watcher);
-  const guard = { lantern: [0, -50, 0] as V3, at: [0, -50, 0] as V3, yaw: 0, stopped: false, gone: false };
+
+  type Guard = { lantern: V3; at: V3; yaw: number; stopped: boolean; gone: boolean };
+
+  const guard: Guard = { lantern: [0, -50, 0], at: [0, -50, 0], yaw: 0, stopped: false, gone: false };
 
   const pushedOut = (x: number, z: number) => {
     const q = pushOut([x, z], feet, 0.28);
@@ -195,7 +201,7 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
     people.forEach((p, i) => {
       const { figures, set } = p.g;
 
-      if (p.plan.kind === 'stay') {
+      if (!p.walker) {
         // Talkers take turns: one speaks, the other listens, now and then they swap
         const swap = p.plan.swap;
 
@@ -209,7 +215,7 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
       }
 
       const plan = p.plan;
-      const { x, z } = stepWalker(p as Parameters<typeof stepWalker>[0], plan, dt, you, pushedOut);
+      const { x, z } = stepWalker(p.walker, plan, dt, you, pushedOut);
 
       if (p === guardOf && guard.gone) {
         // His beat is finished
@@ -221,25 +227,25 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
         return;
       }
 
-      set.write(p.id, { position: [x, heightAt(x, z) + (plan.lift ?? 0), z], rotation: yawQ(p.yaw) });
+      set.write(p.id, { position: [x, heightAt(x, z) + (plan.lift ?? 0), z], rotation: yawQ(p.walker.yaw) });
       where[i] = [x, heightAt(x, z), z];
 
       if (p === guardOf) {
         // In his left hand, at the knee, swinging with his stride
-        const fx = Math.sin(p.yaw);
-        const fz = Math.cos(p.yaw);
-        const swing = Math.sin(time * 3.4) * 0.06 * Math.min(1, p.speed);
+        const fx = Math.sin(p.walker.yaw);
+        const fz = Math.cos(p.walker.yaw);
+        const swing = Math.sin(time * 3.4) * 0.06 * Math.min(1, p.walker.speed);
         guard.lantern = [x + fz * 0.3 + fx * (0.12 + swing), heightAt(x, z) + 0.62, z - fx * 0.3 + fz * (0.12 + swing)];
         guard.at = [x, heightAt(x, z), z];
-        guard.yaw = p.yaw;
-        guard.stopped = p.wait > 0 || p.speed < 0.2;
+        guard.yaw = p.walker.yaw;
+        guard.stopped = p.walker.wait > 0 || p.walker.speed < 0.2;
       }
 
       if (p === torchBearer) {
         // Held at the hip on his right, swinging a little with his stride, aimed at the path ahead
-        const fx = Math.sin(p.yaw);
-        const fz = Math.cos(p.yaw);
-        const sway = Math.sin(time * 5.2) * 0.06 * Math.min(1, p.speed);
+        const fx = Math.sin(p.walker.yaw);
+        const fz = Math.cos(p.walker.yaw);
+        const sway = Math.sin(time * 5.2) * 0.06 * Math.min(1, p.walker.speed);
         torch.on = true;
         torch.position = [x + fx * 0.3 - fz * 0.22, heightAt(x, z) + 0.95, z + fz * 0.3 + fx * 0.22];
         torch.aim = [fx + -fz * sway, -0.2, fz + fx * sway];
@@ -247,7 +253,7 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
 
       // The line: 0 standing, 1 the slow walk, 2 the walk, each at the pace it was made for
       const { slow, walk } = p;
-      const mix = p.speed <= slow ? p.speed / slow : 1 + Math.min(1, (p.speed - slow) / Math.max(0.05, walk - slow));
+      const mix = p.walker.speed <= slow ? p.walker.speed / slow : 1 + Math.min(1, (p.walker.speed - slow) / Math.max(0.05, walk - slow));
       figures.mix(p.pose, mix, time);
     });
   };

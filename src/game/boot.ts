@@ -1,7 +1,11 @@
 /** Keyboard shortcuts for frequently used launch options. The URL reproduces the complete setup. */
-export const RELOAD_PRESETS: Record<string, string[]> = {
+export const RELOAD_PRESETS = {
   p: ['probe', 'state'], m: ['profile'], c: ['phone', 'state'], '0': [],
 };
+
+export function isReloadPreset(key: string): key is keyof typeof RELOAD_PRESETS {
+  return Object.hasOwn(RELOAD_PRESETS, key);
+}
 
 export function launchOptions(search = '', hash = '') {
   const params = new URLSearchParams(search);
@@ -12,7 +16,7 @@ export function launchOptions(search = '', hash = '') {
 
   const key = params.get('preset');
 
-  if (key && Object.hasOwn(RELOAD_PRESETS, key)) {
+  if (key && isReloadPreset(key)) {
     for (const flag of RELOAD_PRESETS[key]) params.set(flag, '');
     params.delete('preset');
   }

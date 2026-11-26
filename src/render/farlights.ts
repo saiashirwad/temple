@@ -20,14 +20,17 @@ export function createFarLights(lights: FarLight[], time: { $: number }, wandere
   const m = Math.max(lights.length, 1);
   const n = m + 1;
 
+  const fallback: FarLight = { at: [0, -999, 0], color: [0, 0, 0], strength: 0 };
+  const sources = lights.length ? lights : [fallback];
+
   const where = tgpu.const(
     d.arrayOf(d.vec4f, m),
-    (lights.length ? lights : [{ at: [0, -999, 0], color: [0, 0, 0], strength: 0 } as FarLight]).map((l, i) => d.vec4f(l.at[0], l.at[1], l.at[2], i * 0.618 + l.strength * 0)),
+    sources.map((l, i) => d.vec4f(l.at[0], l.at[1], l.at[2], i * 0.618)),
   );
 
   const tint = tgpu.const(
     d.arrayOf(d.vec3f, m),
-    (lights.length ? lights : [{ at: [0, 0, 0], color: [0, 0, 0], strength: 0 } as FarLight]).map((l) => d.vec3f(l.color[0] * l.strength, l.color[1] * l.strength, l.color[2] * l.strength)),
+    sources.map((l) => d.vec3f(l.color[0] * l.strength, l.color[1] * l.strength, l.color[2] * l.strength)),
   );
 
   const quad = tgpu.const(

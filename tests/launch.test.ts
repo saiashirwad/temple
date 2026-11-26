@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveLaunch } from '../src/game/launch.ts';
 
-import { verifyFirstFrame } from '../tools/scenario/first-frame.ts';
+import { readFirstFrame, verifyFirstFrame, type FirstFrame } from '../tools/scenario/first-frame.ts';
 
 const open = (query: string) => resolveLaunch(new URLSearchParams(query));
 
@@ -39,7 +39,9 @@ test('world captures honor the order of the requested views and custom cameras',
 test('the frame verifier rejects a camera still easing toward the correct bridge', () => {
   const params = new URLSearchParams('scenario=world.walk&run=1&shot=bridge');
   const [x, z, yaw, pitch] = SPOTS['3'].at;
-  const frame = { ms: 123, at: [x, z] as [number, number], yaw, pitch, mode: 'held', readingNote: false, sitting: -1, ended: false, guardGone: false };
+  const frame: FirstFrame = { ms: 123, at: [x, z], yaw, pitch, mode: 'held', readingNote: false, sitting: -1, ended: false, guardGone: false };
+  assert.deepEqual(readFirstFrame(frame.ms, JSON.stringify(frame)), frame);
+  assert.throws(() => readFirstFrame(frame.ms, JSON.stringify({ ...frame, at: ['bad', z] })));
   verifyFirstFrame(params, frame);
   assert.throws(() => verifyFirstFrame(params, { ...frame, at: [x + 1, z] }));
   assert.throws(() => verifyFirstFrame(params, { ...frame, pitch: 0 }));

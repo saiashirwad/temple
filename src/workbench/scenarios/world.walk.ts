@@ -1,5 +1,5 @@
 import { SPOTS } from '../../content/viewpoints.ts';
-import { RUNS } from '../../game/presets.ts';
+import { encounterFor, RUNS } from '../../game/presets.ts';
 
 export const title = 'Explore the world';
 
@@ -78,7 +78,9 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     const link = document.createElement('a');
     const url = new URL('./', location.href);
 
-    if (RUNS[key]) url.searchParams.set('encounter', RUNS[key].id);
+    const encounter = encounterFor(key);
+
+    if (encounter) url.searchParams.set('encounter', encounter.id);
     else url.searchParams.set('preset', key);
 
     if (params.has('seed')) url.searchParams.set('seed', params.get('seed')!);

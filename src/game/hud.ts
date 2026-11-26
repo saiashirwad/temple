@@ -51,8 +51,7 @@ function seen(el: Element, key: string, v: string | boolean) {
 function put(el: HTMLElement, prop: string, v: string) {
   if (seen(el, prop, v)) return;
 
-  if (prop.startsWith('--')) el.style.setProperty(prop, v);
-  else (el.style as unknown as Record<string, string>)[prop] = v;
+  el.style.setProperty(prop, v);
 }
 
 function flag(el: Element, cls: string, on: boolean) {

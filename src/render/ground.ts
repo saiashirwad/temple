@@ -57,7 +57,7 @@ const warp = (g: number) => {
 };
 
 /** The land's shape where it's sampled: its normal in xyz, its height in w. */
-const shapeAt = (p: d.v2f) => {
+const terrainSample = (p: d.v2f) => {
   'use gpu';
   const e = 0.35;
   const hx = heightGpu(p + d.vec2f(e, 0)) - heightGpu(p - d.vec2f(e, 0));
@@ -74,12 +74,12 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
   const cols = (PATCH.length * 2) / PATCH.step;
   const rows = (PATCH.half * 2) / PATCH.step;
   const RV = cols + 1;
-  const landShape = root.createBuffer(d.arrayOf(d.vec4f, V * V)).$usage('storage');
-  const riverShape = root.createBuffer(d.arrayOf(d.vec4f, RV * (rows + 1))).$usage('storage');
-  const landOut = landShape.as('mutable');
-  const riverOut = riverShape.as('mutable');
-  const landIn = landShape.as('readonly');
-  const riverIn = riverShape.as('readonly');
+  const landSamples = root.createBuffer(d.arrayOf(d.vec4f, V * V)).$usage('storage');
+  const riverSamples = root.createBuffer(d.arrayOf(d.vec4f, RV * (rows + 1))).$usage('storage');
+  const landOut = landSamples.as('mutable');
+  const riverOut = riverSamples.as('mutable');
+  const landIn = landSamples.as('readonly');
+  const riverIn = riverSamples.as('readonly');
 
   /** Where the land grid's corner (ix, iz) sits, in metres. */
   const landPoint = (ix: number, iz: number) => {
@@ -107,15 +107,15 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
     const f = d.f32(gid.x);
     const iz = std.floor(f / V);
     const p = landPoint(f - iz * V, iz);
-    const shape = shapeAt(p);
+    const sample = terrainSample(p);
     // Along the river the finer strip draws the land: this coarse grid sinks under it
     const rq = riverLocalGpu(p);
 
     if (std.abs(rq.x) < PATCH.length - 3 && std.abs(rq.y) < PATCH.half - 5) {
-      shape.w = shape.w - 40;
+      sample.w = sample.w - 40;
     }
 
-    landOut.$[gid.x] = d.vec4f(shape);
+    landOut.$[gid.x] = d.vec4f(sample);
   });
 
   const bakeRiver = tgpu.computeFn({ workgroupSize: [64], in: { gid: d.builtin.globalInvocationId } })(({ gid }) => {
@@ -127,7 +127,7 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
 
     const f = d.f32(gid.x);
     const r = std.floor(f / RV);
-    riverOut.$[gid.x] = shapeAt(riverPoint(f - r * RV, r));
+    riverOut.$[gid.x] = terrainSample(riverPoint(f - r * RV, r));
   });
 
   root.createComputePipeline({ compute: bakeLand }).dispatchWorkgroups(Math.ceil((V * V) / 64));
@@ -146,10 +146,10 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       const ix = cell - row * N + corner.x;
       const iz = row + corner.y;
       const p = landPoint(ix, iz);
-      const shape = landIn.$[d.u32(iz * V + ix)];
-      const world = d.vec3f(p.x, shape.w, p.y);
+      const sample = landIn.$[d.u32(iz * V + ix)];
+      const world = d.vec3f(p.x, sample.w, p.y);
 
-      return Corner({ position: cameras.toClip(world), world, normal: shape.xyz });
+      return Corner({ position: cameras.toClip(world), world, normal: sample.xyz });
     },
     pixelOf: (corner) => {
       'use gpu';
@@ -346,10 +346,10 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       const c = cell - row * cols + corner.x;
       const r = row + corner.y;
       const p = riverPoint(c, r);
-      const shape = riverIn.$[d.u32(r * RV + c)];
-      const world = d.vec3f(p.x, shape.w, p.y);
+      const sample = riverIn.$[d.u32(r * RV + c)];
+      const world = d.vec3f(p.x, sample.w, p.y);
 
-      return Corner({ position: cameras.toClip(world), world, normal: shape.xyz });
+      return Corner({ position: cameras.toClip(world), world, normal: sample.xyz });
     },
     draw: (pass) => pass.draw(cols * rows * 6),
   };

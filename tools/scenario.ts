@@ -1,12 +1,13 @@
 // Use the same static game and workbench entries as a human player.
-import type {} from '../src/scenario/checkpoint.ts';
+import type { Snapshot } from '../src/scenario/checkpoint.ts';
 import { chromium } from 'playwright';
+import { z } from 'zod';
 import { createServer, preview } from 'vite';
 import { parseArgs } from 'node:util';
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { verifyFirstFrame, type FirstFrame } from './scenario/first-frame.ts';
+import { readFirstFrame, verifyFirstFrame, type FirstFrame } from './scenario/first-frame.ts';
 import { startClip, writeSheet, type Panel } from './scenario/media.ts';
 
 const { positionals, values } = parseArgs({
@@ -34,13 +35,18 @@ if (values.help) {
   process.exit(0);
 }
 
-interface Shot { name: string; file: string; state?: unknown }
+interface Shot { name: string; file: string; state?: Snapshot }
 
 if (values.sheet) {
+  const savedCapture = z.object({
+    scenario: z.string(),
+    shots: z.array(z.object({ name: z.string(), file: z.string() })),
+  });
+
   const panels: Panel[] = [];
 
   for (const folder of positionals) {
-    const result = JSON.parse(await readFile(join(folder, 'result.json'), 'utf8')) as { scenario: string; shots: Shot[] };
+    const result = savedCapture.parse(JSON.parse(await readFile(join(folder, 'result.json'), 'utf8')));
 
     for (const shot of result.shots) panels.push({ label: result.scenario + ' / ' + shot.name, path: join(folder, shot.file) });
   }
@@ -105,9 +111,9 @@ let browser;
 
 try {
   if ('listen' in server) await server.listen();
-  const address = server.httpServer!.address();
+  const base = server.resolvedUrls?.local[0];
 
-  if (!address || typeof address === 'string') throw new Error('No HTTP port available.');
+  if (!base) throw new Error('No local HTTP URL available.');
   const asset = params.get('asset') ?? '';
   const needsGpu = values.game || (id === 'world.walk' && params.has('view')) || (id === 'asset.inspect' && (asset.startsWith('tree/') || asset.startsWith('plant/') || /\.(gltf|glb)$/i.test(asset)));
   browser = await chromium.launch({
@@ -119,14 +125,14 @@ try {
   const errors: string[] = [], available: string[] = [];
   const shots: Shot[] = [];
   let clip: { file: string; from: string; done: Promise<void> } | undefined;
-  let trace: unknown;
-  let finalState: unknown;
+  let trace: Snapshot | undefined;
+  let finalState: Snapshot | undefined;
   let firstFrame: FirstFrame | undefined;
   let status = 'fail';
   let sheet: string | undefined;
   page.on('pageerror', err => errors.push(err.message));
 
-  const collect = async (name: string, state?: unknown) => {
+  const collect = async (name: string, state?: Snapshot) => {
     available.push(name);
 
     if (!folder) return;
@@ -153,7 +159,7 @@ try {
       await page.exposeFunction('scenarioCapture', collect);
     }
 
-    await page.goto('http://127.0.0.1:' + address.port + entry, { timeout: 90000, waitUntil: 'domcontentloaded' });
+    await page.goto(new URL(entry, base).href, { timeout: 90000, waitUntil: 'domcontentloaded' });
     const selector = values.game ? '#game-replay' : '#workspace';
     const target = page.locator(selector);
     await page.waitForFunction(selector => {
@@ -174,10 +180,13 @@ try {
 
     if (values.game && status === 'pass') {
       await page.locator('canvas[data-first-frame]').waitFor();
-      firstFrame = await page.evaluate((): FirstFrame => ({
+
+      const { ms, snapshot } = await page.evaluate(() => ({
         ms: Math.round(performance.getEntriesByName('game:first-frame')[0].startTime),
-        ...JSON.parse(document.querySelector('canvas')!.dataset.firstFrame!),
+        snapshot: document.querySelector('canvas')!.dataset.firstFrame!,
       }));
+
+      firstFrame = readFirstFrame(ms, snapshot);
       verifyFirstFrame(params, firstFrame);
     }
 

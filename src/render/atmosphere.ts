@@ -3,7 +3,7 @@
 // and the moon's light falling in faint shafts through the palms, marched through its shadow.
 // Drawn additively into the scene's picture before TAA, which smooths the march's dither.
 
-import { cameras, shading, type CameraBase, type Frame, type Lighting, type targets } from '@typegpu/kit';
+import { cameras, shading, type CameraBase, type SharedBindings, type Frame, type Lighting, type targets } from '@typegpu/kit';
 import { memo } from '@typegpu/kit/memo';
 import { common, d, std, tgpu, type TgpuRoot } from 'typegpu';
 import { Q } from './quality.ts';
@@ -16,7 +16,7 @@ export function createAtmosphere(
   view: CameraBase,
   light: Lighting,
   format: GPUTextureFormat,
-  shared: { layout: never; group: () => never },
+  shared: SharedBindings,
   /** Moon-shaft march steps and lamp halos at most. */
   { steps = Q.steps, halos = HALOS }: { steps?: number; halos?: number } = {},
 ) {
@@ -128,10 +128,10 @@ export function createAtmosphere(
     halos: HALOS,
     initAsync: () => pipeline.initAsync(),
     /** Adds the air's light over `color`, reading `depth`, within `region`. */
-    record(frame: Frame, color: GPUTextureView | (() => GPUTextureView), depth: targets.Depth, region: { width: number; height: number }) {
+    record(frame: Frame, color: GPUTextureView, depth: targets.Depth, region: { width: number; height: number }) {
       values.frame++;
       air.write(values);
-      const pass = frame.encoder.beginRenderPass({ colorAttachments: { view: typeof color === 'function' ? color() : color, loadOp: 'load', storeOp: 'store' } } as never);
+      const pass = frame.encoder.beginRenderPass({ colorAttachments: { view: color, loadOp: 'load', storeOp: 'store' } });
       pass.setViewport(0, 0, region.width, region.height, 0, 1);
       pass.setBindGroup(shared.layout, shared.group());
       pass.setPipeline(bound(depth));

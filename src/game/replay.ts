@@ -1,7 +1,7 @@
-import { SPOTS } from '../content/viewpoints.ts';
+import { SPOTS, spotAt } from '../content/viewpoints.ts';
 import { checkpoint, wantsCheckpoint } from '../scenario/checkpoint.ts';
 import type { Launch } from './launch.ts';
-import { RUNS, type Scene } from './presets.ts';
+import { encounterFor, type Scene } from './presets.ts';
 
 /** Drive browser replays through the production simulation and input handlers. */
 export function gameReplay(launch: Launch) {
@@ -25,7 +25,10 @@ export function gameReplay(launch: Launch) {
   let scene: Scene | undefined;
 
   const record = (event: string, detail?: string) => {
-    trace.push({ at: +((performance.now() - began) / 1000).toFixed(2), event, ...(detail ? { detail } : {}) });
+    const entry: ReplayEntry = { at: +((performance.now() - began) / 1000).toFixed(2), event };
+
+    if (detail) entry.detail = detail;
+    trace.push(entry);
 
     if (replayBox) replayBox.textContent = JSON.stringify(trace);
   };
@@ -59,7 +62,7 @@ export function gameReplay(launch: Launch) {
   async function tour(s: Scene) {
     try {
       const preset = launch.preset;
-      const encounter = preset ? RUNS[preset] : undefined;
+      const encounter = preset ? encounterFor(preset) : undefined;
 
       if (encounter) {
         await encounter.start(s);
@@ -77,7 +80,7 @@ export function gameReplay(launch: Launch) {
         record('encounter', encounter.name);
         await checkpoint('encounter', s.inspect());
       } else {
-        if (preset && !SPOTS[preset]) throw new Error('Unknown view or encounter preset: ' + preset);
+        if (preset && !spotAt(preset)) throw new Error('Unknown view or encounter preset: ' + preset);
         const spots = launch.views;
 
         for (const spot of spots) {
@@ -109,10 +112,10 @@ export function gameReplay(launch: Launch) {
     };
 
     const key = (type: 'keydown' | 'keyup', k: string) => window.dispatchEvent(new KeyboardEvent(type, { key: k, bubbles: true }));
-    let examined = '';
-    let closed = '';
-    const onExamined = (e: Event) => { examined = (e as CustomEvent<string>).detail; record('examined', examined); };
-    const onClosed = (e: Event) => { closed = (e as CustomEvent<string>).detail; record('closed', closed); };
+    let examined: string | undefined;
+    let closed: string | undefined;
+    const onExamined = (e: WindowEventMap['temple:examined']) => { examined = e.detail; record('examined', examined); };
+    const onClosed = (e: WindowEventMap['temple:closed']) => { closed = e.detail; record('closed', closed); };
 
     addEventListener('temple:examined', onExamined);
     addEventListener('temple:closed', onClosed);

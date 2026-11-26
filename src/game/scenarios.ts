@@ -1,4 +1,12 @@
-import { SPOTS } from '../content/viewpoints.ts';
+declare global {
+  interface WindowEventMap {
+    'temple:view': CustomEvent<string>;
+    'temple:examined': CustomEvent<string | undefined>;
+    'temple:closed': CustomEvent<string | undefined>;
+  }
+}
+
+import { spotAt } from '../content/viewpoints.ts';
 // Test scenarios, run by a key chord so a test browser that can only open the bare address,
 // press keys and take screenshots can still set up any situation: press ` (backquote), then a
 // key. Keys pressed while the scene is still loading are kept and run once it's ready.
@@ -21,9 +29,9 @@ import { SPOTS } from '../content/viewpoints.ts';
 //   p    reload with stage timings (probe);  m  reload with GPU timings (profile)
 //   c    reload with the phone layout;  0  reload clean
 
-import { boot, RELOAD_PRESETS } from './boot.ts';
+import { boot, RELOAD_PRESETS, isReloadPreset } from './boot.ts';
 import type { Launch } from './launch.ts';
-import { RUNS, type Run, type Scene } from './presets.ts';
+import { encounterFor, type Run, type Scene } from './presets.ts';
 import { gameReplay } from './replay.ts';
 
 export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
@@ -58,7 +66,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
   );
 
   const run = async (key: string, s: Scene) => {
-    if (Object.hasOwn(RELOAD_PRESETS, key)) {
+    if (isReloadPreset(key)) {
       const url = new URL(location.href);
       url.hash = '';
 
@@ -66,7 +74,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
       else {
         for (const option of Object.values(RELOAD_PRESETS).flat()) url.searchParams.delete(option);
 
-        if (Object.hasOwn(RELOAD_PRESETS, url.searchParams.get('preset') ?? '')) url.searchParams.delete('preset');
+        if (isReloadPreset(url.searchParams.get('preset') ?? '')) url.searchParams.delete('preset');
 
         for (const option of RELOAD_PRESETS[key]) url.searchParams.set(option, '');
       }
@@ -93,8 +101,8 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     }
 
     shown = true;
-    const spot = SPOTS[key];
-    const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : RUNS[key];
+    const spot = spotAt(key);
+    const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : encounterFor(key);
 
     if (!r) return;
     delete stateBox.dataset.error;
@@ -102,7 +110,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     current = active;
 
     try {
-      const view = spot ?? SPOTS[RUNS[key]?.spot ?? ''];
+      const view = spot ?? spotAt(encounterFor(key)?.spot ?? '');
 
       if (view) await s.test.prepareView(view);
 
@@ -127,8 +135,8 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
 
   // Same-origin workbench switches views without recreating the device or downloading assets.
   addEventListener('temple:view', async event => {
-    const key = (event as CustomEvent<string>).detail;
-    const spot = SPOTS[key];
+    const key = event.detail;
+    const spot = spotAt(key);
 
     if (!scene || !spot) return;
 

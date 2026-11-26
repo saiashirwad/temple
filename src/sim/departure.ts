@@ -14,12 +14,12 @@ export type Fact =
   | { kind: 'quest'; state: 'offered' | 'ready' | 'departed' }
   | { kind: 'denied'; reason: string };
 
-export interface State {
+export type State = {
   tick: number;
   inventory: Item[];
   equipped: 'torch' | null;
   quest: 'unoffered' | 'offered' | 'ready' | 'departed';
-}
+};
 
 export interface Tick {
   tick: number;

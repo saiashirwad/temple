@@ -3,7 +3,9 @@ import { NOTE_AT } from '../world/trail/bungalow.ts';
 /** x, z, yaw, pitch, eye height above the ground. Yaw π faces +z, 0 faces -z. */
 export type Spot = readonly [number, number, number, number, number];
 
-export const SPOTS: Record<string, { name: string; shot: string; at: Spot }> = {
+export interface Viewpoint { name: string; shot: string; at: Spot }
+
+export const SPOTS = {
   '1': { shot: 'town', name: 'town view', at: [122.8, -128.1, 2.41, 0.06, 1.62] },
   '2': { shot: 'bridge-path', name: 'path before the bridge', at: [-160.5, -113.5, 1.55, 0.18, 1.62] },
   '3': { shot: 'bridge', name: 'bridge', at: [-169.73, -108.86, 0.981, 0.22, 1.62] },
@@ -13,4 +15,12 @@ export const SPOTS: Record<string, { name: string; shot: string; at: Spot }> = {
   '7': { shot: 'herd-close', name: 'herd glade, close', at: [-110.2, -256.1, -2.05, 0.12, 1.62] },
   '8': { shot: 'veranda', name: 'veranda, the note', at: [NOTE_AT.x, NOTE_AT.z + 1.2, 0.186, 0.75, 3.5] },
   '9': { shot: 'chair', name: 'his chair, looking out', at: [20.61, -396.33, 2.792, 0.07, 2.63] },
-};
+} satisfies Record<string, Viewpoint>;
+
+function isSpotKey(key: string): key is keyof typeof SPOTS {
+  return Object.hasOwn(SPOTS, key);
+}
+
+export function spotAt(key: string): Viewpoint | undefined {
+  return isSpotKey(key) ? SPOTS[key] : undefined;
+}
