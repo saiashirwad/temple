@@ -139,8 +139,8 @@ export function broadleaf(b: Builder, r: () => number, size: number, kind: 'mang
   // Lobed and holed, reaching toward the open side, a few twigs sticking out of the skin: a
   // mango's crown spreads low and broad, a jack's stands taller and looser
   const mango = kind === 'mango';
-  const shaped = uneven(clumps, r, { base: trunkTop, yaw: r() * Math.PI * 2, lean: 0.35, drop: 0.18, jitter: 0.3, s: mango ? [1.15, 0.7, 1.15] : [0.95, 0.88, 0.95] });
-  crown(b, r, leaves, T.core, centre, shaped, 0.36, mango ? [0.42, 0.15] : [0.32, 0.18], 0.4, false, { lump: 0.3, holes: mango ? 1 : 2, twigs: 2, twig: T.bark });
+  const foliageClumps = uneven(clumps, r, { base: trunkTop, yaw: r() * Math.PI * 2, lean: 0.35, drop: 0.18, jitter: 0.3, s: mango ? [1.15, 0.7, 1.15] : [0.95, 0.88, 0.95] });
+  crown(b, r, leaves, T.core, centre, foliageClumps, 0.36, mango ? [0.42, 0.15] : [0.32, 0.18], 0.4, false, { lump: 0.3, holes: mango ? 1 : 2, twigs: 2, twig: T.bark });
 
   if (kind === 'jack') {
     // Jackfruit hang right off the trunk and the big limbs
@@ -189,8 +189,8 @@ export function rubberTree(b: Builder, r: () => number, size: number) {
   }
 
   clumps.push({ c: add(top, [0, 2.2 * size, 0]), r: 1.1 * size });
-  const shaped = uneven(clumps, r, { base: top, yaw: r() * Math.PI * 2, lean: 0.3, drop: 0.2, s: [1.1, 0.75, 1.1] });
-  crown(b, r, T.rubber, null, add(top, [0, 2 * size, 0]), shaped, 0.32, [0.26, 0.1], 0.5, false, { lump: 0.25, holes: 2, twigs: 2, twig: T.rubberBark });
+  const foliageClumps = uneven(clumps, r, { base: top, yaw: r() * Math.PI * 2, lean: 0.3, drop: 0.2, s: [1.1, 0.75, 1.1] });
+  crown(b, r, T.rubber, null, add(top, [0, 2 * size, 0]), foliageClumps, 0.32, [0.26, 0.1], 0.5, false, { lump: 0.25, holes: 2, twigs: 2, twig: T.rubberBark });
 }
 
 /** The banyan: a trunk of fused stems, buttress roots over its platform, great level limbs hung with aerial roots, and a vast low dome of leaves. */
@@ -290,8 +290,8 @@ export function banyan(b: Builder, r: () => number) {
     clumps.push({ c: [Math.sin(a) * o, 10.5 + r() * 2.5 - o * 0.3, Math.cos(a) * o], r: 2.4 + r() * 0.8 });
   }
 
-  const shaped = uneven(clumps, r, { base: top, yaw: r() * Math.PI * 2, lean: 0.15, drop: 0.06, jitter: 0.25, s: [1.15, 0.7, 1.15] });
-  crown(b, r, T.banyan, T.core, centre, shaped, 0.5, [0.36, 0.21], 0.3, false, { lump: 0.3, holes: 1 });
+  const foliageClumps = uneven(clumps, r, { base: top, yaw: r() * Math.PI * 2, lean: 0.15, drop: 0.06, jitter: 0.25, s: [1.15, 0.7, 1.15] });
+  crown(b, r, T.banyan, T.core, centre, foliageClumps, 0.5, [0.36, 0.21], 0.3, false, { lump: 0.3, holes: 1 });
 }
 
 const v3 = (h: number) => {
@@ -326,7 +326,7 @@ export function crownOf(model: { meshes: readonly { positions: ArrayLike<number>
     }
   }
 
-  if (n === 0) return { crown: [0, top, 0] as V3, reach: Math.max(top, 0.3) };
+  if (n === 0) return { crown: [0, top, 0] satisfies V3, reach: Math.max(top, 0.3) };
   const c: V3 = [sx / n, sy / n, sz / n];
   let far = 0;
 

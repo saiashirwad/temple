@@ -475,27 +475,37 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = [], options
     // Lower down, moist deciduous forest: teak, irul, silk cotton, an old rubber estate gone
     // wild, cashew at its edge; higher up, evergreen: maruthu, wild fig, ezhilampala, wild mango
     // and the odd jack
-    const wild = (deep: number) => [
-      { w: 0.2 - deep * 0.12, list: teaks, kind: 'broad' as FarKind },
-      { w: 0.16 - deep * 0.06, list: iruls, kind: 'broad' as FarKind },
-      { w: 0.07, list: silks, kind: 'broad' as FarKind },
-      { w: 0.1 - deep * 0.07, list: rubbers, kind: 'rubber' as FarKind },
-      { w: 0.05 - deep * 0.05, list: cashews, kind: 'broad' as FarKind },
-      { w: 0.1 + deep * 0.12, list: laurels, kind: 'broad' as FarKind },
-      { w: 0.06 + deep * 0.06, list: figs, kind: 'broad' as FarKind },
-      { w: 0.07 + deep * 0.06, list: alstonias, kind: 'broad' as FarKind },
-      { w: 0.12 + deep * 0.04, list: mangos, kind: 'broad' as FarKind },
-      { w: 0.05 + deep * 0.02, list: jacks, kind: 'broad' as FarKind },
-    ];
+    const forestSpecies = [
+      { baseWeight: 0.20, depthDelta: -0.12, list: teaks, kind: 'broad' },
+      { baseWeight: 0.16, depthDelta: -0.06, list: iruls, kind: 'broad' },
+      { baseWeight: 0.07, depthDelta: 0, list: silks, kind: 'broad' },
+      { baseWeight: 0.10, depthDelta: -0.07, list: rubbers, kind: 'rubber' },
+      { baseWeight: 0.05, depthDelta: -0.05, list: cashews, kind: 'broad' },
+      { baseWeight: 0.10, depthDelta: 0.12, list: laurels, kind: 'broad' },
+      { baseWeight: 0.06, depthDelta: 0.06, list: figs, kind: 'broad' },
+      { baseWeight: 0.07, depthDelta: 0.06, list: alstonias, kind: 'broad' },
+      { baseWeight: 0.12, depthDelta: 0.04, list: mangos, kind: 'broad' },
+      { baseWeight: 0.05, depthDelta: 0.02, list: jacks, kind: 'broad' },
+    ] as const;
 
-    const wildTree = (q: number, deep: number) => {
-      const list = wild(deep);
-      const total = list.reduce((n, t) => n + t.w, 0);
-      let acc = 0;
+    const cumulativeWeights = new Float64Array(forestSpecies.length);
 
-      for (const t of list) if (q * total < (acc += t.w)) return t;
+    const wildTree = (q: number, depth: number) => {
+      let total = 0;
 
-      return list[0]!;
+      for (let i = 0; i < forestSpecies.length; i++) {
+        const species = forestSpecies[i]!;
+        total += species.baseWeight + depth * species.depthDelta;
+        cumulativeWeights[i] = total;
+      }
+
+      const roll = q * total;
+
+      for (let i = 0; i < forestSpecies.length; i++) {
+        if (roll < cumulativeWeights[i]!) return forestSpecies[i]!;
+      }
+
+      return forestSpecies[0];
     };
 
     const forestSpacing = new Spacing(8);

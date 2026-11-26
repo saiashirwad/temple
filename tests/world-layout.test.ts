@@ -6,7 +6,7 @@ import { specimens } from '../src/world/vegetation/specimens.ts';
 import { tourDistance } from '../src/world/vegetation/planting.ts';
 
 test('a baked layout restores the authored ground, routes, specimen identities and placement order', () => {
-  const tree = { at: [1, 2, 3] as [number, number, number], yaw: -1, scale: 0.75, stiff: 2, tint: [1, 0.75, 1.25] as [number, number, number], specimen: specimens.palms[2] };
+  const tree: WorldLayout['planted']['trees'][number] = { at: [1, 2, 3], yaw: -1, scale: 0.75, stiff: 2, tint: [1, 0.75, 1.25], specimen: specimens.palms[2] };
 
   const world: WorldLayout = {
     planted: { trees: [tree], plants: [{ ...tree, specimen: specimens.ferns[1] }],

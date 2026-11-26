@@ -8,20 +8,20 @@ const leafy = (h: number): Mat => ({ color: hex(h), roughness: 0.7, pattern: P.L
 const flower = (h: number): Mat => ({ color: hex(h), roughness: 0.6, pattern: P.FLOWER, doubleSided: true });
 
 export const PL = {
-  grass: [0x3a5a1c, 0x4a6224, 0x56602a].map((h) => ({ color: hex(h), roughness: 0.8, pattern: P.GRASS, doubleSided: true }) as Mat),
-  fern: { color: hex(0x2e5a1a), roughness: 0.7, pattern: P.FROND, doubleSided: true } as Mat,
-  stem: { color: hex(0x3a4a1c), roughness: 0.8, pattern: P.PLAIN } as Mat,
+  grass: [0x3a5a1c, 0x4a6224, 0x56602a].map((h) => ({ color: hex(h), roughness: 0.8, pattern: P.GRASS, doubleSided: true })),
+  fern: { color: hex(0x2e5a1a), roughness: 0.7, pattern: P.FROND, doubleSided: true },
+  stem: { color: hex(0x3a4a1c), roughness: 0.8, pattern: P.PLAIN },
   shrub: [leafy(0x1c3a12), leafy(0x24461a), leafy(0x2a4a18)],
-  core: { color: hex(0x0a1407), roughness: 0.9, pattern: P.PLAIN } as Mat,
+  core: { color: hex(0x0a1407), roughness: 0.9, pattern: P.PLAIN },
   ixora: flower(0xd8281a),
   hibiscus: flower(0xc8102a),
   jasmine: flower(0xf0ece0),
-  croton: [0x2a4a18, 0x3a4a10, 0x4a3a10].map((h) => ({ color: hex(h), roughness: 0.6, pattern: P.CROTON, doubleSided: true }) as Mat),
-  banana: { color: hex(0x4a7a24), roughness: 0.55, pattern: P.BANANA, doubleSided: true } as Mat,
-  bananaDry: { color: hex(0x4a3c2a), roughness: 0.85, pattern: P.BANANA, doubleSided: true } as Mat,
-  bananaStem: { color: hex(0x6a7a34), roughness: 0.55, pattern: P.PALM_BARK } as Mat,
-  bananaBloom: { color: hex(0x4a1428), roughness: 0.45, pattern: P.PLAIN, doubleSided: true } as Mat,
-  bananaFruit: { color: hex(0x5a8a26), roughness: 0.45, pattern: P.PLAIN } as Mat,
+  croton: [0x2a4a18, 0x3a4a10, 0x4a3a10].map((h) => ({ color: hex(h), roughness: 0.6, pattern: P.CROTON, doubleSided: true })),
+  banana: { color: hex(0x4a7a24), roughness: 0.55, pattern: P.BANANA, doubleSided: true },
+  bananaDry: { color: hex(0x4a3c2a), roughness: 0.85, pattern: P.BANANA, doubleSided: true },
+  bananaStem: { color: hex(0x6a7a34), roughness: 0.55, pattern: P.PALM_BARK },
+  bananaBloom: { color: hex(0x4a1428), roughness: 0.45, pattern: P.PLAIN, doubleSided: true },
+  bananaFruit: { color: hex(0x5a8a26), roughness: 0.45, pattern: P.PLAIN },
   tulsi: [leafy(0x2a3a1a), leafy(0x3a2a2a)],
   lantana: [leafy(0x2a4416), leafy(0x324c1a), leafy(0x263c14)],
   lantanaFlower: [flower(0xd8508a), flower(0xe88a1a), flower(0xe8c83a), flower(0xc83a6a)],
@@ -29,9 +29,9 @@ export const PL = {
   chromolaenaFlower: [flower(0xd8d0e0), flower(0xc8b8d8)],
   ginger: [leafy(0x2e5a1a), leafy(0x386420), leafy(0x2a5018)],
   turmeric: [leafy(0x3e6a20), leafy(0x467424)],
-  rattan: { color: hex(0x5a5a2a), roughness: 0.6, pattern: P.PALM_BARK } as Mat,
-  rattanLeaf: { color: hex(0x3a5a1c), roughness: 0.6, pattern: P.FROND, doubleSided: true } as Mat,
-};
+  rattan: { color: hex(0x5a5a2a), roughness: 0.6, pattern: P.PALM_BARK },
+  rattanLeaf: { color: hex(0x3a5a1c), roughness: 0.6, pattern: P.FROND, doubleSided: true },
+} satisfies Record<string, Mat | Mat[]>;
 
 export function grassTuft(b: Builder, r: () => number, height = 0.4) {
   const blades = 14 + Math.floor(r() * 10);
@@ -82,12 +82,12 @@ export function floweringShrub(b: Builder, r: () => number, size: number, bloom:
     b.sweep(PL.stem, [[0, 0, 0], kink, c.c], [0.03, 0.02, 0.01], 4);
   }
 
-  const shaped = uneven(clumps, r, { base: [0, 0, 0], yaw: r() * Math.PI * 2, lean: 0.4, drop: 0.12, jitter: 0.25, s: [1.15, 0.72, 1.15], sj: 0.4 });
-  crown(b, r, PL.shrub, PL.core, [0, 0.55 * size, 0], shaped, 0.3, [0.2, 0.09], 0.2, true, { lump: 0.35, holes: 1, twigs: 2, twig: PL.stem });
+  const foliageClumps = uneven(clumps, r, { base: [0, 0, 0], yaw: r() * Math.PI * 2, lean: 0.4, drop: 0.12, jitter: 0.25, s: [1.15, 0.72, 1.15], sj: 0.4 });
+  crown(b, r, PL.shrub, PL.core, [0, 0.55 * size, 0], foliageClumps, 0.3, [0.2, 0.09], 0.2, true, { lump: 0.35, holes: 1, twigs: 2, twig: PL.stem });
 
   // Flower heads on the skin of the bush, each a dome of tiny florets
   for (let i = 0; i < heads; i++) {
-    const c = shaped[Math.floor(r() * shaped.length)]!;
+    const c = foliageClumps[Math.floor(r() * foliageClumps.length)]!;
     const s = c.s ?? [1, 0.82, 1];
     const dir = unit(r);
 
@@ -123,10 +123,10 @@ export function lantana(b: Builder, r: () => number, size: number) {
     if (r() < 0.6) clumps.push({ c: lerp(pts[2]!, pts[3]!, r()), r: (0.18 + r() * 0.12) * size });
   }
 
-  const shaped = uneven(clumps, r, { base: [0, 0, 0], yaw: r() * Math.PI * 2, lean: 0.3, drop: 0.15, s: [1.35, 0.6, 1.35], sj: 0.4 });
-  crown(b, r, PL.lantana, PL.core, [0, 0.55 * size, 0], shaped, 0.42, [0.12, 0.075], 0.25, false, { lump: 0.35, holes: 1, twigs: 1, twig: PL.stem });
+  const foliageClumps = uneven(clumps, r, { base: [0, 0, 0], yaw: r() * Math.PI * 2, lean: 0.3, drop: 0.15, s: [1.35, 0.6, 1.35], sj: 0.4 });
+  crown(b, r, PL.lantana, PL.core, [0, 0.55 * size, 0], foliageClumps, 0.42, [0.12, 0.075], 0.25, false, { lump: 0.35, holes: 1, twigs: 1, twig: PL.stem });
 
-  for (const c of shaped) {
+  for (const c of foliageClumps) {
     for (let i = 0; i < 1 + Math.floor(r() * 3); i++) {
       const s = c.s ?? [1, 0.82, 1];
       const u = unit(r);
@@ -289,7 +289,7 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
         const w = 0.05 + r() * 0.04;
         const seg = 5;
         const tx = Math.cos(a), tz = -Math.sin(a);
-        const at = (u: number): V3 => [top[0] + Math.sin(a + Math.PI / 2) * 0 + tx * (rr + u * u * 0.25 + u * 0.05), top[1] - 0.05 - u * L, top[2] + tz * (rr + u * u * 0.25 + u * 0.05)];
+        const at = (u: number): V3 => [top[0] + tx * (rr + u * u * 0.25 + u * 0.05), top[1] - 0.05 - u * L, top[2] + tz * (rr + u * u * 0.25 + u * 0.05)];
         const side: V3 = [-tz * w * 0.5, 0, tx * w * 0.5];
 
         for (let j = 0; j < seg; j++) {

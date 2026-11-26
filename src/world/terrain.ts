@@ -80,14 +80,14 @@ export function landAt(x: number, z: number) {
   const pq = Math.hypot((x - PADDY.x) / PADDY.rx, (z - PADDY.z) / PADDY.rz);
   const paddy = (1 - ss(0.86, 1.08, pq)) * ss(ROAD.half + 0.8, ROAD.half + 4, across);
   const h = hilly + (PADDY.y - hilly) * paddy;
-  const shaped = POND_FLOOR + (h - POND_FLOOR) * ss(0.72, 1.06, q);
+  const pondBed = POND_FLOOR + (h - POND_FLOOR) * ss(0.72, 1.06, q);
 
   // The ghat is cut into the bank
   if (x > GHAT.x0 - 0.5 && x < GHAT.x0 + GHAT.step * GHAT.count + 1 && Math.abs(z - POND.z) < GHAT.half + 0.6) {
-    return Math.min(shaped, GROUND - Math.max(x - GHAT.x0, 0) * 0.75 - 0.08);
+    return Math.min(pondBed, GROUND - Math.max(x - GHAT.x0, 0) * 0.75 - 0.08);
   }
 
-  return shaped;
+  return pondBed;
 }
 
 /** Whether a point is on the road, with a margin either side. */
@@ -160,9 +160,9 @@ export const heightGpu = (p: d.v2f) => {
   const pq = std.length(d.vec2f((x - PADDY.x) / PADDY.rx, (z - PADDY.z) / PADDY.rz));
   const paddy = (1 - std.smoothstep(0.86, 1.08, pq)) * std.smoothstep(ROAD.half + 0.8, ROAD.half + 4, across);
   const h = hilly + (PADDY.y - hilly) * paddy;
-  const shaped = POND_FLOOR + (h - POND_FLOOR) * std.smoothstep(0.72, 1.06, q);
+  const pondBed = POND_FLOOR + (h - POND_FLOOR) * std.smoothstep(0.72, 1.06, q);
   const ghat = x > GHAT.x0 - 0.5 && x < GHAT.x0 + GHAT.step * GHAT.count + 1 && std.abs(z - POND.z) < GHAT.half + 0.6;
-  const land = std.select(shaped, std.min(shaped, GROUND - std.max(x - GHAT.x0, 0) * 0.75 - 0.08), ghat);
+  const land = std.select(pondBed, std.min(pondBed, GROUND - std.max(x - GHAT.x0, 0) * 0.75 - 0.08), ghat);
   // The river's ravine, only out where it runs
   let cut = d.f32(land);
 

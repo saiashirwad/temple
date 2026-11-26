@@ -100,8 +100,8 @@ export function buildTemple() {
   };
 
   /** Kalasam finials on a ridge: stacked pots ending in a spike. */
-  const finial = (p: V3, k = 1) =>
-    b.lathe(M.gold, p, ([[0, 0], [0.16, 0.03], [0.17, 0.08], [0.06, 0.13], [0.15, 0.22], [0.17, 0.3], [0.07, 0.4], [0.11, 0.46], [0.12, 0.52], [0.04, 0.6], [0.05, 0.7], [0.015, 0.95], [0, 1.0]] as [number, number][]).map(([r, y]) => [r * k, y * k]), 14);
+  const finialProfile: [number, number][] = [[0, 0], [0.16, 0.03], [0.17, 0.08], [0.06, 0.13], [0.15, 0.22], [0.17, 0.3], [0.07, 0.4], [0.11, 0.46], [0.12, 0.52], [0.04, 0.6], [0.05, 0.7], [0.015, 0.95], [0, 1.0]];
+  const finial = (p: V3, k = 1) => b.lathe(M.gold, p, finialProfile.map(([r, y]) => [r * k, y * k]), 14);
 
   /** Rafter ends along an eave from a to b, under the roof edge. */
   const rafters = (a: V3, c: V3, out: [number, number], spacing = 0.42) => {
@@ -666,7 +666,7 @@ export function buildTemple() {
     // Lower roof of tiles, a lattice clerestory, then the steep copper upper roof with gables
     b.roof(M.tile, [0, 0, 0], [W + 0.95, L + 0.95], [W - 0.65, L - 0.6], 3.55, 5.1, { sag: 0.14 });
     eaves([0, 0, 0], [W + 0.95, L + 0.95], 3.55, [W, L]);
-    struts([[-W, L], [0, L], [W, L], [-W, -L], [0, -L], [W, -L]].map(([x, z]) => [x!, z!] as [number, number]).filter(([, z]) => z > 0), [0, 1], 2.9, 3.5, 0.85);
+    struts([[-W, L], [0, L], [W, L]], [0, 1], 2.9, 3.5, 0.85);
     struts([[-W, -L], [0, -L], [W, -L]], [0, -1], 2.9, 3.5, 0.85);
     struts([[W, -L + 0.6], [W, L - 0.6]], [1, 0], 2.9, 3.5, 0.85);
     struts([[-W, -L + 0.6], [-W, 0], [-W, L - 0.6]], [-1, 0], 2.9, 3.5, 0.85);

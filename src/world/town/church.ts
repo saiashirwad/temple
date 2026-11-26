@@ -241,7 +241,7 @@ export function buildChurch(b: Builder) {
       b.box(CREAM, [s * 2.0, gg + 4.2, hz], [0.1, 0.03, 0.03]);
     }
 
-    b.sweep(LIME, Array.from({ length: 9 }, (_, i) => [-1.75 + (3.5 * i) / 8, gg + 3.0 + Math.sin((Math.PI * i) / 8) * 0.9, hz] as V3), Array(9).fill(0.22), 6);
+    b.sweep(LIME, Array.from({ length: 9 }, (_, i): V3 => [-1.75 + (3.5 * i) / 8, gg + 3.0 + Math.sin((Math.PI * i) / 8) * 0.9, hz]), Array(9).fill(0.22), 6);
   });
 
   // ---- the wayside shrine down at the road, by the lane

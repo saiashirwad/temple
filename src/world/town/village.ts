@@ -37,21 +37,21 @@ const scaled = (m: Mat, k: number): Mat => ({ ...m, emission: [m.emission![0] * 
 const paint = (h: number): Mat => ({ color: hex(h), roughness: 0.8, pattern: P.PAINT });
 
 export const H = {
-  oxide: { color: hex(0x6a2216), roughness: 0.3, pattern: P.PLAIN } as Mat,
-  ceramic: { color: hex(0xb8ae9c), roughness: 0.2, pattern: P.PLAIN } as Mat,
-  glass: { color: hex(0x0b0d10), roughness: 0.08, pattern: P.GLASS } as Mat,
-  grill: { color: hex(0x1c1e20), roughness: 0.5, metallic: 0.6, pattern: P.STEEL } as Mat,
-  tank: { color: hex(0x121212), roughness: 0.45, pattern: P.PLAIN } as Mat,
-  rust: { color: hex(0x6a4a36), roughness: 0.6, metallic: 0.45, pattern: P.TIN } as Mat,
-  asbestos: { color: hex(0x7c7a74), roughness: 0.85, pattern: P.TIN } as Mat,
-  shutterBlue: { color: hex(0x2a5068), roughness: 0.6, pattern: P.WOOD } as Mat,
-  shutterGreen: { color: hex(0x2e5a3a), roughness: 0.6, pattern: P.WOOD } as Mat,
-  husk: { color: hex(0x4a3020), roughness: 0.95, pattern: P.CLOTH } as Mat,
-  firewood: { color: hex(0x4a3828), roughness: 0.9, pattern: P.WOOD } as Mat,
-  rope: { color: hex(0x5a4a34), roughness: 0.9, pattern: P.CLOTH } as Mat,
-  sheet: { color: hex(0xa88a5a), roughness: 0.55, pattern: P.CLOTH, doubleSided: true } as Mat,
-  tulsiThara: { color: hex(0xd8cfc0), roughness: 0.85, pattern: P.PLASTER } as Mat,
-};
+  oxide: { color: hex(0x6a2216), roughness: 0.3, pattern: P.PLAIN },
+  ceramic: { color: hex(0xb8ae9c), roughness: 0.2, pattern: P.PLAIN },
+  glass: { color: hex(0x0b0d10), roughness: 0.08, pattern: P.GLASS },
+  grill: { color: hex(0x1c1e20), roughness: 0.5, metallic: 0.6, pattern: P.STEEL },
+  tank: { color: hex(0x121212), roughness: 0.45, pattern: P.PLAIN },
+  rust: { color: hex(0x6a4a36), roughness: 0.6, metallic: 0.45, pattern: P.TIN },
+  asbestos: { color: hex(0x7c7a74), roughness: 0.85, pattern: P.TIN },
+  shutterBlue: { color: hex(0x2a5068), roughness: 0.6, pattern: P.WOOD },
+  shutterGreen: { color: hex(0x2e5a3a), roughness: 0.6, pattern: P.WOOD },
+  husk: { color: hex(0x4a3020), roughness: 0.95, pattern: P.CLOTH },
+  firewood: { color: hex(0x4a3828), roughness: 0.9, pattern: P.WOOD },
+  rope: { color: hex(0x5a4a34), roughness: 0.9, pattern: P.CLOTH },
+  sheet: { color: hex(0xa88a5a), roughness: 0.55, pattern: P.CLOTH, doubleSided: true },
+  tulsiThara: { color: hex(0xd8cfc0), roughness: 0.85, pattern: P.PLASTER },
+} satisfies Record<string, Mat>;
 
 const CLOTHS: Mat[] = [0xb8261b, 0x2a5a9a, 0xd8d2c4, 0xc89a2a, 0x3a7a4a, 0x8a2a6a, 0xd87a3a].map((h) => ({ color: hex(h), roughness: 0.9, pattern: P.CLOTH, doubleSided: true }));
 const OLD_WALLS: Mat[] = [M.plaster, M.plaster, M.ochre, paint(0xd8c8a0), paint(0xb8c8b0)];
@@ -95,7 +95,7 @@ function windowAt(c: Ctx, at: V3, yaw: number, w: number, h: number, style: 'woo
   const { b, r } = c;
   b.with({ at, yaw }, () => {
     const kind = r();
-    const pane = !glow ? H.glass : kind < 0.2 ? TV_WINDOW : kind < 0.5 ? TUBE_WINDOW : WINDOW;
+    const pane: Mat = !glow ? H.glass : kind < 0.2 ? TV_WINDOW : kind < 0.5 ? TUBE_WINDOW : WINDOW;
     const seed = r() * 0.45;
     // Its own fixed dice, from where it stands, so the rest of the village stays as it was
     let hs = Math.abs(Math.sin(at[0] * 12.9898 + at[2] * 78.233 + at[1] * 37.719 + yaw) * 43758.5453) % 1;

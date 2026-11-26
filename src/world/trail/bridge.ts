@@ -92,11 +92,18 @@ export function buildRiver(b: Builder) {
   const cy = Math.cos(heading);
   const sy = Math.sin(heading);
   const world = (lx: number, y: number, lz: number): V3 => [bx + lx * cy + lz * sy, y, bz - lx * sy + lz * cy];
+
+  const groundAt = (lx: number, lz: number) => {
+    const [x, , z] = world(lx, 0, lz);
+
+    return heightAt(x, z);
+  };
+
   b.with({ at: [bx, 0, bz], yaw: heading }, () => {
     // Landings of concrete at each end, from the ground up to the deck
     for (const [t, y, dir] of [[-a, ya, -1], [bEnd, yb, 1]] as const) {
-      const g = heightAt(...((p) => [p[0], p[2]] as [number, number])(world(0, 0, t)));
-      const low = Math.min(g, heightAt(...((p) => [p[0], p[2]] as [number, number])(world(0, 0, t - dir * 1.0)))) - 0.4;
+      const g = groundAt(0, t);
+      const low = Math.min(g, groundAt(0, t - dir)) - 0.4;
       b.box(M.concrete, [0, (y + low) / 2, t - dir * 0.2], [half + 0.35, (y - low) / 2, 1.0], 'y-');
 
       // Posts, a beam across their tops, the main cables' anchors behind on the ground
@@ -105,7 +112,7 @@ export function buildRiver(b: Builder) {
         b.box(POST, [side * (half + 0.18), y + 2.5, t - dir * 0.6], [0.16, 0.06, 0.16]);
         const ax = side * (half + 0.4);
         const az = t + dir * 2.8;
-        const ag = heightAt(...((p) => [p[0], p[2]] as [number, number])(world(ax, 0, az)));
+        const ag = groundAt(ax, az);
         b.box(M.concrete, [ax, ag + 0.15, az], [0.3, 0.35, 0.3], 'y-');
         b.bar(CABLE, [side * (half + 0.18), y + 2.4, t - dir * 0.6], [ax, ag + 0.45, az], 0.018);
       }
@@ -129,7 +136,7 @@ export function buildRiver(b: Builder) {
       return pts;
     };
 
-    for (const side of [-half + 0.05, half - 0.05]) b.sweep(CABLE, edge(side, -0.07), new Array(25).fill(0.03), 4);
+    for (const side of [-half + 0.05, half - 0.05]) b.sweep(CABLE, edge(side, -0.07), Array.from({ length: 25 }, () => 0.03), 4);
     const plankR = rng(7);
     // Seen only: the walker stands on the level deck pieces below, which cover the same span
     b.open(() => {
@@ -164,9 +171,9 @@ export function buildRiver(b: Builder) {
         mid.push([x * 0.96, deckAt(t) + 0.5, t]);
       }
 
-      b.sweep(CABLE, main, new Array(33).fill(0.022), 5);
-      b.sweep(CABLE, rail, new Array(33).fill(0.016), 4);
-      b.sweep(CABLE, mid, new Array(33).fill(0.01), 4);
+      b.sweep(CABLE, main, Array.from({ length: 33 }, () => 0.022), 5);
+      b.sweep(CABLE, rail, Array.from({ length: 33 }, () => 0.016), 4);
+      b.sweep(CABLE, mid, Array.from({ length: 33 }, () => 0.01), 4);
 
       // Hangers down from the main cable to the deck's edge, every half metre
       for (let t = -a + 1.1; t < bEnd - 1.0; t += 0.5) {

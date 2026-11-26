@@ -230,7 +230,7 @@ export const CROSSING = (() => {
     pts.push([p.x + d[0] * s + d[1] * bend, p.z + d[1] * s - d[0] * bend]);
   }
 
-  return { along, at: [p.x, p.z] as XZ, d, pts, half: 1.4 };
+  return { along, at: [p.x, p.z] satisfies XZ, d, pts, half: 1.4 };
 })();
 
 export function crossingDistance(x: number, z: number) {

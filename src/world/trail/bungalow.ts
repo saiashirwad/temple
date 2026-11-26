@@ -63,7 +63,13 @@ export function buildBungalow(b: Builder, building = BUNGALOW) {
   // The ground under it sloping away: the plinth reaches down to the lowest corner
   let low = Infinity;
 
-  for (const lx of [-W - 0.4, 0, W + 0.4]) for (const lz of [-D - 0.4, 0, D + V + 0.4]) low = Math.min(low, heightAt(...(([wx, , wz]) => [wx, wz] as [number, number])(world(lx, 0, lz))));
+  for (const lx of [-W - 0.4, 0, W + 0.4]) {
+    for (const lz of [-D - 0.4, 0, D + V + 0.4]) {
+      const [wx, , wz] = world(lx, 0, lz);
+      low = Math.min(low, heightAt(wx, wz));
+    }
+  }
+
   const depth = floor - low + 0.3;
 
   b.with({ at: [x, floor, z], yaw }, () => {

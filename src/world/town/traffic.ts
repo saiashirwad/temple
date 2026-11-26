@@ -13,7 +13,7 @@ const plain = (h: number, rough = 0.6, metallic = 0): Mat => ({ color: hex(h), r
 const paint = (h: number, rough = 0.35): Mat => ({ color: hex(h), roughness: rough, pattern: P.PAINT });
 const HEAD = lit(P.HEAD, [30, 26, 18]);
 const TAIL = lit(P.TAIL, [6, 0.25, 0.1]);
-const AMBER = { color: hex(0x8a4a08), roughness: 0.3, pattern: P.PLAIN } as Mat;
+const AMBER: Mat = { color: hex(0x8a4a08), roughness: 0.3, pattern: P.PLAIN };
 const RUBBER = plain(0x111111, 0.8);
 const RIM = plain(0x8a8a88, 0.35, 1);
 const CHROME = plain(0xc8c8c8, 0.2, 1);
@@ -427,5 +427,5 @@ export function rideAt(r: Rider, t: number) {
   const y = r.kind === 'bus' ? Math.min(heightAt(ahead, za), heightAt(behind, zb), heightAt(x, z)) : heightAt(x, z);
   const pitch = Math.atan2(heightAt(ahead, za) - heightAt(behind, zb), Math.hypot(ahead - behind, za - zb));
 
-  return { on, position: [x, y, z] as V3, yaw, pitch, travelled: s };
+  return { on, position: [x, y, z] satisfies V3, yaw, pitch, travelled: s };
 }

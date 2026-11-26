@@ -29,7 +29,7 @@ const S = {
   sign: lit(P.SIGN, [4.5, 4.2, 3.4]),
   signRed: lit(P.SIGN, [5, 1.2, 0.6]),
   cross: lit(P.BULB, [0.3, 6, 1.2]),
-  glass: { color: [0.02, 0.02, 0.02] as V3, roughness: 0.05, pattern: P.GLASS },
+  glass: { color: [0.02, 0.02, 0.02], roughness: 0.05, pattern: P.GLASS },
   pole: { color: hex(0x8c8a84), roughness: 0.9, pattern: P.CONCRETE },
   rubber: plain(0x111111, 0.8),
   chrome: plain(0xc8c8c8, 0.2, 1),
@@ -40,10 +40,10 @@ const S = {
   green: plain(0x2a7a3a, 0.5),
   banana: plain(0xd8b830, 0.6),
   bananaGreen: plain(0x8aa030, 0.6),
-  aluminium: { color: hex(0xb8b8b4), roughness: 0.35, metallic: 1, pattern: P.STEEL } as Mat,
+  aluminium: { color: hex(0xb8b8b4), roughness: 0.35, metallic: 1, pattern: P.STEEL },
   sack: plain(0xc8b898, 0.95),
   rice: plain(0xe8e2d4, 0.9),
-};
+} satisfies Record<string, Mat>;
 
 const GOODS = [0xd83020, 0x2050c0, 0xe8c020, 0x30a040, 0xf0f0e8, 0xe07020, 0x8030a0, 0x20a0b0].map((h) => plain(h, 0.5));
 const WALLS = [paint(0x3f8a9a), paint(0x7aa85a), paint(0xd8a040), paint(0xc87890), paint(0xe8e0cf), paint(0x4a6ab0)];

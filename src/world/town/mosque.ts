@@ -89,7 +89,7 @@ function minaret(b: Builder, x: number, z: number, h: number, seed: number) {
 
   b.sweep(GOLD, pts, pts.map((_, i) => 0.02 + 0.03 * Math.sin((Math.PI * i) / 10)), 5);
 
-  return { top: [x, y1, z] as V3, upper: [x, y2, z] as V3 };
+  return { top: [x, y1, z] satisfies V3, upper: [x, y2, z] satisfies V3 };
 }
 
 /** A pointed-arch pane facing +z, for windows. */

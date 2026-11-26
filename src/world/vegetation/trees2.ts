@@ -40,14 +40,14 @@ export const W = {
   core: plain(0x0c1608),
   pod: plain(0x3a2a18),
   greenPod: plain(0x4a5a22),
-  papayaStem: { color: hex(0x8a8a72), roughness: 0.9, pattern: P.PALM_BARK } as Mat,
+  papayaStem: { color: hex(0x8a8a72), roughness: 0.9, pattern: P.PALM_BARK },
   papaya: leaves(0.8, 0x3e6a1e, 0x467424, 0x365e1a),
   papayaStalk: plain(0x7a8a3a, 0.6),
   papayaFruit: plain(0x4e7a22, 0.6),
   papayaRipe: plain(0xc88a20, 0.6),
   pandanBark: bark(0x6a5e4a),
-  pandan: { color: hex(0x3e5a1e), roughness: 0.65, pattern: P.FROND, doubleSided: true } as Mat,
-  pandanDry: { color: hex(0x6a5a32), roughness: 0.65, pattern: P.FROND, doubleSided: true } as Mat,
+  pandan: { color: hex(0x3e5a1e), roughness: 0.65, pattern: P.FROND, doubleSided: true },
+  pandanDry: { color: hex(0x6a5a32), roughness: 0.65, pattern: P.FROND, doubleSided: true },
   pandanFruit: plain(0xb0701c, 0.6),
 } satisfies Record<string, Mat | Mat[]>;
 
@@ -80,7 +80,7 @@ interface Spec {
   /** How the crown reaches toward the light, and how many clumps go on the shaded side. */
   light: number;
   drop: number;
-  shape: V3;
+  crownScale: V3;
   leaves: Mat[];
   core: Mat | null;
   cover: number;
@@ -174,19 +174,19 @@ function grow(b: Builder, r: () => number, spec: Spec, size: number) {
     }
   });
   const base = on(spec.tiers[0]?.at ?? 0.7);
-  const shaped = uneven(clumps, r, { base, yaw, lean: spec.light, drop: spec.drop, jitter: 0.3, s: spec.shape });
+  const foliageClumps = uneven(clumps, r, { base, yaw, lean: spec.light, drop: spec.drop, jitter: 0.3, s: spec.crownScale });
   let cx = 0, cy = 0, cz = 0;
 
-  for (const k of shaped) {
+  for (const k of foliageClumps) {
     cx += k.c[0];
     cy += k.c[1];
     cz += k.c[2];
   }
 
-  const n = Math.max(shaped.length, 1);
-  crown(b, r, spec.leaves, spec.core, [cx / n, cy / n - 0.5 * size, cz / n], shaped, spec.cover, spec.leaf, spec.droop, false, { twig: spec.bark, ...spec.rag });
+  const n = Math.max(foliageClumps.length, 1);
+  crown(b, r, spec.leaves, spec.core, [cx / n, cy / n - 0.5 * size, cz / n], foliageClumps, spec.cover, spec.leaf, spec.droop, false, { twig: spec.bark, ...spec.rag });
 
-  return { clumps: shaped, tips, top: on(1), on, yaw };
+  return { clumps: foliageClumps, tips, top: on(1), on, yaw };
 }
 
 /** Things hanging under a crown: pods, drumsticks, fruit on stalks. */
@@ -206,7 +206,7 @@ export function teak(b: Builder, r: () => number, size: number) {
   grow(b, r, {
     bark: W.teakBark, height: 8.5, girth: 0.3, crook: 0.12, lean: 0.05, buttress: 4,
     tiers: [{ at: 0.62, n: 3, up: 0.7, len: 3.2, r: 0.12 }, { at: 0.85, n: 3, up: 1.1, len: 2.6, r: 0.09 }],
-    branch: 2, clump: [1.0, 1.5], light: 0.35, drop: 0.25, shape: [1.2, 0.55, 1.2],
+    branch: 2, clump: [1.0, 1.5], light: 0.35, drop: 0.25, crownScale: [1.2, 0.55, 1.2],
     leaves: W.teak, core: null, cover: 0.32, leaf: [0.58, 0.36], droop: 0.7, rag: { lump: 0.35, holes: 2, twigs: 2 },
   }, size);
 }
@@ -216,7 +216,7 @@ export function laurel(b: Builder, r: () => number, size: number) {
   grow(b, r, {
     bark: W.laurelBark, height: 12, girth: 0.38, crook: 0.08, lean: 0.03, buttress: 6,
     tiers: [{ at: 0.72, n: 3, up: 0.45, len: 4.2, r: 0.15 }, { at: 0.9, n: 3, up: 0.7, len: 3.2, r: 0.11 }],
-    branch: 2, reach: 0.5, curl: 0.18, clump: [1.0, 1.45], light: 0.25, drop: 0.15, shape: [1.4, 0.48, 1.4],
+    branch: 2, reach: 0.5, curl: 0.18, clump: [1.0, 1.45], light: 0.25, drop: 0.15, crownScale: [1.4, 0.48, 1.4],
     leaves: W.laurel, core: W.core, cover: 0.36, leaf: [0.28, 0.13], droop: 0.35, rag: { lump: 0.3, holes: 1, twigs: 2 },
   }, size);
 }
@@ -226,7 +226,7 @@ export function irul(b: Builder, r: () => number, size: number) {
   grow(b, r, {
     bark: W.irulBark, height: 5.5, girth: 0.26, crook: 0.4, lean: 0.12,
     tiers: [{ at: 0.6, n: 3, up: 0.55, len: 3.4, r: 0.11 }, { at: 0.92, n: 3, up: 0.9, len: 2.6, r: 0.08 }],
-    branch: 2, curl: 0.38, clump: [0.8, 1.15], light: 0.45, drop: 0.2, shape: [1.15, 0.68, 1.15],
+    branch: 2, curl: 0.38, clump: [0.8, 1.15], light: 0.45, drop: 0.2, crownScale: [1.15, 0.68, 1.15],
     leaves: W.irul, core: W.core, cover: 0.3, leaf: [0.22, 0.12], droop: 0.3, rag: { lump: 0.4, holes: 1, twigs: 3 },
   }, size);
 }
@@ -259,7 +259,7 @@ export function fig(b: Builder, r: () => number, size: number, peepal = false) {
   const g = grow(b, r, {
     bark: bk, height: 4.4, girth: 0.3, crook: 0.1, lean: 0.06, buttress: peepal ? 4 : 6,
     tiers: [{ at: 0.78, n: 4, up: peepal ? 0.6 : 0.3, len: peepal ? 4.2 : 5.4, r: 0.17 }, { at: 1, n: 2, up: 1.0, len: 3, r: 0.12 }],
-    branch: 2, reach: 0.5, clump: [1.3, 1.8], light: 0.3, drop: 0.15, shape: peepal ? [1.1, 0.75, 1.1] : [1.3, 0.6, 1.3],
+    branch: 2, reach: 0.5, clump: [1.3, 1.8], light: 0.3, drop: 0.15, crownScale: peepal ? [1.1, 0.75, 1.1] : [1.3, 0.6, 1.3],
     leaves: peepal ? W.peepal : W.fig, core: peepal ? null : W.core, cover: peepal ? 0.3 : 0.38, leaf: peepal ? [0.3, 0.17] : [0.3, 0.15], droop: peepal ? 0.6 : 0.35,
     rag: { lump: 0.3, holes: peepal ? 2 : 1, twigs: 2 },
   }, size);
@@ -291,7 +291,7 @@ export function silkCotton(b: Builder, r: () => number, size: number) {
       { at: 0.78, n: 3, up: 0.14, len: 2.7, r: 0.09 },
       { at: 0.92, n: 3, up: 0.25, len: 1.9, r: 0.07 },
     ],
-    branch: 1, reach: 0.4, curl: 0.12, clump: [0.75, 1.05], light: 0.2, drop: 0.12, shape: [1.5, 0.42, 1.5],
+    branch: 1, reach: 0.4, curl: 0.12, clump: [0.75, 1.05], light: 0.2, drop: 0.12, crownScale: [1.5, 0.42, 1.5],
     leaves: W.silk, core: null, cover: 0.3, leaf: [0.32, 0.15], droop: 0.45, rag: { lump: 0.3, holes: 1, twigs: 2 },
   }, size);
 
@@ -318,7 +318,7 @@ export function alstonia(b: Builder, r: () => number, size: number) {
       { at: 0.78, n: 4, up: 0.18, len: 2.1, r: 0.075 },
       { at: 0.94, n: 4, up: 0.35, len: 1.4, r: 0.06 },
     ],
-    branch: 0, curl: 0.1, clump: [0.95, 1.3], light: 0.15, drop: 0.08, shape: [1.55, 0.36, 1.55],
+    branch: 0, curl: 0.1, clump: [0.95, 1.3], light: 0.15, drop: 0.08, crownScale: [1.55, 0.36, 1.55],
     leaves: W.alstonia, core: W.core, cover: 0.34, leaf: [0.3, 0.1], droop: 0.25, rag: { lump: 0.2, holes: 1, twigs: 1 },
   }, size);
 }
@@ -328,7 +328,7 @@ export function cashew(b: Builder, r: () => number, size: number) {
   grow(b, r, {
     bark: W.cashewBark, height: 1.6, girth: 0.22, crook: 0.3, lean: 0.25,
     tiers: [{ at: 0.85, n: 5, up: 0.22, len: 4.2, r: 0.12 }],
-    branch: 2, reach: 0.5, curl: 0.4, clump: [1.0, 1.4], light: 0.45, drop: 0.2, shape: [1.3, 0.62, 1.3],
+    branch: 2, reach: 0.5, curl: 0.4, clump: [1.0, 1.4], light: 0.45, drop: 0.2, crownScale: [1.3, 0.62, 1.3],
     leaves: W.cashew, core: W.core, cover: 0.36, leaf: [0.26, 0.15], droop: 0.35, rag: { lump: 0.35, holes: 1, twigs: 2 },
   }, size);
 }
@@ -338,7 +338,7 @@ export function tamarind(b: Builder, r: () => number, size: number) {
   const g = grow(b, r, {
     bark: W.tamarindBark, height: 3.4, girth: 0.42, crook: 0.18, lean: 0.08, buttress: 3,
     tiers: [{ at: 0.85, n: 5, up: 0.75, len: 4.2, r: 0.17 }, { at: 1, n: 2, up: 1.4, len: 3.4, r: 0.12 }],
-    branch: 2, clump: [1.3, 1.75], light: 0.25, drop: 0.1, shape: [1.05, 0.72, 1.05],
+    branch: 2, clump: [1.3, 1.75], light: 0.25, drop: 0.1, crownScale: [1.05, 0.72, 1.05],
     leaves: W.tamarind, core: W.core, cover: 0.32, leaf: [0.28, 0.14], droop: 0.45, rag: { lump: 0.4, holes: 1, twigs: 3 },
   }, size);
 
@@ -350,7 +350,7 @@ export function gulmohar(b: Builder, r: () => number, size: number) {
   const g = grow(b, r, {
     bark: W.gulmoharBark, height: 2.6, girth: 0.26, crook: 0.15, lean: 0.12,
     tiers: [{ at: 0.92, n: 5, up: 0.5, len: 4.6, r: 0.13 }],
-    branch: 3, reach: 0.4, curl: 0.22, clump: [1.0, 1.35], light: 0.35, drop: 0.12, shape: [1.55, 0.42, 1.55],
+    branch: 3, reach: 0.4, curl: 0.22, clump: [1.0, 1.35], light: 0.35, drop: 0.12, crownScale: [1.55, 0.42, 1.55],
     leaves: W.gulmohar, core: null, cover: 0.3, leaf: [0.26, 0.13], droop: 0.55, rag: { lump: 0.3, holes: 2, twigs: 2 },
   }, size);
 
@@ -362,7 +362,7 @@ export function drumstick(b: Builder, r: () => number, size: number) {
   const g = grow(b, r, {
     bark: W.drumstickBark, height: 3.2, girth: 0.12, crook: 0.3, lean: 0.15,
     tiers: [{ at: 0.6, n: 2, up: 0.9, len: 2.8, r: 0.06 }, { at: 0.95, n: 3, up: 1.2, len: 2.2, r: 0.05 }],
-    branch: 2, curl: 0.35, clump: [0.55, 0.85], light: 0.4, drop: 0.25, shape: [1.25, 0.6, 1.25],
+    branch: 2, curl: 0.35, clump: [0.55, 0.85], light: 0.4, drop: 0.25, crownScale: [1.25, 0.6, 1.25],
     leaves: W.drumstick, core: null, cover: 0.24, leaf: [0.16, 0.1], droop: 0.65, rag: { lump: 0.4, holes: 2, twigs: 2 },
   }, size);
 

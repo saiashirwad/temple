@@ -15,7 +15,7 @@ type V3 = [number, number, number];
 
 import { SOUND_FILES as FILES } from '../content/assets.ts';
 
-type Sheet = keyof typeof SPRITES;
+type SpriteKey = [sheet: 'steps', item: keyof typeof SPRITES.steps] | [sheet: 'calls', item: Call];
 
 export type Call = keyof typeof SPRITES.calls;
 
@@ -141,7 +141,7 @@ export function createSound(world: SoundWorld, random = Math.random) {
     const c = ctx!;
 
     // The hills' echo, built when the page has a moment to spare
-    if (typeof requestIdleCallback === 'function') requestIdleCallback(buildEcho, { timeout: 4000 });
+    if ('requestIdleCallback' in window) window.requestIdleCallback(buildEcho, { timeout: 4000 });
     else setTimeout(buildEcho, 500);
     await Promise.all(
       FILES.map(async (name) => {
@@ -322,9 +322,10 @@ export function createSound(world: SoundWorld, random = Math.random) {
    * Plays a variant of `item` from a sprite sheet at `at` (or in your head when null). Returns the
    * voice, or null if the sheet hasn't loaded (callers fall back to the synth).
    */
-  const sprite = (sheet: Sheet, item: string, at: V3 | null, o: ClipOptions = {}) => {
+  const sprite = (...clip: [...SpriteKey, at: V3 | null, options?: ClipOptions]) => {
+    const [sheet, item, at, o = {}] = clip;
     const buf = buffers.get(sheet);
-    const list = (SPRITES[sheet] as Record<string, number[][]>)[item];
+    const list = sheet === 'calls' ? SPRITES.calls[item] : SPRITES.steps[item];
 
     if (!ready() || !buf || !list?.length) return null;
     const key = sheet + item;
@@ -332,7 +333,7 @@ export function createSound(world: SoundWorld, random = Math.random) {
 
     if (list.length > 1 && k === lastOf.get(key)) k = (k + 1 + Math.floor(random() * (list.length - 1))) % list.length;
     lastOf.set(key, k);
-    const [from, len] = list[k] as [number, number];
+    const [from, len] = list[k]!;
     const v = voice(at, { ref: o.ref ?? 6, rolloff: o.rolloff ?? 1, max: o.max ?? 500, hrtf: o.hrtf });
     const src = v.clip(buf);
     const rate = (o.rate ?? 1) * rand(0.95, 1.05);

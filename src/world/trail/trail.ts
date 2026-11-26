@@ -111,7 +111,7 @@ export const TRAIL_MAP = (() => {
   const nx = Math.ceil((x1 - x0 + pad * 2) / res);
   const nz = Math.ceil((z1 - z0 + pad * 2) / res);
 
-  return { lo, res, nx, nz, size: [nx * res, nz * res] as XZ };
+  return { lo, res, nx, nz, size: [nx * res, nz * res] satisfies XZ };
 })();
 
 /**
