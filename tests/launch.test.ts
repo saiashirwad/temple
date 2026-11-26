@@ -43,6 +43,9 @@ test('the frame verifier rejects a camera still easing toward the correct bridge
   verifyFirstFrame(params, frame);
   assert.throws(() => verifyFirstFrame(params, { ...frame, at: [x + 1, z] }));
   assert.throws(() => verifyFirstFrame(params, { ...frame, pitch: 0 }));
+  const preset = new URLSearchParams('preset=3');
+  verifyFirstFrame(preset, frame);
+  assert.throws(() => verifyFirstFrame(preset, { ...frame, at: [x + 1, z] }));
 });
 
 test('named encounters use the same entry camera and resources as their keyboard shortcuts', () => {
