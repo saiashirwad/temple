@@ -16,7 +16,8 @@
     "gen:models": "tsx tools/models/fetch.ts",
     "gen:beasts": "nice npx tsx tools/beasts/elephant.ts && nice npx tsx tools/beasts/dhole.ts",
     "gen:people": "tsx tools/people/build.ts && tsx tools/people/shrink.ts",
-    "scenario": "tsx tools/scenario.ts"
+    "scenario": "tsx tools/scenario.ts",
+    "startup": "tsx tools/startup.ts"
   },
   "dependencies": {
     "@typegpu/color": "0.12.2",

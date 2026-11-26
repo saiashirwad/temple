@@ -208,6 +208,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   // ---- what is built, and what grows
   const t0 = performance.now();
   /** When each startup stage finished, in milliseconds since the page began loading (for the readout). */
+  performance.mark('game:scene', { startTime: t0 });
   const stages = [{ name: 'scene', ms: Math.round(t0) }];
   const stage = (name: string) => {
     const n = document.querySelector('#note');
@@ -218,7 +219,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       tag.textContent += ` ${name}:${((performance.now() - t0) / 1000).toFixed(2)}`;
     }
     console.log('stage', name, ((performance.now() - t0) / 1000).toFixed(2));
-    stages.push({ name, ms: Math.round(performance.now()) });
+    const mark = performance.mark('game:' + name);
+    stages.push({ name, ms: Math.round(mark.startTime) });
   };
   // Downloads first, so the files arrive while the town is being built
   const loadPeople = peopleLoader();
