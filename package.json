@@ -25,7 +25,8 @@
     "@typegpu/kit": "^0.1.0",
     "@typegpu/noise": "0.12.1",
     "box3d.js": "^0.1.1",
-    "typegpu": "0.12.11"
+    "typegpu": "0.12.11",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

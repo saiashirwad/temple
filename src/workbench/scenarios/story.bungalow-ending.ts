@@ -7,7 +7,14 @@ export type Trace = { at: number; event: string; detail?: string };
 export function rehearseBungalow() {
   const trace: Trace[] = [];
   let time = 0;
-  const add = (event: string, detail?: string) => trace.push({ at: +time.toFixed(2), event, ...(detail === undefined ? {} : { detail }) });
+
+  const add = (event: string, detail?: string) => {
+    const entry: Trace = { at: +time.toFixed(2), event };
+
+    if (detail !== undefined) entry.detail = detail;
+    trace.push(entry);
+  };
+
   const story = createStory({ tell: (text) => add('line', text), guardGone: () => add('guard gone'), end: () => add('end') });
   const bungalow = createBungalowStory(() => { add('sit'); story.sit(); });
 

@@ -134,9 +134,10 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   root.querySelector('[name=remove]')!.addEventListener('click', () => {
     obstacle = [1e6, 1e6];
   });
-  root.querySelector('[name=pause]')!.addEventListener('click', (event) => {
+  const pause = root.querySelector<HTMLButtonElement>('[name=pause]')!;
+  pause.addEventListener('click', () => {
     paused = !paused;
-    (event.currentTarget as HTMLElement).textContent = paused ? 'Resume' : 'Pause';
+    pause.textContent = paused ? 'Resume' : 'Pause';
   });
   canvas.addEventListener('pointerdown', (e) => {
     const rect = canvas.getBoundingClientRect();

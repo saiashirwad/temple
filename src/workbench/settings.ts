@@ -57,7 +57,7 @@ function slider(
   root.append(field);
 }
 
-export function exportSettings(root: HTMLElement, filename: string, settings: object) {
+export function exportSettings(root: HTMLElement, filename: string, settings: Record<string, number>) {
   const button = document.createElement('button');
   button.textContent = 'Export ' + filename;
   button.onclick = () => {

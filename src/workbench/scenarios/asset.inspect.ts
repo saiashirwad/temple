@@ -188,7 +188,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
           {
             night,
             specimen: specimen?.build(seed),
-            ...(path.startsWith('people/') && !path.startsWith('people/clips/') && clipPath ? { clipUrl: urlOf(clipPath) } : {}),
+            clipUrl: path.startsWith('people/') && !path.startsWith('people/clips/') && clipPath ? urlOf(clipPath) : undefined,
           },
         );
 

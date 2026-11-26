@@ -1,4 +1,5 @@
 import '../forest.css';
+import { z } from 'zod';
 // A top-down inspection of the same placements the game builds, without a GPU.
 import { buildGrounds } from '../../world/town/grounds.ts';
 import { buildVillage } from '../../world/town/village.ts';
@@ -9,9 +10,17 @@ import { trailAt, TRAIL_LENGTH } from '../../world/trail/trail.ts';
 import { BRIDGE } from '../../world/trail/bridge.ts';
 import VEGETATION from '../../content/vegetation.json';
 
-const colors: Record<string, string> = { trees: '#8bd88c', far: '#4f8f71', plants: '#e4ba6e', grass: '#99a967' };
+const colors = { trees: '#8bd88c', far: '#4f8f71', plants: '#e4ba6e', grass: '#99a967' };
 
-type Point = { at: readonly number[]; name: string; group: string };
+type Point = { at: readonly number[]; name: string; group: keyof typeof colors };
+
+const forestSettings = z.object({
+  seed: z.int(),
+  density: z.number().min(0).max(100),
+  region: z.enum(['world', 'bridge']),
+  grass: z.boolean(),
+  group: z.enum(['all', 'trees', 'far', 'plants', 'grass']),
+});
 
 export const title = 'Forest distribution';
 
@@ -172,10 +181,10 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     try {
       const p = plantAll(village.homes, grounds.gaps, village.tulsi, { seed: value, density: 1 });
       points = [
-        ...p.trees.map((t) => ({ at: t.at, name: t.specimen.species, group: 'trees' })),
-        ...p.far.map((t) => ({ at: t.at, name: t.specimen ? t.specimen.species : `${t.kind} card`, group: 'far' })),
-        ...p.plants.map((t) => ({ at: t.at, name: t.specimen.species, group: 'plants' })),
-        ...meadowPlaces(land.pixels, p.walked, { seed: value, density: 1 }).map((t) => ({
+        ...p.trees.map((t): Point => ({ at: t.at, name: t.specimen.species, group: 'trees' })),
+        ...p.far.map((t): Point => ({ at: t.at, name: t.specimen ? t.specimen.species : `${t.kind} card`, group: 'far' })),
+        ...p.plants.map((t): Point => ({ at: t.at, name: t.specimen.species, group: 'plants' })),
+        ...meadowPlaces(land.pixels, p.walked, { seed: value, density: 1 }).map((t): Point => ({
           at: t.at,
           name: t.length,
           group: 'grass',
@@ -216,22 +225,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   });
   root.querySelector('[name=apply]')!.addEventListener('click', () => {
     try {
-      const data: unknown = JSON.parse(settings.value);
-
-      if (!data || typeof data !== 'object') throw new Error('Expected a settings object');
-      const d = data as Record<string, unknown>;
-
-      if (
-        !Number.isSafeInteger(d.seed) ||
-        typeof d.density !== 'number' ||
-        !Number.isFinite(d.density) ||
-        d.density < 0 ||
-        d.density > 100 ||
-        !['world', 'bridge'].includes(String(d.region)) ||
-        typeof d.grass !== 'boolean' ||
-        !['all', 'trees', 'far', 'plants', 'grass'].includes(String(d.group))
-      )
-        throw new Error('Invalid settings');
+      const d = forestSettings.parse(JSON.parse(settings.value));
       seed.value = String(d.seed);
       density.value = String(d.density);
       region.value = String(d.region);

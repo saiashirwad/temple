@@ -82,7 +82,8 @@ export async function inspectModel(
         max[k] = Math.max(max[k]!, v);
       }
 
-  const center = min.map((v, i) => (v + max[i]!) / 2) as [number, number, number];
+  const midpoint = (axis: number) => (min[axis] + max[axis]) / 2;
+  const center: [number, number, number] = [midpoint(0), midpoint(1), midpoint(2)];
   const size = Math.max(...max.map((v, i) => v - min[i]!), 0.01);
 
   const create = async (root: TgpuRoot, surface: Surface) => {
@@ -131,11 +132,10 @@ export async function inspectModel(
     const object = pool.add(model);
     const figures = file?.skin && clip ? poses.create(root, file.skin, { clip }, { capacity: 1 }) : null;
 
-    const things = figures
-      ? instances.create(root, pool, { kind: Figure, capacity: model.meshes.length })
-      : instances.create(root, pool, { capacity: model.meshes.length });
+    const posed = figures && instances.create(root, pool, { kind: Figure, capacity: model.meshes.length });
+    const things = posed ?? instances.create(root, pool, { capacity: model.meshes.length });
 
-    if (figures) (things as ReturnType<typeof instances.create<typeof Figure>>).add(object, { pose: figures.add('clip', 0) });
+    if (figures && posed) posed.add(object, { pose: figures.add('clip', 0) });
     else things.add(object, {});
     const renderer = figures ? things.renderer().pipe(figures.inject()) : things.renderer();
     const drawn = [scene.add(renderer)];
@@ -170,26 +170,20 @@ export async function inspectModel(
     };
   };
 
-  let ready!: () => void;
-  let fail!: (error: unknown) => void;
-
-  const firstFrame = new Promise<void>((resolve, reject) => {
-    ready = resolve;
-    fail = reject;
-  });
+  const firstFrame = Promise.withResolvers<void>();
 
   const host = web.host(create, {
     canvas,
     attach: ({ scene }) => web.orbitControls(scene.view, canvas),
-    onFrame: () => ready(),
+    onFrame: () => firstFrame.resolve(),
     onError: (error) => {
       report(`Preview error: ${String(error)}`);
-      fail(error);
+      firstFrame.reject(error);
     },
   });
 
   try {
-    await firstFrame;
+    await firstFrame.promise;
   } catch (error) {
     host.destroy();
     throw error;
