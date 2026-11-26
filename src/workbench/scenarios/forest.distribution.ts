@@ -1,5 +1,4 @@
 import '../forest.css';
-import { z } from 'zod';
 // A top-down inspection of the same placements the game builds, without a GPU.
 import { buildGrounds } from '../../world/town/grounds.ts';
 import { buildVillage } from '../../world/town/village.ts';
@@ -14,13 +13,19 @@ const colors = { trees: '#8bd88c', far: '#4f8f71', plants: '#e4ba6e', grass: '#9
 
 type Point = { at: readonly number[]; name: string; group: keyof typeof colors };
 
-const forestSettings = z.object({
-  seed: z.int(),
-  density: z.number().min(0).max(100),
-  region: z.enum(['world', 'bridge']),
-  grass: z.boolean(),
-  group: z.enum(['all', 'trees', 'far', 'plants', 'grass']),
-});
+async function parseForestSettings(source: string) {
+  const { object, int, number, gte, lte, enum: choice, boolean } = await import('zod/mini');
+
+  const settings = object({
+    seed: int(),
+    density: number().check(gte(0), lte(100)),
+    region: choice(['world', 'bridge']),
+    grass: boolean(),
+    group: choice(['all', 'trees', 'far', 'plants', 'grass']),
+  });
+
+  return settings.parse(JSON.parse(source));
+}
 
 export const title = 'Forest distribution';
 
@@ -223,14 +228,14 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     settings.value = JSON.stringify({ seed: Number(seed.value), density: Number(density.value) / 100 }, null, 2);
     share.textContent = 'Vegetation content JSON: save it as src/content/vegetation.json to use it in the game.';
   });
-  root.querySelector('[name=apply]')!.addEventListener('click', () => {
+  root.querySelector('[name=apply]')!.addEventListener('click', async () => {
     try {
-      const d = forestSettings.parse(JSON.parse(settings.value));
+      const d = await parseForestSettings(settings.value);
       seed.value = String(d.seed);
       density.value = String(d.density);
-      region.value = String(d.region);
+      region.value = d.region;
       grass.checked = d.grass;
-      group.value = String(d.group);
+      group.value = d.group;
       void rebuild();
     } catch (error) {
       root.dataset.error = String(error);
