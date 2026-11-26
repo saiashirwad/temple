@@ -8,7 +8,8 @@ import { createDanger } from './danger.ts';
 import { GLADE, INTEREST, SHRINES, type Interest } from '../world/trail/jungle.ts';
 import { RIVER, riverLevel, riverLocal, riverPoint } from '../world/trail/river.ts';
 import type { createSound } from '../audio/sound.ts';
-import { COOK_NOTE, createStory, DOWN_TEXT, GUARD_LINES, REST_TEXT, type StoryEvent } from './story.ts';
+import { createStory } from './story.ts';
+import { COOK_NOTE, DOWN_TEXT, GUARD_LINES, REST_TEXT } from '../content/narrative.ts';
 import { heightAt } from '../world/terrain.ts';
 import { TRAIL_LENGTH, trailAt, trailNear } from '../world/trail/trail.ts';
 import { createUnease, type UneaseHooks } from './unease.ts';
@@ -82,12 +83,17 @@ export const farLanternAt = (sat: number): [number, number, number, number] => {
   return [p.x, heightAt(p.x, p.z) + 0.7 + swing * 0.2, p.z, w];
 };
 
-type Say = ((text: string, seconds: number) => void) | null;
+interface JourneyHud {
+  say(text: string, seconds: number): void;
+  tell(text: string, seconds: number): void;
+  arrive(): void;
+  down(): void;
+  end(): void;
+}
 
 export function createJourney({ random, walker, people, sound, eyes, cover, view, later, fog, torchLamp, beasts }: JourneyDeps) {
   const state = { furthest: 0, deep: 0, torch: 0, torchOff: false, hidden: false, arrived: false, near: null as Interest | null, wind: [0, 1] as [number, number], reading: false, arrivedAt: -99, metHerd: false, darkFor: 0, ended: false, downs: 0, alertUntil: 0 };
-  /** What the page shows: index.ts sets these. */
-  const hud = { onArrive: null as (() => void) | null, onSay: null as Say, onDown: null as (() => void) | null, onTell: null as Say, onEnd: null as (() => void) | null };
+  let hud: JourneyHud | undefined;
   /** The last frame's tick; before the first, a still one at the origin. */
   let tk: Tick = { seconds: 0, dt: 0, eye: [0, 0, 0], fwd: [0, 0, -1], yaw: 0, x: 0, z: 0 };
   /** Seconds to the next howl, once you're in among the trees. */
@@ -106,21 +112,20 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
 
   // ---- the story of the walk, told as you go
   const story = createStory({
-    tell: (text, secs) => hud.onTell?.(text, secs),
+    tell: (text, secs) => hud?.tell(text, secs),
     guardGone: () => {
       people.guard.gone = true;
     },
     end: () => {
       state.ended = true;
-      hud.onEnd?.();
+      hud?.end();
     },
   });
-  const storyMark = (e: StoryEvent) => story.mark(e);
   /** Seconds left lying in the dark after going down: nothing hunts you meanwhile. */
   let downFor = 0;
   const danger = createDanger(GLADE, {
     cover: cover.inCover,
-    mark: storyMark,
+    mark: story.mark,
     safe: (x, z) => cover.atShrine(x, z) || aloft(x, z) || (!people.guard.gone && Math.hypot(x - people.guard.at[0], z - people.guard.at[2]) < 9) || Math.hypot(x, z) < TOWN_R || Math.hypot(x - BUNGALOW.x, z - BUNGALOW.z) < BUNGALOW_SAFE,
     wild: (x, z) => {
       // The cheap tests first: most of the time this is town, or the bungalow
@@ -131,17 +136,17 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     say: (text, showFor = 6) => {
       // The story waits while this is up
       state.alertUntil = tk.seconds + showFor;
-      hud.onSay?.(text, showFor);
+      hud?.say(text, showFor);
     },
     sound,
-    shove: (vx, vz) => walker.shove(vx, vz),
+    shove: walker.shove,
     down: () => {
       // You come to by the last shrine you passed, or back at the start of the path
       const along = trailNear(walker.at[0], walker.at[1], 40).along;
       const back = [...SHRINES].reverse().find((sh) => sh.along <= along);
       const p = trailAt(back ? back.along : 8);
       state.downs++;
-      hud.onDown?.();
+      hud?.down();
       // Dark for a moment, then awake by the shrine; the story says what happened, in its own turn
       downFor = 1.4;
       later(1.4, () => walker.moveTo(p.x, p.z, p.heading + Math.PI, true));
@@ -152,7 +157,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
   let guardTalks = 0;
   let guardLine: { at: number; text: string } | null = null;
   let creakIn = 1;
-  const bungalow = createBungalowStory(() => story.sit());
+  const bungalow = createBungalowStory(story.sit);
 
   /** How far into the trees, the story's own pace, the wind. */
   const progress = (t: Tick) => {
@@ -167,14 +172,14 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     // The crickets fall silent round a big animal: the forest's own warning that the herd is near
     if (danger.herd.some((e) => e.on && Math.hypot(e.x - x, e.z - z) < 26)) {
       sound.hush(1.5);
-      storyMark('hush');
+      story.mark('hush');
       state.metHerd = true;
     }
     // Past the herd, unhurt: something learned
-    if (state.metHerd && near.distance < 20 && near.along > GLADE.along + 45 && Math.hypot(x - GLADE.x, z - GLADE.z) > 45) storyMark('herdPassed');
+    if (state.metHerd && near.distance < 20 && near.along > GLADE.along + 45 && Math.hypot(x - GLADE.x, z - GLADE.z) > 45) story.mark('herdPassed');
     // Walking in the dark with your torch off, deep in the trees
     state.darkFor = state.torchOff && state.deep > 0.5 && walker.pace > 0.4 ? state.darkFor + dt : 0;
-    if (state.darkFor > 14) storyMark('dark');
+    if (state.darkFor > 14) story.mark('dark');
     // The wind, turning slowly through the night
     const wa = 0.8 + Math.sin(seconds * 0.011) * 1.6 + Math.sin(seconds * 0.037 + 2) * 0.5;
     state.wind = [Math.sin(wa), Math.cos(wa)];
@@ -203,7 +208,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
       howlIn -= dt;
       if (howlIn < 0) {
         sound.howl(farOff(), 0.55 + random.ambience() * 0.25);
-        storyMark('howl');
+        story.mark('howl');
         howlIn = 55 + random.ambience() * 95;
         if (random.ambience() < 0.35) replyIn = 4 + random.ambience() * 5;
       }
@@ -280,77 +285,21 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     if (!state.arrived && Math.hypot(x - BUNGALOW_FRONT[0], z - BUNGALOW_FRONT[1]) < ARRIVE_R) {
       state.arrived = true;
       state.arrivedAt = seconds;
-      hud.onArrive?.();
+      hud?.arrive();
     }
   };
 
-  /** What the page reads and sets (index.ts). */
-  const api = {
-    get furthest() {
-      return state.furthest;
-    },
-    length: TRAIL_LENGTH,
-    set onArrive(fn: (() => void) | null) {
-      hud.onArrive = fn;
-    },
-    /** Something close by worth bending down or stopping to look at, or null. */
-    get near() {
-      return state.near;
-    },
-    get health() {
-      return danger.health;
-    },
-    get sinceHurt() {
-      return danger.sinceHurt;
-    },
-    get threat() {
-      return danger.threat;
-    },
-    get hidden() {
-      return state.hidden;
-    },
-    get torchOn() {
-      return !state.torchOff;
-    },
-    toggleTorch() {
-      state.torchOff = !state.torchOff;
-    },
-    set onSay(fn: Say) {
-      hud.onSay = fn;
-    },
-    set onDown(fn: (() => void) | null) {
-      hud.onDown = fn;
-    },
-    /** Whether you're reading something close up: the story waits. */
-    set reading(v: boolean) {
-      state.reading = v;
-    },
-    /** A line of the story to show. */
-    set onTell(fn: Say) {
-      hud.onTell = fn;
-    },
-    /** The walk is over. */
-    set onEnd(fn: (() => void) | null) {
-      hud.onEnd = fn;
-    },
-    /** Which way the wind blows, flat. */
-    get wind(): readonly [number, number] {
-      return state.wind;
-    },
-    /** How near you are to facing the red dogs down, 0 to 1. */
-    get holding() {
-      return danger.holding;
-    },
+  return {
+    state, step, story, danger,
+    attachHud(output: JourneyHud) { hud = output; },
     /** You've looked at, read or sat at `it`. */
-    examined(it: Interest) {
+    examine(it: Interest) {
       if (it.id && bungalow.examine(it.id, tk.seconds) && it.id === 'bungalow.chair') {
         // Sitting where he sat, looking out the way he looked: off the veranda, down the hill
         const far = trailAt(FAR_FROM);
         view.goal.yaw = Math.atan2(-(far.x - tk.eye[0]), -(far.z - tk.eye[2])) + 0.1;
         view.goal.pitch = 0.07;
-      } else if (it.text === REST_TEXT) storyMark('rested');
+      } else if (it.text === REST_TEXT) story.mark('rested');
     },
   };
-
-  return { state, step, story, danger, api };
 }

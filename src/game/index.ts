@@ -112,20 +112,20 @@ if (!navigator.gpu) {
 
       // Something for test browsers to wait on: the scene is up and drawing
       document.body.append(Object.assign(document.createElement('i'), { id: 'running', style: 'position:fixed;left:0;bottom:0;width:1px;height:1px' }));
-      const controls = web.orbitControls(scene.view, canvas, { sensitivity: coarse ? 0.007 : 0.005, onChange: () => scene.touched() });
+      const controls = web.orbitControls(scene.view, canvas, { sensitivity: coarse ? 0.007 : 0.005, onChange: () => scene.walker.touched() });
 
-      const j = scene.journey;
+      const { state, danger } = scene.journey;
       const walker = scene.walker;
       let shown: string | null = null;
       let shownId: string | undefined;
       let since = 0;
       // Bending down to look at something by the path: dung, prints, a shrine, a view
       const examine = () => {
-        const it = j.near;
+        const it = state.near;
         if (!it) return;
         walker.touched();
         if (it.low || it.sit) walker.crouchDown(it.low);
-        j.examined(it);
+        scene.journey.examine(it);
         hud.caption(it.text);
         shown = it.text;
         shownId = it.id;
@@ -141,7 +141,7 @@ if (!navigator.gpu) {
         walker.touched();
         walker.toggleCrouch();
       };
-      const torch = () => j.toggleTorch();
+      const torch = () => { state.torchOff = !state.torchOff; };
       const hud = createHud(
         {
           mode: () => {
@@ -172,7 +172,7 @@ if (!navigator.gpu) {
         const g = scene.view.goal;
         g.yaw -= e.movementX * 0.0022;
         g.pitch = Math.min(1.3, Math.max(-1.1, g.pitch + e.movementY * 0.0022));
-        scene.touched();
+        scene.walker.touched();
       });
       // Every key in one place
       const moveKeys = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift']);
@@ -210,9 +210,9 @@ if (!navigator.gpu) {
       // Keys let go while the window was away would otherwise keep you walking
       addEventListener('blur', () => walker.keys.clear());
       setInterval(() => {
-        const it = j.near;
+        const it = state.near;
         const reading = shown !== null;
-        j.reading = reading;
+        state.reading = reading;
         // Up again and the words gone once you walk on, or move away
         if (reading && ((walker.moving && performance.now() - since > 600) || !it || it.text !== shown)) {
           shown = null;
@@ -223,31 +223,27 @@ if (!navigator.gpu) {
         }
         hud.look(!it || shown !== null || walker.mode === 'above' ? null : (it.label ?? 'Look closer'));
       }, 150);
-      j.onSay = hud.say;
-      j.onTell = hud.tell;
-      j.onEnd = hud.end;
-      j.onDown = hud.down;
-      j.onArrive = hud.arrive;
+      scene.journey.attachHud(hud);
       // Health, breath, and what the forest is telling you
       hudFrame = () => {
         // The wind on screen: which way it blows, turned to the way you face
         const yaw = scene.view.pose.yaw;
-        const [wx, wz] = j.wind;
+        const [wx, wz] = state.wind;
         const right = wx * Math.cos(yaw) - wz * Math.sin(yaw);
         const ahead = -wx * Math.sin(yaw) - wz * Math.cos(yaw);
         hud.update({
           above: walker.mode === 'above',
-          forest: j.furthest > 60 || j.health < 1,
+          forest: state.furthest > 60 || danger.health < 1,
           moving: walker.moving,
-          health: j.health,
+          health: danger.health,
           stamina: walker.stamina,
           winded: walker.winded,
-          hidden: j.hidden,
-          threat: j.threat,
-          holding: j.holding,
-          sinceHurt: j.sinceHurt,
+          hidden: state.hidden,
+          threat: danger.threat,
+          holding: danger.holding,
+          sinceHurt: danger.sinceHurt,
           windDeg: (Math.atan2(right, ahead) * 180) / Math.PI,
-          torchOn: j.torchOn,
+          torchOn: !state.torchOff,
           sneaking: walker.sneaking,
         });
       };
@@ -263,7 +259,7 @@ if (!navigator.gpu) {
         canvas.dataset.ready = '';
         const pose = scene.view.pose;
         canvas.dataset.firstFrame = JSON.stringify({ at: [pose.target[0], pose.target[2]], yaw: pose.yaw, pitch: pose.pitch, mode: scene.walker.mode,
-          readingNote: document.querySelector('#caption')?.classList.contains('on') && scene.test.story.sitting < 0, ended: scene.test.state.ended, guardGone: scene.test.guardGone, sitting: scene.test.story.sitting });
+          readingNote: document.querySelector('#caption')?.classList.contains('on') && scene.journey.story.sitting < 0, ended: scene.journey.state.ended, guardGone: scene.test.guardGone, sitting: scene.journey.story.sitting });
         performance.mark('game:first-frame');
         delete document.body.dataset.starting;
         note.remove();

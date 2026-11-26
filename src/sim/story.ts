@@ -2,7 +2,6 @@ import { stepFixed } from '../math/math.ts';
 import { TUNING } from '../content/tuning.ts';
 
 import { TOWN, PATH, EVENTS, FINALE, type StoryEvent } from '../content/narrative.ts';
-export { COOK_NOTE, DOWN_TEXT, GUARD_LINES, REST_TEXT, type StoryEvent } from '../content/narrative.ts';
 
 export interface StoryHooks {
   /** Show a line of the story for `seconds`. */

@@ -103,11 +103,11 @@ export function gameReplay(launch: Launch) {
       const from = launch.beat;
       const seated = from === 'seated' || from === 'guard-gone' || from === 'ending';
       if (from !== 'veranda') record('direct entry', from);
-      const note = s.journey.near;
+      const note = s.journey.state.near;
       if (note?.id !== 'bungalow.note') throw new Error('Veranda entry did not reach the note');
       if (seated) {
         // Compose a later starting state through the same transitions as the real walk.
-        s.journey.examined(note);
+        s.journey.examine(note);
         s.test.stepJourney(0.7);
       } else {
         record('placed at veranda');
@@ -124,23 +124,23 @@ export function gameReplay(launch: Launch) {
         try { await waitFor(() => closed === 'bungalow.note', 'putting down note', 5000); }
         finally { key('keyup', 's'); }
         record('walked to close note');
-        if (s.journey.near?.id !== 'bungalow.chair') {
+        if (s.journey.state.near?.id !== 'bungalow.chair') {
           key('keydown', 'w');
-          try { await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair', 5000); }
+          try { await waitFor(() => s.journey.state.near?.id === 'bungalow.chair', 'chair', 5000); }
           finally { key('keyup', 'w'); }
         }
       }
-      await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair');
+      await waitFor(() => s.journey.state.near?.id === 'bungalow.chair', 'chair');
       key('keydown', 'e'); key('keyup', 'e');
-      await waitFor(() => examined === 'bungalow.chair' && s.test.story.sitting >= 0, 'chair examination');
+      await waitFor(() => examined === 'bungalow.chair' && s.journey.story.sitting >= 0, 'chair examination');
       if (seated) s.view.jump();
       if (from === 'guard-gone' || from === 'ending') {
         // Only the narrative clock needs to advance. Deliver its normal HUD and guard effects.
         for (let i = 0; i < 1200; i++) {
-          if (from === 'ending' ? s.test.state.ended : s.test.guardGone) break;
-          s.test.story.update(0.1, { along: s.journey.furthest, moving: false, busy: false });
+          if (from === 'ending' ? s.journey.state.ended : s.test.guardGone) break;
+          s.journey.story.update(0.1, { along: s.journey.state.furthest, moving: false, busy: false });
         }
-        if (from === 'ending' ? !s.test.state.ended : !s.test.guardGone) throw new Error('Finale checkpoint unavailable');
+        if (from === 'ending' ? !s.journey.state.ended : !s.test.guardGone) throw new Error('Finale checkpoint unavailable');
       }
       prepared = true;
       if (from !== 'guard-gone' && from !== 'ending') {
@@ -152,7 +152,7 @@ export function gameReplay(launch: Launch) {
         record('guard gone');
         await captureStory(s, 'guard-gone');
       }
-      await waitFor(() => s.test.state.ended, 'ending', 15000);
+      await waitFor(() => s.journey.state.ended, 'ending', 15000);
       record('ended');
       await captureStory(s, 'ending');
       finish(true);

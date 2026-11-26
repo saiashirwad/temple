@@ -877,8 +877,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       bench.sums.clear();
       test.skip = -1;
     },
-    danger,
-    story,
     wildlifeReady, townReady,
     get guardGone() {
       return people.guard.gone;
@@ -921,11 +919,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   return {
     view,
     walker,
-    /** The walk to the forest bungalow: how far along, and a call for arriving. */
-    journey: journey.api,
-    touched() {
-      walker.touched();
-    },
+    journey,
     test,
     frame(frame: Frame) {
       const dt = frame.dt * test.timeScale;

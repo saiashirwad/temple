@@ -48,7 +48,7 @@ export const RUNS: Record<string, Run> = {
       const fx = -Math.sin(yaw);
       const fz = -Math.cos(yaw);
       const at = (ahead: number, side: number, speed: number, turn: number) => ({ x: x + fx * ahead + fz * side, z: z + fz * ahead - fx * side, yaw: Math.atan2(fx, fz) + Math.PI + turn, speed });
-      s.test.danger.show([at(3.2, -0.9, 0, 0.3), at(4.2, 0.9, 1.2, 1.4), at(5.5, -1.8, 2.4, -1.5), at(7, 1.6, 6.5, 1.6)], 'searching');
+      s.journey.danger.show([at(3.2, -0.9, 0, 0.3), at(4.2, 0.9, 1.2, 1.4), at(5.5, -1.8, 2.4, -1.5), at(7, 1.6, 6.5, 1.6)], 'searching');
     },
   },
   w: {
@@ -57,7 +57,7 @@ export const RUNS: Record<string, Run> = {
       await wildlifeReady(s);
       if (s.walker.mode === 'held' || Math.hypot(...s.walker.at) < 150) await standAt(s, SPOTS['2']!.at);
       else await solid(s);
-      s.test.danger.summon();
+      s.journey.danger.summon();
     },
     judge: (st, t) => (['coming', 'searching', 'attack'].includes(st.danger.pack) ? 'PASS' : t > 6 ? 'FAIL: no pack' : null),
   },
@@ -66,9 +66,9 @@ export const RUNS: Record<string, Run> = {
     async start(s) {
       await wildlifeReady(s);
       await standAt(s, SPOTS['2']!.at);
-      if (!s.journey.torchOn) s.journey.toggleTorch();
+      s.journey.state.torchOff = false;
       s.test.timeScale = 2;
-      s.test.danger.summon();
+      s.journey.danger.summon();
     },
     judge: (st, t) => (st.danger.pack === 'leaving' || st.danger.pack === 'away' && t > 4 ? 'PASS' : t > 14 ? `FAIL: still ${st.danger.pack}, nerve ${st.danger.nerve}` : null),
   },
@@ -77,7 +77,7 @@ export const RUNS: Record<string, Run> = {
     async start(s) {
       await wildlifeReady(s);
       await standAt(s, SPOTS['6']!.at);
-      s.test.danger.startle(1);
+      s.journey.danger.startle(1);
     },
     judge: (st, t) => (st.danger.charge ? 'PASS' : t > 5 ? 'FAIL: no charge' : null),
   },
@@ -89,11 +89,11 @@ export const RUNS: Record<string, Run> = {
       // Exercise the same interactions as the player: read, put down, then sit.
       const until = async (id: string) => {
         const deadline = performance.now() + 5000;
-        while (s.journey.near?.id !== id) {
+        while (s.journey.state.near?.id !== id) {
           if (performance.now() > deadline) throw new Error(`interaction ${id} unavailable`);
           await new Promise((done) => setTimeout(done, 50));
         }
-        s.journey.examined(s.journey.near!);
+        s.journey.examine(s.journey.state.near!);
       };
       await until('bungalow.note');
       await until('bungalow.chair');
@@ -114,7 +114,7 @@ export const RUNS: Record<string, Run> = {
       if (s.walker.mode !== 'walk') s.walker.touched();
       const [x, z] = s.walker.at;
       const yaw = s.view.pose.yaw;
-      s.test.danger.hurt(2, { x, z, fx: -Math.sin(yaw), fz: -Math.cos(yaw) } as never);
+      s.journey.danger.hurt(2, { x, z, fx: -Math.sin(yaw), fz: -Math.cos(yaw) } as never);
     },
     judge: (st, t) => (st.downs > 0 && st.danger.health > 0.5 ? 'PASS' : t > 3 ? 'FAIL: not down' : null),
   },
