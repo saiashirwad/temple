@@ -15,7 +15,7 @@ A walk from a Kerala town to a forest bungalow at night. Run `npm ci` and `npm r
 | Inventory, equipment and quest experiments | `story.village-departure` | Edit `src/sim/departure.ts`. This is a workbench rehearsal. The released walk still starts as before. |
 | Lighting, encounters and frame timings in context | `world.walk` | Jump into the game at the bridge, herd glade or veranda, or select a benchmark. Rendering lives in `src/render/` and scene assembly in `src/game/`. |
 
-The asset inspector lists each procedural variant alongside file assets. Open `/workbench.html?scenario=asset.inspect&asset=plant/fern/2` for the second fern exactly as built in-game. Changing its seed or lighting updates the shareable URL. The distribution map uses the same specimen IDs and placement rules without building plant meshes.
+The asset inspector lists each procedural variant alongside file assets. Open `/workbench.html?scenario=asset.inspect&asset=plant/fern/2` for the second fern exactly as built in-game. Changing its seed or lighting updates the shareable URL. The distribution map uses those same specimens and placement rules without building plant meshes. The placement seed controls locations. Each specimen has its own geometry seed, so editing its shape keeps the rest of the layout reproducible. The game uploads the instances in `src/render/vegetation.ts`.
 
 A scenario URL can go directly in a task or bug report, for example `/workbench.html?scenario=forest.distribution&region=bridge&group=grass&seed=42`.
 
