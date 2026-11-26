@@ -5,20 +5,11 @@
 import { images } from '@typegpu/kit';
 import { d, std, tgpu, type TgpuRoot } from 'typegpu';
 import { TEX, TEX_LAYERS } from '../generated/textures.gen.ts';
+import { materialLayers as LAYERS } from '../content/materials.ts';
 import { Q } from './quality.ts';
 
 export { TEX };
 
-/**
- * Layers whose mesh colour sets the mean of the tile: the tile's own variation multiplies the
- * mesh colour. Roof tiles, the ground and the murals keep the colours they were made in.
- */
-/** The texture array's layers: the baked tiles, then the poster atlas painted on its own. */
-const LAYERS = [
-  ...TEX_LAYERS,
-  { name: 'posters', metres: 1, metal: false, mean: [0.3, 0.12, 0.08] as readonly number[] },
-  { name: 'signs', metres: 1, metal: false, mean: [0.4, 0.38, 0.3] as readonly number[] },
-] as const;
 /** The poster atlas's layer, read with the mesh's own UVs. */
 export const POSTER_LAYER = TEX_LAYERS.length;
 /** The path's painted signs. */
@@ -44,20 +35,44 @@ export interface Tex {
 export const Sampled = d.struct({ color: d.vec4f, normal: d.vec3f, rough: d.f32, metal: d.f32, ratioOn: d.f32 });
 export const Flat = d.struct({ color: d.vec4f, slope: d.vec2f, rough: d.f32 });
 
-export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex> {
-  const base = `${import.meta.env.BASE_URL}tex/`;
-  const get = async (file: string, mimeType: string) => {
-    const res = await fetch(`${base}${file}?v=${(LAYERS.find((l) => file.startsWith(l.name + '_')) as { mean?: readonly number[] } | undefined)?.mean?.join('_') ?? ''}`);
+/** In a build each array arrives in layer order in a single pack. The workbench and
+ * dev server also work directly from the individual files edited by the texture tools. */
+async function loadTiles(id: string, suffix: string, mimeType: string) {
+  const pack = document.querySelector<HTMLLinkElement>(`#material-${id}`);
+  if (pack) {
+    const res = await fetch(pack.href);
+    if (!res.ok) throw new Error(`Missing texture pack ${pack.href}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const offsets = new DataView(bytes.buffer);
+    return Promise.all(LAYERS.map((_, i) => images.decodeBitmap({
+      bytes: bytes.subarray(offsets.getUint32(4 * i, true), offsets.getUint32(4 * (i + 1), true)),
+      mimeType,
+    })));
+  }
+  return Promise.all(LAYERS.map(async layer => {
+    const file = `${layer.name}_${suffix}`;
+    const res = await fetch(`${import.meta.env.BASE_URL}tex/${file}?v=${layer.mean.join('_')}`);
     if (!res.ok) throw new Error(`Missing texture ${file}`);
-    return images.decode({ bytes: new Uint8Array(await res.arrayBuffer()), mimeType });
-  };
+    return images.decodeBitmap({ bytes: new Uint8Array(await res.arrayBuffer()), mimeType });
+  }));
+}
+
+async function loadTileArray(root: TgpuRoot, id: string, suffix: string, mime: string, color: 'srgb' | 'linear') {
+  const pictures = await loadTiles(id, suffix, mime);
+  try {
+    return images.array(root, pictures, { color });
+  } finally {
+    // The GPU has its own copy. Release up to 96 MiB of decoded colour bitmaps.
+    for (const picture of pictures) picture.close();
+  }
+}
+
+export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex> {
   const size = sharp ? 1024 : 512;
-  const [colors, datas] = await Promise.all([
-    Promise.all(LAYERS.map((l) => get(`${l.name}_${size}_c.webp`, 'image/webp'))),
-    Promise.all(LAYERS.map((l) => get(`${l.name}_512_d.jpg`, 'image/jpeg'))),
+  const [color, data] = await Promise.all([
+    loadTileArray(root, `color-${size}`, `${size}_c.webp`, 'image/webp', 'srgb'),
+    loadTileArray(root, 'data', '512_d.jpg', 'image/jpeg', 'linear'),
   ]);
-  const color = images.array(root, colors, { color: 'srgb' });
-  const data = images.array(root, datas, { color: 'linear' });
   const colorView = color.createView(d.texture2dArray(d.f32));
   const dataView = data.createView(d.texture2dArray(d.f32));
   const smooth = images.sampler(root, { anisotropy: Q.anisotropy });
