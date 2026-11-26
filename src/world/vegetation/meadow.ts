@@ -19,6 +19,7 @@ import { BANYAN, COMPOUND, ROAD } from '../../content/world.ts';
 import { now } from '../../render/surfaces.ts';
 
 const mat = (h: number): Mat => ({ color: hex(h), roughness: 0.75, pattern: P.GRASS, doubleSided: true });
+
 // Fresh green, a yellower green, a blue-green, and the straw of dry tips and seed heads
 const GREENS = [0x4a7e20, 0x5a8826, 0x68902e, 0x3c6e28, 0x548e32].map(mat);
 const STRAW = mat(0x8a8248);
@@ -37,13 +38,16 @@ function blade(b: Builder, r: () => number, at: V3, height: number, colour: Mat,
   const wx = Math.cos(a) * w0;
   const wz = -Math.sin(a) * w0;
   const pts: V3[] = [];
+
   for (let k = 0; k <= 3; k++) {
     const t = k / 3;
     const bend = lean * t * t * height * 1.2;
     pts.push([at[0] + dx * bend, at[1] + height * t * (1 - lean * t * 0.25), at[2] + dz * bend]);
   }
+
   const n: V3 = [dx * 0.3, 1, dz * 0.3];
   const widths = [1, 0.8, 0.5];
+
   for (let k = 0; k < 2; k++) {
     const p = pts[k]!;
     const q = pts[k + 1]!;
@@ -51,6 +55,7 @@ function blade(b: Builder, r: () => number, at: V3, height: number, colour: Mat,
     const v = widths[k + 1]!;
     b.card(colour, [p[0] - wx * u, p[1], p[2] - wz * u], [p[0] + wx * u, p[1], p[2] + wz * u], [q[0] + wx * v, q[1], q[2] + wz * v], [q[0] - wx * v, q[1], q[2] - wz * v], n, [0, k / 3, 1, (k + 1) / 3]);
   }
+
   const p = pts[2]!;
   const q = pts[3]!;
   b.card(colour, [p[0] - wx * 0.5, p[1], p[2] - wz * 0.5], [p[0] + wx * 0.5, p[1], p[2] + wz * 0.5], q, q, n, [0, 2 / 3, 1, 1]);
@@ -63,6 +68,7 @@ function blade(b: Builder, r: () => number, at: V3, height: number, colour: Mat,
 function patch(b: Builder, r: () => number, size: number, count: number, height: number, seeds: number, flowers: number) {
   const clumps = 5 + Math.floor(r() * 4);
   const centres = Array.from({ length: clumps }, () => [(r() - 0.5) * size, (r() - 0.5) * size] as const);
+
   for (let i = 0; i < count; i++) {
     // Most blades in clumps, the rest scattered between
     const c = centres[i % clumps]!;
@@ -74,16 +80,19 @@ function patch(b: Builder, r: () => number, size: number, count: number, height:
     const tone = r() < 0.08 ? STRAW : GREENS[Math.floor(r() * GREENS.length)]!;
     blade(b, r, [x, -0.03, z], h, tone);
   }
+
   // Seed stalks: stiff, straight and pale, a narrow head at the top
   for (let i = 0; i < seeds; i++) {
     const c = centres[i % clumps]!;
     blade(b, r, [c[0], -0.03, c[1]], height * (1.5 + r() * 0.6), STRAW, 0.25);
   }
+
   // Touch-me-not: a sprawl of tiny leaves near the ground and round pink puffs
   for (let i = 0; i < flowers; i++) {
     const x = (r() - 0.5) * size * 0.8;
     const z = (r() - 0.5) * size * 0.8;
     b.blob(PINK, [x, 0.12 + r() * 0.06, z], [0.022, 0.022, 0.022], 6, 4, 0.3);
+
     for (let k = 0; k < 4; k++) blade(b, r, [x + (r() - 0.5) * 0.15, -0.02, z + (r() - 0.5) * 0.15], 0.1, GREENS[1]!, 2.5);
   }
 }
@@ -93,11 +102,14 @@ export const PATCH = 1.5;
 /** The meadow's models, short, mid and long. */
 export function meadowModels() {
   const r = seeded(91);
+
   const make = (fn: (b: Builder) => void) => {
     const b = new Builder(true);
     fn(b);
+
     return b.model();
   };
+
   return {
     // Kept short, along the walks and round the temple
     short: [0, 1].map(() => make((b) => patch(b, r, PATCH, 85, 0.22, 0, 2))),
@@ -115,39 +127,58 @@ export function meadowPlaces(land: Uint8Array, walked: (x: number, z: number) =>
   const seed = (options.seed ?? VEGETATION.seed) >>> 0;
   const r = seeded((seed + 11) % 2147483646 + 1);
   const m = LAND_N / (2 * LAND);
+
   const at = (x: number, z: number, ch: number) => {
     const i = Math.floor((x + LAND) * m);
     const j = Math.floor((z + LAND) * m);
+
     if (i < 0 || j < 0 || i >= LAND_N || j >= LAND_N) return 0;
+
     return land[(j * LAND_N + i) * 4 + ch]! / 255;
   };
+
   const R = 165;
   // Slow waves of long and short over the land, as grazing and cutting leave it
   const unkempt = (x: number, z: number) => Math.sin(x * 0.11 + Math.sin(z * 0.07) * 2) * Math.sin(z * 0.09 + x * 0.03) + Math.sin(x * 0.31 + z * 0.27) * 0.3;
+
   for (let gz = -R; gz < R; gz += PATCH) {
     for (let gx = -R; gx < R; gx += PATCH) {
       const x = gx + (r() - 0.5) * PATCH * 0.8;
       const z = gz + (r() - 0.5) * PATCH * 0.8;
+
       if (x * x + z * z > R * R) continue;
+
       if (onRoad(x, z, 0.4)) continue;
+
       // The sand in the temple, the path to its gate, the shops' forecourts
       if (x > -COMPOUND.x - 0.4 && x < COMPOUND.x + 0.4 && z > COMPOUND.z0 - 0.4 && z < COMPOUND.z1 + 0.4) continue;
+
       if (Math.abs(x) < 2.2 && z > COMPOUND.z1 && z < ROAD.z) continue;
+
       if (x > -22 && x < 14 && z > ROAD.z + ROAD.half - 0.5 && z < ROAD.z + ROAD.half + 12) continue;
+
       if (Math.abs(x - CHURCH.x) < CHURCH.hx && Math.abs(z - CHURCH.z) < CHURCH.hz) continue;
+
       if (Math.abs(x - MOSQUE.x) < MOSQUE.hx && Math.abs(z - MOSQUE.z) < MOSQUE.hz) continue;
+
       if (Math.hypot(x - BANYAN[0], z - BANYAN[2]) < 4.4) continue;
+
       if (pondQ(x, z) < 1.06) continue;
+
       // Cheap tests first; none of these draws from `r`, so the order doesn't change the layout
       // Swept yards, lanes and paddy
       if (at(x, z, 0) > 0.35 || at(x, z, 1) > 0.3 || at(x, z, 3) > 0.3) continue;
       // Cut laterite banks stay bare
       const h = heightAt(x, z);
       const slope = Math.hypot(heightAt(x + 0.5, z) - h, heightAt(x, z + 0.5) - h) / 0.5;
+
       if (slope > 0.75) continue;
+
       // Not on the forest footpath
       if (trailDistance(x, z, 4) < 1.7) continue;
+
       if (!plantFree(x, z, 0.6)) continue;
+
       // Thinner under the plantations' litter
       if (at(x, z, 2) > 0.5 && r() < 0.6) continue;
       const worn = walked(x, z) < 1.4 || onRoad(x, z, 1.4);
@@ -156,7 +187,9 @@ export function meadowPlaces(land: Uint8Array, walked: (x: number, z: number) =>
       out.push({ at: [x, h - 0.01, z], yaw: r() * Math.PI * 2, scale: 0.85 + r() * 0.35, length });
     }
   }
+
   const density = options.density ?? VEGETATION.density;
+
   return density < 1 ? out.filter(p => inPlantingDensity(p.at, density)) : out;
 }
 
@@ -165,6 +198,7 @@ export function defineGrass(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
   return instances.define('Grass', {
     carry: (vertexIndex) => {
       'use gpu';
+
       return d.vec4f(pool.extra.pat(vertexIndex), pool.extra.col(vertexIndex).xyz);
     },
     deform: (vertex, patch) => {
@@ -178,11 +212,13 @@ export function defineGrass(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
       const gust = wave * wave * (std.sin(t * 0.23 + w.x * 0.02) * 0.4 + 0.75);
       const shiver = std.sin(t * 5.3 + w.x * 3.1 + w.y * 2.3) * 0.12;
       const push = (gust + shiver + 0.15) * h * h * 1.6;
+
       return p + d.vec3f(push * 0.85, -push * h * 0.6, push * 0.5);
     },
     deformShadow: false,
     bounds: (_patch, base) => {
       'use gpu';
+
       return instances.Sphere({ center: base.center, radius: base.radius + 0.3 });
     },
     surface: (pixel, base) => {
@@ -204,6 +240,7 @@ export function defineGrass(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
       // Lit as if facing up, the way a field of blades scatters light: no dark backs
       const lit = shading.Point(pixel.point);
       lit.normal = std.normalize(std.mix(pixel.point.normal * std.sign(std.dot(pixel.point.normal, pixel.point.view) + 0.0001), d.vec3f(0, 1, 0), 0.6));
+
       return instances.Shaded({ point: lit, material: m });
     },
   });

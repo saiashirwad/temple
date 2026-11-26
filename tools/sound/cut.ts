@@ -17,9 +17,11 @@ const RATE = 44100;
 /** Decodes a stretch of a file to mono floats at RATE, through `filter` (ffmpeg -af). */
 function decode(file: string, filter: string, from = 0, length = 0) {
   const args = ['-v', 'error', '-ss', String(from), ...(length ? ['-t', String(length)] : []), '-i', join(SRC, file), '-ac', '1', '-ar', String(RATE)];
+
   if (filter) args.push('-af', filter);
   args.push('-f', 'f32le', '-');
   const raw = execFileSync('ffmpeg', args, { maxBuffer: 1 << 30 });
+
   return new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4).slice();
 }
 
@@ -27,11 +29,14 @@ function decode(file: string, filter: string, from = 0, length = 0) {
 function envelope(s: Float32Array) {
   const n = Math.floor(RATE / 100);
   const e = new Float32Array(Math.floor(s.length / n));
+
   for (let i = 0; i < e.length; i++) {
     let a = 0;
+
     for (let k = 0; k < n; k++) a += s[i * n + k]! ** 2;
     e[i] = Math.sqrt(a / n);
   }
+
   return e;
 }
 
@@ -54,44 +59,57 @@ interface Find {
 function events(s: Float32Array, f: Find) {
   const e = envelope(s);
   let peak = 0;
+
   for (const v of e) peak = Math.max(peak, v);
   const thr = peak * 10 ** (-f.under / 20);
   const found: { a: number; b: number; energy: number }[] = [];
   let a = -1;
   let quiet = 0;
+
   for (let i = 0; i <= e.length; i++) {
     const loud = i < e.length && e[i]! > thr;
+
     if (loud) {
       if (a < 0) a = i;
       quiet = 0;
     } else if (a >= 0 && (++quiet * 0.01 > f.join || i === e.length)) {
       const b = i - quiet;
       const len = (b - a) * 0.01;
+
       if (len >= f.min) {
         // A long stretch gives several events, each as long as allowed
         const step = Math.round(f.max * 100);
+
         for (let c = a; c < b; c += step) {
           const d = Math.min(b, c + step);
+
           if ((d - c) * 0.01 < f.min) break;
           let en = 0;
+
           for (let k = c; k <= d; k++) en += e[k]! ** 2;
           found.push({ a: c, b: d, energy: en / (d - c + 1) });
         }
       }
+
       a = -1;
     }
   }
+
   // Loud but not the outliers: sort by energy and drop the very loudest (handling bumps, clips)
   found.sort((x, y) => y.energy - x.energy);
   const pick = found.length > f.count + 2 ? found.slice(1) : found;
   const kept: [number, number][] = [];
+
   for (const ev of pick) {
     const s0 = Math.max(0, Math.round((ev.a * 0.01 - f.pre) * RATE));
     const s1 = Math.min(s.length, Math.round((ev.b * 0.01 + f.tail) * RATE));
+
     if (kept.some(([x, y]) => s0 < y && s1 > x)) continue;
     kept.push([s0, s1]);
+
     if (kept.length >= f.count) break;
   }
+
   return kept.sort((x, y) => x[0] - y[0]);
 }
 
@@ -102,17 +120,22 @@ function level(c: Float32Array, rmsDb: number) {
   const top = sorted.slice(0, Math.max(1, Math.min(50, sorted.length >> 1)));
   const rms = Math.sqrt(top.reduce((a, v) => a + v * v, 0) / top.length) || 1e-6;
   let peak = 0;
+
   for (const v of c) peak = Math.max(peak, Math.abs(v));
   const gain = Math.min(10 ** (rmsDb / 20) / rms, 0.89 / (peak || 1));
   const out = new Float32Array(c.length);
   const fin = Math.min(c.length >> 2, Math.round(RATE * 0.006));
   const fout = Math.min(c.length >> 1, Math.round(RATE * 0.06));
+
   for (let i = 0; i < c.length; i++) {
     let g = gain;
+
     if (i < fin) g *= i / fin;
+
     if (i > c.length - fout) g *= (c.length - i) / fout;
     out[i] = c[i]! * g;
   }
+
   return out;
 }
 
@@ -207,31 +230,39 @@ function wav(file: string, s: Float32Array, channels = 1) {
   b.writeUInt16LE(16, 34);
   b.write('data', 36);
   b.writeUInt32LE(s.length * 2, 40);
+
   for (let i = 0; i < s.length; i++) b.writeInt16LE(Math.round(Math.max(-1, Math.min(1, s[i]!)) * 32767), 44 + i * 2);
   writeFileSync(file, b);
 }
+
 const mp3 = (from: string, to: string, extra: string[] = []) => execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', from, ...extra, '-c:a', 'libmp3lame', '-q:a', '3', to]);
 
 const sheets: Record<string, Record<string, [number, number][]>> = {};
+
 /** Lays clips one after another with a gap of silence; returns the offsets in seconds. */
 function sprite(name: string, groups: Record<string, Float32Array[]>) {
   const offsets: Record<string, [number, number][]> = {};
   const parts: Float32Array[] = [new Float32Array(GAP)];
   let at = GAP;
+
   for (const [k, clips] of Object.entries(groups)) {
     offsets[k] = [];
+
     for (const c of clips) {
       offsets[k].push([+(at / RATE).toFixed(3), +(c.length / RATE).toFixed(3)]);
       parts.push(c, new Float32Array(GAP));
       at += c.length + GAP;
     }
   }
+
   const all = new Float32Array(at);
   let o = 0;
+
   for (const p of parts) {
     all.set(p, o);
     o += p.length;
   }
+
   const tmp = join(tmpdir(), `${name}.wav`);
   wav(tmp, all);
   // Mono, 96 kbit/s VBR is plenty for single calls and steps
@@ -243,22 +274,30 @@ function sprite(name: string, groups: Record<string, Float32Array[]>) {
 
 function cut(it: Item) {
   const s = decode(it.file, it.filter ?? '', it.from ?? 0, it.length ?? 0);
+
   return events(s, it.find).map(([a, b]) => level(s.subarray(a, b), it.rms));
 }
 
 const calls: Record<string, Float32Array[]> = {};
+
 for (const [k, items] of Object.entries(CALLS)) {
   calls[k] = items.flatMap(cut);
+
   if (!calls[k].length) console.warn('no clips for', k);
 }
+
 sprite('calls', calls);
 
 const steps: Record<string, Float32Array[]> = {};
+
 for (const [k, it] of Object.entries(STEPS)) {
   steps[k] = cut(it);
+
   if (steps[k].length < 4) console.warn('few steps for', k, steps[k].length);
 }
+
 sprite('steps', steps);
+
 // The offsets, for the game to import: [start, length] in seconds of each clip in its sheet
 writeFileSync(join(import.meta.dirname, '../../src/audio/sprites.json'), JSON.stringify(sheets, null, 1) + '\n');
 
@@ -277,16 +316,20 @@ for (const [k, b] of Object.entries(BEDS)) {
   const n = Math.round(fade * RATE);
   const keep = frames - n;
   const out = new Float32Array(keep * 2);
+
   for (let i = 0; i < keep; i++)
     for (let ch = 0; ch < 2; ch++) {
       let v = data.readInt16LE((i * 2 + ch) * 2) / 32767;
+
       if (i < n) {
         const t = i / n;
         const tail = data.readInt16LE(((keep + i) * 2 + ch) * 2) / 32767;
         v = v * Math.sin((t * Math.PI) / 2) + tail * Math.cos((t * Math.PI) / 2);
       }
+
       out[i * 2 + ch] = v;
     }
+
   const looped = join(tmpdir(), `${k}-loop.wav`);
   wav(looped, out, 2);
   mp3(looped, join(OUT, `${k}.mp3`), ['-ac', '2', '-q:a', '4']);

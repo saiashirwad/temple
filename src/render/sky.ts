@@ -28,6 +28,7 @@ export const skyColor = (look: d.v3f) => {
   const cover = perlin2d.sample(onCloud * 0.5) * 0.6 + perlin2d.sample(onCloud * 1.4 + 3) * 0.4;
   const lit = 1 + std.pow(toMoon, 6.0) * 3;
   c += CLOUD * lit * std.smoothstep(0.0, 0.5, cover) * std.smoothstep(0.02, 0.2, up);
+
   return std.select(std.mix(HORIZON, BELOW, std.saturate(-up * 5)), c, up > 0);
 };
 
@@ -43,5 +44,6 @@ export const sky = environment.background((look: d.v3f) => {
   const maria = 0.85 + perlin2d.sample(look.xy * 900) * 0.15;
   c += d.vec3f(1.6, 1.7, 1.9) * disc * maria;
   c += d.vec3f(0.02, 0.03, 0.05) * std.pow(std.saturate(m), 400.0);
+
   return c;
 });

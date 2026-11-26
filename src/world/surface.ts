@@ -20,17 +20,25 @@ const FOREST = 150;
 export function surfaceAt(x: number, z: number, y = heightAt(x, z)): Surface {
   // Feet well above the land: planks of a raised floor or the bridge
   if (onBridge(x, z, 0.2) || y - heightAt(x, z) > 0.6) return 'wood';
+
   if (inRiver(x, z, 0.3)) return 'wet';
+
   // Tar sounds like stone under a sandal: hard and dry
   if (onRoad(x, z, -0.3)) return 'stone';
+
   // The temple's sand court, and its stone path up from the gate
   if (Math.abs(x) < COMPOUND.x && z > COMPOUND.z0 && z < COMPOUND.z1) return Math.abs(x) < 1.6 ? 'stone' : 'dirt';
+
   if (onLane(x, z, 0) || inYard(x, z, 0) || (Math.abs(x) < 2.2 && z > COMPOUND.z1 && z < 27)) return 'gravel';
+
   if (Math.hypot(x, z) > FOREST - 30) {
     const near = trailNear(x, z, 4);
+
     // The trail is beaten earth; off it, the forest floor is all dry leaves
     if (near.distance < 1.4) return 'dirt';
+
     if (Math.hypot(x, z) > FOREST) return 'leaves';
   }
+
   return 'grass';
 }

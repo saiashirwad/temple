@@ -27,6 +27,7 @@ export interface Layer {
 }
 
 const TAU = Math.PI * 2;
+
 const set = (o: Px, c: C, h: number, rough: number, mask: number) => {
   o.c = c;
   o.h = h;
@@ -166,8 +167,10 @@ const granite: Layer = {
     const fA = big.f2 - big.f1;
     const small = worley(u, v, 560, 560, 5);
     const idB = small.id;
+
     const pal = (k: number): C =>
       k < 0.28 ? hex(0x1a1a1c) : k < 0.55 ? hex(0x4a4a4c) : k < 0.78 ? hex(0x6e6a66) : k < 0.92 ? hex(0x8a7a72) : hex(0xb0aca4);
+
     let c = lerp3(pal(idA), pal(idB), 0.35);
     c = lerp3(c, hex(0x101012), smooth(0.08, 0.0, fA) * 0.3);
     const tone = fbm(u, v, 4, 4, 4, 9);
@@ -214,6 +217,7 @@ const countryTile: Layer = {
     const lip = smooth(0.97, 1.0, fv);
     const chipped = cover && hash(col, row, 17) > 0.9 ? smooth(0.82, 0.86, fv + noise(u, v, 80, 80, 3) * 0.1) : 0;
     let h = prof + lap - lip * 0.012 - chipped * 0.01 + fbm(u, v, 120, 120, 3, 5) * 0.0006;
+
     if (cover && Math.abs(across) > 1) h = 0.012 * Math.min(1, across * across) + lap;
     // Colour: clay where rain and sun wear the crown, black mould in the channels and laps
     const crown = cover ? clamp(1 - Math.abs(across)) : 0;
@@ -331,6 +335,7 @@ const grain = (u: number, v: number) => {
   const pores = smooth(0.25, 0.6, noise(u, v, 420, 6, 7) + noise(u, v, 840, 12, 8) * 0.5);
   const check = smooth(0.02, 0.0, Math.abs(noise(u, v, 40, 2, 9))) * smooth(0.2, 0.5, fbm(u, v, 6, 1, 3, 10));
   const fiber = noise(u, v, 300, 4, 11);
+
   return { late, pores, check, fiber, warp };
 };
 
@@ -476,6 +481,7 @@ const mural: Layer = {
     const bot = band(0.89, 0.97);
     const inBand = Math.max(top, bot);
     line = Math.max(line, smooth(0.004, 0.0, Math.min(Math.abs(v - 0.03), Math.abs(v - 0.11), Math.abs(v - 0.89), Math.abs(v - 0.97))));
+
     if (inBand > 0.5) {
       // Running pattern of red lozenges with white dots
       const cx = fract(u * 16);
@@ -483,6 +489,7 @@ const mural: Layer = {
       const diamond = Math.abs(cx - 0.5) * 2 + Math.abs(yy);
       c = diamond < 0.85 ? RED : GREEN;
       line = Math.max(line, smooth(0.08, 0.0, Math.abs(diamond - 0.85)));
+
       if (Math.hypot((cx - 0.5) * 0.25, yy * 0.04) < 0.008) c = WHITE;
     } else if (v > 0.11 && v < 0.89) {
       // The vine: two sine stems crossing, leaves along them, lotuses where they loop
@@ -493,8 +500,10 @@ const mural: Layer = {
       const d1 = Math.abs(y - s1) * 0.39;
       const d2 = Math.abs(y - s2) * 0.39;
       const stem = Math.min(d1, d2);
+
       if (stem < 0.012) c = GREEN;
       line = Math.max(line, smooth(0.0035, 0.0, Math.abs(stem - 0.012)));
+
       // Leaves: almond shapes hung off the stems
       for (let i = 0; i < 12; i++) {
         const lu = (i + 0.25) / 12;
@@ -507,10 +516,13 @@ const mural: Layer = {
         const ru = du * Math.cos(a) - dv * Math.sin(a);
         const rv = du * Math.sin(a) + dv * Math.cos(a);
         const leaf = Math.hypot(ru / 0.05, rv / 0.02);
+
         if (leaf < 1) c = lerp3(GREEN, hex(0x5a8a4a), clamp(1 - Math.abs(rv) / 0.02) * 0.6);
         line = Math.max(line, smooth(0.12, 0.0, Math.abs(leaf - 1)) * 0.9);
+
         if (leaf < 1) line = Math.max(line, smooth(0.0015, 0.0, Math.abs(rv)) * 0.6);
       }
+
       // Lotus rosettes in the loops
       for (let i = 0; i < 6; i++) {
         const lu = (i + 0.5) / 6;
@@ -520,15 +532,20 @@ const mural: Layer = {
         const a = Math.atan2(dv, du);
         const petals = 0.06 * (0.62 + 0.38 * Math.abs(Math.cos(a * 4)));
         const inner = 0.06 * (0.38 + 0.22 * Math.abs(Math.cos(a * 4 + Math.PI / 4)));
+
         if (r < petals) c = RED;
+
         if (r < inner) c = lerp3(RED, WHITE, 0.6);
+
         if (r < 0.014) c = hex(0xd8a83a);
         line = Math.max(line, smooth(0.0035, 0.0, Math.abs(r - petals)), smooth(0.003, 0.0, Math.abs(r - inner)), smooth(0.003, 0.0, Math.abs(r - 0.014)));
         // Blue dots in the ground between
         const bu = (((u - lu) % 1) + 1) % 1 - 0.5;
+
         if (Math.hypot(bu * 0.4, (v - 0.22) * 1) < 0.012 || Math.hypot(bu * 0.4, (v - 0.78) * 1) < 0.012) c = BLUE;
       }
     }
+
     // Hand-drawn lines wobble in weight
     line *= 0.75 + 0.25 * noise(u, v, 60, 60, 41);
     c = lerp3(c, BLACK, clamp(line));
@@ -619,6 +636,7 @@ const grass: Layer = {
     let blade = 0;
     let shade = 0;
     let dry = 0;
+
     for (let k = 0; k < 3; k++) {
       const w = worley(u, v, 110 + k * 40, 110 + k * 40, 3 + k * 10);
       const a = w.id * TAU;
@@ -627,12 +645,14 @@ const grass: Layer = {
       const len = 0.9 + hash(w.cx, w.cy, k) * 0.5;
       const t = clamp(0.5 - along / len);
       const b = smooth(0.09 * (1 - t * 0.7), 0.0, Math.abs(across)) * smooth(0.5 * len, 0.4 * len, Math.abs(along));
+
       if (b > blade) {
         blade = b;
         shade = t;
         dry = hash(w.cx, w.cy, k + 50);
       }
     }
+
     const patchy = smooth(-0.3, 0.5, fbm(u, v, 5, 5, 4, 41));
     const soil: C = lerp3(hex(0x4a2a18), hex(0x2a1a10), clamp(noise(u, v, 300, 300, 43) + 0.5));
     let g: C = lerp3(hex(0x3a5a1a), hex(0x5a7a22), shade);

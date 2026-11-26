@@ -55,33 +55,42 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   let state = makeWalker(plan);
   let obstacle: [number, number] = [1e6, 1e6];
   let paused = false;
+
   let cx = 0,
     cz = 0,
     span = 1;
+
   const reset = () => {
     plan = plans[Number(select.value)]!;
     state = makeWalker(plan);
     pace.value = String(plan.speed);
     obstacle = [1e6, 1e6];
+
     const xs = plan.route.map((p) => p[0]),
       zs = plan.route.map((p) => p[1]);
+
     cx = (Math.min(...xs) + Math.max(...xs)) / 2;
     cz = (Math.min(...zs) + Math.max(...zs)) / 2;
     span = Math.max(12, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) * 1.2);
     status.textContent = `Route ${state.length.toFixed(1)} m · ${plan.loop ? 'loop' : `turns around after a ${plan.pause ?? 3} s pause`}`;
   };
+
   const xy = (x: number, z: number) => [375 + ((x - cx) / span) * 750, 375 + ((z - cz) / span) * 750] as const;
+
   const draw = (result: { x: number; z: number; inWay: boolean; stopped: boolean }) => {
     ctx.fillStyle = '#24382d';
     ctx.fillRect(0, 0, 750, 750);
     // Town footprints are the same collision geometry consulted by production dodging.
     ctx.strokeStyle = '#506b58';
     ctx.lineWidth = 1;
+
     for (const f of feet) {
       const [x, z] = xy(f.x, f.z);
+
       if (x < -100 || x > 850 || z < -100 || z > 850) continue;
       ctx.save();
       ctx.translate(x, z);
+
       if (f.kind === 'cyl') {
         ctx.beginPath();
         ctx.arc(0, 0, (f.r / span) * 750, 0, Math.PI * 2);
@@ -90,18 +99,23 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
         ctx.rotate(-Math.atan2(f.s, f.c));
         ctx.strokeRect((-f.hx / span) * 750, (-f.hz / span) * 750, ((2 * f.hx) / span) * 750, ((2 * f.hz) / span) * 750);
       }
+
       ctx.restore();
     }
+
     ctx.strokeStyle = '#c8d8c3';
     ctx.lineWidth = 2;
     ctx.beginPath();
     plan.route.forEach((p, i) => {
       const [x, y] = xy(...p);
+
       if (i) ctx.lineTo(x, y);
       else ctx.moveTo(x, y);
     });
+
     if (plan.loop) ctx.closePath();
     ctx.stroke();
+
     const dot = (x: number, z: number, color: string, r: number) => {
       const q = xy(x, z);
       ctx.fillStyle = color;
@@ -109,10 +123,12 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       ctx.arc(q[0], q[1], r, 0, Math.PI * 2);
       ctx.fill();
     };
+
     dot(obstacle[0], obstacle[1], '#f1b77c', 7);
     dot(result.x, result.z, '#a5e4a0', 6);
     output.textContent = `Speed ${state.speed.toFixed(2)} m/s · route ${state.metres.toFixed(1)} / ${state.length.toFixed(1)} m · dodge ${state.dodge.toFixed(2)} m · ${state.wait > 0 ? 'waiting at endpoint' : result.stopped ? 'stopping for obstacle' : result.inWay ? 'avoiding obstacle' : 'walking'}`;
   };
+
   select.addEventListener('change', reset);
   root.querySelector('[name=restart]')!.addEventListener('click', reset);
   root.querySelector('[name=remove]')!.addEventListener('click', () => {
@@ -129,29 +145,38 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       cz + ((e.clientY - rect.top) / rect.height - 0.5) * span,
     ];
   });
+
   if (params.get('person') === 'watcher') {
     const i = plans.findIndex((p) => p.watcher);
+
     if (i >= 0) select.value = String(i);
   }
+
   reset();
   let last = performance.now();
   let frame = 0;
+
   const tick = (now: number) => {
     if (!panel.isConnected) return;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const target = Math.max(0, Math.min(3, Number(pace.value) || 0));
     const current = { ...plan, speed: target };
+
     const blocked = (x: number, z: number) => {
       const q = pushOut([x, z], feet, 0.28);
+
       return q[0] !== x || q[1] !== z;
     };
+
     const p = paused
       ? { ...walkerAt(state, state.metres), inWay: false, stopped: false }
       : stepWalker(state, current, dt, obstacle, blocked);
+
     draw(p);
     frame = requestAnimationFrame(tick);
   };
+
   frame = requestAnimationFrame(tick);
   // Stop drawing if the host swaps out the workbench.
   new MutationObserver((_, observer) => {

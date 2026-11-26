@@ -23,8 +23,10 @@ test('the same seed replays the same night', () => {
     danger.summon();
     const p = player({ ...P, torch: false, fx: 0, fz: -1 });
     run((dt) => danger.update(dt, p), 40);
+
     return JSON.stringify([danger.debug, log.marks, log.downs]);
   };
+
   assert.equal(night(), night());
 });
 
@@ -36,12 +38,14 @@ test('standing tall, facing them, torch on: they give up', () => {
   // Face whichever dog is nearest, every step
   run((dt) => {
     const live = danger.wolves.filter((w) => w.on);
+
     if (live.length) {
       const w = live.reduce((a, b) => (Math.hypot(a.x - p.x, a.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? a : b));
       const d = Math.hypot(w.x - p.x, w.z - p.z) || 1;
       p.fx = (w.x - p.x) / d;
       p.fz = (w.z - p.z) / d;
     }
+
     danger.update(dt, p);
   }, 60);
   assert.ok(log.marks.includes('stood'), `marks: ${log.marks.join(',')}; ${JSON.stringify(danger.debug)}`);
@@ -79,11 +83,13 @@ test('back to them, no torch, standing in the open: they get you, once per fall'
     const before = log.downs;
     // Always facing away from the nearest dog
     const w = danger.wolves.find((x) => x.on);
+
     if (w) {
       const d = Math.hypot(w.x - p.x, w.z - p.z) || 1;
       p.fx = -(w.x - p.x) / d;
       p.fz = -(w.z - p.z) / d;
     }
+
     danger.update(dt, p);
     downsAtOnce = Math.max(downsAtOnce, log.downs - before);
   }, 120);

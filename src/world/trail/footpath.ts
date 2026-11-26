@@ -18,13 +18,17 @@ export function buildFootpath(b: Builder) {
     for (let s = 4; s < TRAIL_LENGTH - 2; s += 0.62) {
       const p = trailAt(s);
       const half = trailWidth(s) / 2 + 0.1;
+
       for (const side of [-1, 1]) {
         if (r() < 0.06) continue;
         const x = p.x + Math.cos(p.heading) * half * side;
         const z = p.z - Math.sin(p.heading) * half * side;
+
         // Not on the bridge or down the ravine, and not on another stretch of the path where it doubles back
         if (onBridge(x, z, 2) || riverCut(x, z) > 0.2 || brookDistance(x, z) < BROOK_HALF + 0.5) continue;
+
         if (trailNear(x, z, 4).distance < half - 0.15) continue;
+
         if (Math.hypot(x - BUNGALOW.x, z - BUNGALOW.z) < 9) continue;
         const g = Math.min(heightAt(x, z), heightAt(x + Math.sin(p.heading) * 0.25, z + Math.cos(p.heading) * 0.25), heightAt(x - Math.sin(p.heading) * 0.25, z - Math.cos(p.heading) * 0.25));
         const sunk = r() * 0.05;

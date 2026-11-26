@@ -15,6 +15,7 @@ export async function loadProps(placed: readonly PropAt[]) {
   // Shared maps have their content hash in the filename, so later variants can reuse the response.
   const fetchModel = (url: string) => fetch(url, url.includes('/shared/') ? { cache: 'force-cache' } : undefined);
   const models = await Promise.all(names.map(n => gltf.load(`${base}models/${sizes[n]!.file}`, { fetch: fetchModel })));
+
   return new Map<string, ModelData>(names.map((n, i) => [n, models[i]!]));
 }
 
@@ -28,6 +29,7 @@ export const Prop = instances.define('Prop', {
     const m = shading.Material(base);
     m.roughness = std.min(1, base.roughness * 1.08 + 0.04);
     m.color = base.color * 0.92;
+
     return m;
   },
 });
@@ -37,14 +39,18 @@ const yawQ = (yaw: number): [number, number, number, number] => [0, Math.sin(yaw
 /** Puts every placement into `set`, each model added to the pool once. */
 export function placeProps(pool: meshPool.MeshPool, set: ReturnType<typeof instances.create<typeof Prop>>, models: Map<string, ModelData>, placed: readonly PropAt[]) {
   const added = new Map<string, ReturnType<typeof pool.add>>();
+
   for (const p of placed) {
     let m = added.get(p.name);
+
     if (!m) {
       m = pool.add(models.get(p.name)!);
       added.set(p.name, m);
     }
+
     set.add(m, { position: p.at, rotation: yawQ(p.yaw), scale: p.scale, ...(p.color ? { color: p.color } : {}) });
   }
+
   return [...added.values()];
 }
 
@@ -53,6 +59,7 @@ export function propBudget(placed: readonly PropAt[]) {
   const used = [...new Set(placed.map(p => p.name))].map(name => sizes[name]!);
   const pool = meshPool.roomFor(used);
   const uvs1 = used.some(size => size.uvs1) ? { uvs1: true as const } : {};
+
   return { pool: { ...pool, ...uvs1 }, rows: placed.reduce((n, p) => n + sizes[p.name]!.meshes, 0) };
 }
 
@@ -62,5 +69,6 @@ export const propNear = (p: PropAt, at: readonly number[]) =>
 /** A model is fetched once, even if several copies straddle the first view's radius. */
 export function splitProps(placed: readonly PropAt[], at?: readonly number[]) {
   const visible = new Set(placed.filter(p => !at || propNear(p, at)).map(p => p.name));
+
   return { first: placed.filter(p => visible.has(p.name)), later: placed.filter(p => !visible.has(p.name)) };
 }

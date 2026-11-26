@@ -9,6 +9,7 @@ import { clear, footprints, pushOut, type XZ } from '../sim/routes.ts';
 import type { AVATARS, ClipName } from './assets.ts';
 
 export type Who = keyof typeof AVATARS;
+
 export const WATCHER = 'tea_m01';
 
 /** How a person spends the evening. */
@@ -18,16 +19,21 @@ export type Plan =
 
 // ---- where everyone is
 const shoulder = (x: number, side: 1 | -1, off = 0.7): XZ => [x, roadZ(x) + side * (ROAD.half + off)];
+
 const roadside = (x0: number, x1: number, side: 1 | -1, off = 0.7) => {
   const pts: XZ[] = [];
   const n = Math.ceil(Math.abs(x1 - x0) / 4);
+
   for (let i = 0; i <= n; i++) pts.push(shoulder(x0 + ((x1 - x0) * i) / n, side, off));
+
   return pts;
 };
+
 /** The outer circuit of the temple, the shrine kept on the right hand. */
 const CIRCUIT: XZ[] = [
   [11.5, -12.5], [11.5, 14.4], [-11.6, 14.4], [-11.6, -12.5],
 ];
+
 const TEA: XZ = [3.4, roadZ(3.4) + ROAD.half + 1.7];
 const mosqueGate = (): XZ => [MOSQUE.x + 0 * Math.cos(MOSQUE.yaw) + MOSQUE.hz * Math.sin(MOSQUE.yaw), MOSQUE.z + MOSQUE.hz * Math.cos(MOSQUE.yaw)];
 
@@ -42,9 +48,12 @@ export function plansClear(tulsi: V3[], seats: Seat[], solids: readonly Solid[],
     if (p.kind === 'walk') {
       // Walking beside a companion: her own line, a step to the side of theirs, kept clear itself
       const line = p.side ? beside(p.route, p.side) : p.route;
+
       return { ...p, side: 0, route: clear(line, feet, { loop: p.loop, radius: 0.3 }) };
     }
+
     if (p.clip === 'sit_chair_idle_neutral_01') return p;
+
     return { ...p, at: pushOut(p.at, feet, 0.25) };
   });
 }
@@ -55,12 +64,14 @@ const beside = (route: XZ[], side: number): XZ[] =>
     const a = route[Math.max(0, i - 1)]!;
     const b = route[Math.min(route.length - 1, i + 1)]!;
     const h = Math.atan2(b[0] - a[0], b[1] - a[1]);
+
     return [p[0] + Math.cos(h) * side, p[1] - Math.sin(h) * side];
   });
 
 export function rawPlans(tulsi: V3[], seats: Seat[]): Plan[] {
   const g = mosqueGate();
   const lane = (i: number, n = 4) => LANES[i]!.pts.slice(0, n).map(([x, z]): XZ => [x + 0.5, z]);
+
   const out: Plan[] = [
     // Devotees on the circuit, at a devotee's unhurried pace
     { kind: 'walk', who: 'dev_f15', route: CIRCUIT, loop: true, speed: 0.8, from: 3 },
@@ -88,18 +99,23 @@ export function rawPlans(tulsi: V3[], seats: Seat[]): Plan[] {
     { kind: 'stay', who: 'mosque_m15', at: [g[0] - 0.7, g[1] - 1.6], yaw: 1.2, clip: 'gestic_talk_neutral_01', swap: 'idle_neutral_02' },
     { kind: 'stay', who: 'mosque_m11', at: [g[0] + 0.6, g[1] - 1.2], yaw: 1.2 + Math.PI + 0.25, clip: 'idle_neutral_01', swap: 'gestic_talk_neutral_01' },
   ];
+
   // The forest guard, walking his beat up the path and back with a hurricane lantern
   const beat: XZ[] = [];
+
   for (let s = 230; s <= 690; s += 5) {
     const p = trailAt(s);
     beat.push([p.x, p.z]);
   }
+
   out.push({ kind: 'walk', who: WATCHER, watcher: true, route: beat, speed: 0.85, from: 120, pause: 14 });
+
   if (LINEUP) {
     (['road_m08', 'home_m09', 'road_f11', 'dev_f15', 'gate_f02'] as Who[]).forEach((who, i) =>
       out.push({ kind: 'stay', who, at: [-1.6 + i * 0.8, 24.5], yaw: i % 2 ? 0.4 : -0.4, clip: i === 3 ? 'idle_neutral_02' : 'idle_neutral_01' }),
     );
   }
+
   // Women crouched to light the lamp at their tulsi
   const lit = tulsi.filter((t) => Math.hypot(t[0], t[2]) < 90).slice(0, 2);
   lit.forEach((t, i) => {
@@ -115,10 +131,12 @@ export function rawPlans(tulsi: V3[], seats: Seat[]): Plan[] {
   });
   // A man at his gate, looking out at the road
   const home = PLOTS.find((p) => p.kind === 'old' && Math.abs(p.x) < 60);
+
   if (home) {
     const [x, z] = plotPoint(home, 0.4, home.d + 5.6);
     out.push({ kind: 'stay', who: 'home_m09', at: [x, z], yaw: home.yaw, clip: 'idle_look_around_01', swap: 'idle_neutral_01' });
   }
+
   return out;
 }
 

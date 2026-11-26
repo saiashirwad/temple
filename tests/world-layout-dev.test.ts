@@ -11,9 +11,11 @@ test('the dev server bakes on demand and invalidates only edited layout dependen
   const build = join(folder, 'build');
   const value = join(build, 'value.ts');
   const unrelated = join(folder, 'workbench.html');
+
   try {
     await mkdir(build);
     await symlink(new URL('../node_modules/', import.meta.url), join(folder, 'node_modules'), 'dir');
+
     for (const name of ['world-layout-plugin.ts', 'world-layout-worker.mjs'])
       await copyFile(new URL('../tools/build/' + name, import.meta.url), join(build, name));
     await writeFile(join(folder, 'package.json'), '{"type":"module"}');
@@ -29,8 +31,10 @@ test('the dev server bakes on demand and invalidates only edited layout dependen
         return new TextEncoder().encode(value);
       }
     `);
+
     const server = await createServer({ root: folder, base: '/postcard/', logLevel: 'silent',
       optimizeDeps: { noDiscovery: true }, server: { host: '127.0.0.1', port: 0 } });
+
     try {
       await server.listen();
       const base = server.resolvedUrls!.local[0];
@@ -52,10 +56,12 @@ test('the dev server bakes on demand and invalidates only edited layout dependen
       await writeFile(value, "export const value = 'second';");
       let next = await revalidate();
       const deadline = Date.now() + 4000;
+
       while (next.status === 304 && Date.now() < deadline) {
         await wait(25);
         next = await revalidate();
       }
+
       assert.equal(await next.text(), 'second');
       assert.equal(await readFile(runs, 'utf8'), '11');
     } finally {

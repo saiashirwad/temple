@@ -31,9 +31,11 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   let commands: Command[] = [];
   const trace = root.querySelector<HTMLPreElement>('[data-trace]')!;
   const status = root.querySelector<HTMLElement>('[role=status]')!;
+
   const set = (key: string, value: string) => {
     root.querySelector<HTMLElement>(`[data-state=${key}]`)!.textContent = value;
   };
+
   const render = (ticks: Tick[], replayed = false) => {
     const state = ticks.at(-1)?.state ?? initialDeparture();
     set('tick', String(state.tick));
@@ -48,14 +50,17 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
           ?.facts.map((f) => (f.kind === 'denied' ? f.reason : f.kind === 'quest' ? `Quest: ${f.state}` : `${f.kind}: ${f.item}`))
           .join(' · ') || 'No new facts this tick.';
   };
+
   const update = () => render(replayDeparture(commands));
   root.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) =>
     button.addEventListener('click', () => {
       const action = button.dataset.command;
+
       if (action === 'reset') commands = [];
       else if (action === 'script') commands = [...DEPARTURE_SCRIPT];
       else if (action === 'replay') {
         render(replayDeparture(commands), true);
+
         return;
       } else if (action === 'ask') commands.push({ kind: 'ask', topic: 'journey' });
       else if (action === 'note' || action === 'torch') commands.push({ kind: 'acquire', item: action });
@@ -65,8 +70,10 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       update();
     }),
   );
+
   if (params.has('tick')) {
     const tick = Number(params.get('tick'));
+
     if (!Number.isInteger(tick) || tick < 0 || tick > DEPARTURE_SCRIPT.length)
       throw new Error(`Expected tick from 0 to ${DEPARTURE_SCRIPT.length}`);
     commands = DEPARTURE_SCRIPT.slice(0, tick);
@@ -75,13 +82,16 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     commands = [...DEPARTURE_SCRIPT];
     const first = replayDeparture(commands);
     const second = replayDeparture(commands);
+
     for (let index = 0; index <= first.length; index++) {
       const name = `tick-${index}`;
+
       if (!wantsCheckpoint(name)) continue;
       const prefix = first.slice(0, index);
       render(prefix);
       await checkpoint(name, prefix.at(-1)?.state ?? initialDeparture());
     }
+
     const duplicate = first[3];
     root.dataset.verdict =
       first.at(-1)?.state.quest === 'departed' &&

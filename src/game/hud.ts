@@ -36,27 +36,37 @@ const HINT_KEYS = 'C to crouch · F for the torch';
 
 // ---- diffing writes: each remembers the last value it wrote per element
 const last = new WeakMap<Element, Map<string, string | boolean>>();
+
 function seen(el: Element, key: string, v: string | boolean) {
   let m = last.get(el);
+
   if (!m) last.set(el, (m = new Map()));
+
   if (m.get(key) === v) return true;
   m.set(key, v);
+
   return false;
 }
+
 function put(el: HTMLElement, prop: string, v: string) {
   if (seen(el, prop, v)) return;
+
   if (prop.startsWith('--')) el.style.setProperty(prop, v);
   else (el.style as unknown as Record<string, string>)[prop] = v;
 }
+
 function flag(el: Element, cls: string, on: boolean) {
   if (!seen(el, '.' + cls, on)) el.classList.toggle(cls, on);
 }
+
 function hide(el: HTMLElement, h: boolean) {
   if (!seen(el, '[hidden]', h)) el.hidden = h;
 }
+
 function attr(el: Element, name: string, v: string) {
   if (!seen(el, '@' + name, v)) el.setAttribute(name, v);
 }
+
 function text(el: Node, t: string) {
   if (el.textContent !== t) el.textContent = t;
 }
@@ -99,6 +109,7 @@ export function createHud(actions: HudActions, touch: boolean) {
     e.preventDefault();
     actions.jump();
   });
+
   for (const [b, fn] of [[crouchButton, actions.crouch], [torchButton, actions.torch]] as const)
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -110,6 +121,7 @@ export function createHud(actions: HudActions, touch: boolean) {
     touch = on;
     flag(root, 'touch', on);
   };
+
   setTouch(touch);
   hide(modeButton, false);
 
@@ -127,15 +139,20 @@ export function createHud(actions: HudActions, touch: boolean) {
     const now = performance.now();
     const out = !s.above;
     const vitalsOn = out && s.forest;
+
     if (stage === 0 && s.moving && now - stageAt > 3000) {
       stage = 1;
       stageAt = now;
     } else if (stage === 1 && now - stageAt > 9000) stage = 2;
+
     if (vitalsOn && !vitalsSeen) {
       vitalsSeen = true;
+
       if (!touch) keysUntil = now + 7000;
     }
+
     const h = now < keysUntil ? HINT_KEYS : stage === 0 ? (touch ? HINT_TOUCH : HINT_DESK) : stage === 1 ? HINT_WAY : '';
+
     if (h) text(hint, h);
     flag(hint, 'on', h !== '');
 
@@ -163,6 +180,7 @@ export function createHud(actions: HudActions, touch: boolean) {
 
     // A red flash when hurt, and a steady edge while badly hurt
     const rest = s.health < 0.35 ? '0.35' : '0';
+
     if (s.health < lastHealth - 0.01) {
       put(hurt, 'transition', 'none');
       put(hurt, 'opacity', calm ? '0.5' : '1');
@@ -176,6 +194,7 @@ export function createHud(actions: HudActions, touch: boolean) {
 
   let alertTimer = 0;
   let storyTimer = 0;
+
   return {
     pad,
     knob,
@@ -212,6 +231,7 @@ export function createHud(actions: HudActions, touch: boolean) {
     /** The look-closer button's label, or null to hide it. */
     look(label: string | null) {
       hide(look, label === null);
+
       if (label !== null) text(look.firstChild!, label);
     },
     down() {

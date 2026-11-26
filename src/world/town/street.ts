@@ -18,6 +18,7 @@ const WARM: V3 = [1, 0.72, 0.42];
 const lit = (pattern: number, emission: V3): Mat => ({ color: [0, 0, 0], roughness: 1, emission, pattern });
 const paint = (h: number, rough = 0.75): Mat => ({ color: hex(h), roughness: rough, pattern: P.PAINT });
 const plain = (h: number, rough = 0.6, metallic = 0): Mat => ({ color: hex(h), roughness: rough, metallic, pattern: P.PLAIN });
+
 const S = {
   tube: lit(P.TUBE, [5.5, 7, 7.5]),
   tubeBad: lit(P.TUBE_BAD, [5.5, 7, 7.5]),
@@ -43,16 +44,20 @@ const S = {
   sack: plain(0xc8b898, 0.95),
   rice: plain(0xe8e2d4, 0.9),
 };
+
 const GOODS = [0xd83020, 0x2050c0, 0xe8c020, 0x30a040, 0xf0f0e8, 0xe07020, 0x8030a0, 0x20a0b0].map((h) => plain(h, 0.5));
 const WALLS = [paint(0x3f8a9a), paint(0x7aa85a), paint(0xd8a040), paint(0xc87890), paint(0xe8e0cf), paint(0x4a6ab0)];
+
 /** Which poster from the atlas: Che and the party, films, a coaching ad, the lottery. */
 const POLITICAL = [0, 1, 2, 3, 10];
 const FILMS = [4, 5, 6, 7, 8];
 const ADS = [9, 11];
 const hashed = (x: number, z: number, k = 0) => Math.abs(Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453) % 1;
+
 const posterAt = (x: number, z: number, k = 0) => {
   const h = hashed(x, z, k);
   const list = h < 0.38 ? POLITICAL : h < 0.85 ? FILMS : ADS;
+
   return list[Math.floor(hashed(x, z, k + 1) * list.length)]!;
 };
 
@@ -60,32 +65,39 @@ export function buildStreet() {
   const b = new Builder(true);
   const lamps: Lamp[] = [];
   const r = rng(29);
+
   const light = (position: V3, color: V3, intensity: number, range: number, kind: LampKind, seed: number, extra: Partial<Lamp> = {}) =>
     lamps.push({ position, color, intensity, range, kind, seed, ...extra });
+
   /** The frame of a place beside the road: x along it, -z toward it, y from the ground. */
   const beside = (x: number, off: number, fn: (y: number) => void) => {
     const z = roadZ(x) + off;
     const y = heightAt(x, z);
     const toward = Math.atan2(roadZ(x + 1) - roadZ(x - 1), 2);
     b.with({ at: [x, y, z], yaw: -toward }, () => fn(y));
+
     return { z, y, yaw: -toward };
   };
+
   const world = (x: number, off: number, local: V3): V3 => {
     const z = roadZ(x) + off;
     const y = heightAt(x, z);
     const yaw = -Math.atan2(roadZ(x + 1) - roadZ(x - 1), 2);
     const c = Math.cos(yaw);
     const s = Math.sin(yaw);
+
     return [x + local[0] * c + local[2] * s, y + local[1], z - local[0] * s + local[2] * c];
   };
 
   // ================================================================ poles, lamps and wires
   type Pole = { px: number; kind: 'sodium' | 'sodiumBad' | 'tube' | 'tubeBad' };
+
   const poles: Pole[] = [
     { px: -110, kind: 'tube' }, { px: -78, kind: 'tube' }, { px: -55, kind: 'tubeBad' }, { px: -30, kind: 'sodium' },
     { px: -9, kind: 'sodium' }, { px: 12, kind: 'sodium' }, { px: 33, kind: 'sodiumBad' }, { px: 55, kind: 'sodium' },
     { px: 78, kind: 'tube' }, { px: 98, kind: 'tube' },
   ];
+
   const tops: V3[][] = [];
   poles.forEach(({ px, kind }, i) => {
     const off = ROAD.half + 0.8;
@@ -93,12 +105,15 @@ export function buildStreet() {
     beside(px, off, () => {
       // A tapered concrete pole, the KSEB kind, with its holes and climbing steps
       b.frustum(S.pole, [0, 0, 0], [0.14, 0.1], [0.07, 0.06], -0.3, 8.4, 'top');
+
       for (let y = 1.2; y < 7.5; y += 0.6) b.box(M.dark, [0, y, 0.101 - (y / 8.4) * 0.04], [0.03, 0.08, 0.01]);
       // Cross-arm with insulators for the wires
       b.box(M.steel, [0, 8.1, 0], [0.7, 0.03, 0.04]);
+
       for (const ix of [-0.6, -0.2, 0.2, 0.6]) b.lathe(plain(0xd8d4c8, 0.3), [ix, 8.13, 0], [[0, 0], [0.035, 0], [0.04, 0.04], [0.02, 0.06], [0.03, 0.09], [0, 0.11]], 8);
       // The curved GI arm and the lamp
       b.sweep(M.steel, [[0, 6.9, -0.08], [0, 7.25, -0.6], [0, 7.45, -1.3], [0, 7.5, -2.1]], [0.035, 0.035, 0.032, 0.03], 6);
+
       if (kind === 'tube' || kind === 'tubeBad') {
         b.box(M.steel, [0, 7.48, -2.1], [0.08, 0.03, 0.62]);
         b.with({ at: [0, 0, 0], yaw: 0 }, () => b.seeded(seed, () => b.box(kind === 'tube' ? S.tube : S.tubeBad, [0, 7.42, -2.1], [0.018, 0.018, 0.58])));
@@ -106,11 +121,13 @@ export function buildStreet() {
         b.lathe(M.steel, [0, 7.42, -2.25], [[0.0, 0.14], [0.2, 0.1], [0.22, 0.04], [0.2, 0.0]], 12);
         b.seeded(seed, () => b.lathe(kind === 'sodium' ? M.sodium : M.sodiumBad, [0, 7.42, -2.25], [[0.18, 0.0], [0.12, -0.07], [0, -0.09]], 12));
       }
+
       // Notices and a cable-TV junction box strapped on
       if (r() < 0.6) {
         r();
         b.poster([0, 2.2 + r(), -0.13], [0, 0, -1], 0.34, 0.45, posterAt(px, 1), (hashed(px, 2) - 0.5) * 0.12);
       }
+
       if (r() < 0.5) b.box(plain(0x2a2a2a), [0.12, 5.2, 0], [0.06, 0.12, 0.06]);
     });
     const head = world(px, off, [0, 7.36, kind.startsWith('tube') ? -2.1 : -2.25]);
@@ -118,6 +135,7 @@ export function buildStreet() {
     light(head, tube ? TUBE : SODIUM, tube ? 5.5 : 11, tube ? 12 : 15, kind, seed, { spot: [0.8, 1.3], shadow: px === -9 || px === 12 });
     tops.push([-0.6, -0.2, 0.2].map((ix) => world(px, off, [ix, 8.24, 0])));
   });
+
   // The wires sag between poles; the cable-TV line hangs lower and slacker
   for (let i = 0; i + 1 < poles.length; i++) {
     for (let k = 0; k < 3; k++) {
@@ -126,13 +144,16 @@ export function buildStreet() {
       const segs = 14;
       const sag = k === 2 ? 1.1 : 0.55;
       const pts: V3[] = [];
+
       for (let s = 0; s <= segs; s++) {
         const u = s / segs;
         pts.push([a[0] + (c[0] - a[0]) * u, a[1] + (c[1] - a[1]) * u - (k === 2 ? 1.2 : 0) - 4 * u * (1 - u) * sag, a[2] + (c[2] - a[2]) * u]);
       }
+
       b.sweep(M.dark, pts, pts.map(() => (k === 2 ? 0.016 : 0.01)), 3);
     }
   }
+
   // A transformer on a double pole by the road, west of the shops
   beside(-21, ROAD.half + 2.2, () => {
     b.prop('pole1', [0, 0, 0], 0, 1.3);
@@ -153,14 +174,17 @@ export function buildStreet() {
         b.box(M.ochre, [s * 3.3, 5.25, 0], [0.4, 0.12, 0.4]);
         b.lathe(M.gold, [s * 3.3, 5.37, 0], [[0, 0], [0.14, 0.04], [0.1, 0.16], [0.05, 0.22], [0.08, 0.32], [0, 0.55]], 10);
       }
+
       b.box(M.plaster, [0, 4.75, 0], [3.0, 0.42, 0.26]);
       b.box(M.ochre, [0, 4.3, 0], [3.0, 0.04, 0.3]);
       b.roof(M.tile, [0, 0, 0], [3.8, 0.75], [3.1, 0.05], 5.18, 5.8, { sag: 0.12, rows: 3 });
       b.seeded(0.19, () => b.box(S.sign, [0, 4.75, 0.27], [2.6, 0.32, 0.01]));
       b.seeded(0.19, () => b.box(S.sign, [0, 4.75, -0.27], [2.6, 0.32, 0.01]));
+
       // Serial lights all round the arch, both faces
       for (const fz of [0.36, -0.36]) {
         for (let i = 0; i <= 44; i++) b.blob(S.serial, [-3.0 + (i / 44) * 6.0, 5.2, fz], [0.025, 0.025, 0.025], 4, 2);
+
         for (const s of [-1, 1]) for (let i = 0; i <= 26; i++) b.blob(S.serial, [s * 2.95, 0.6 + (i / 26) * 3.65, fz], [0.025, 0.025, 0.025], 4, 2);
       }
     });
@@ -171,13 +195,16 @@ export function buildStreet() {
   for (const side of [-1, 1]) {
     for (let x = -46; x < 46; x += 0.6) {
       if (side < 0 && Math.abs(x) < 2.3) continue;
+
       // ...and where the forest path leaves the road
       if (side < 0 && Math.abs(x - 20) < 1.4) continue;
+
       if (side > 0 && x > -17.5 && x < -13.5) continue;
       const k = Math.round((x + 46) / 0.6);
       beside(x, side * (ROAD.half + 0.12), () => b.box(k % 2 ? M.white : M.black, [0, 0.07, 0], [0.27, 0.11, 0.09], 'y-'));
     }
   }
+
   // A milestone by the road
   beside(-27, -(ROAD.half + 0.9), () => {
     b.box(M.white, [0, 0.35, 0], [0.18, 0.35, 0.08], 'y-');
@@ -186,22 +213,27 @@ export function buildStreet() {
 
   // ================================================================ the shops across the road
   const FRONT = ROAD.half + 1.7;
+
   /** A shop's shell: plinth, side and back walls, ceiling and a Mangalore-tiled roof. */
   const shell = (w: number, wall: Mat) => {
     const D = 4;
     b.box(M.concrete, [0, -0.25, D / 2], [w / 2 + 0.05, 0.5, D / 2 + 0.4], 'y-');
+
     for (const s of [-1, 1]) b.box(wall, [s * (w / 2 - 0.1), 0.25 + 1.5, D / 2], [0.1, 1.5, D / 2], 'y-');
     b.box(wall, [0, 0.25 + 1.5, D - 0.1], [w / 2, 1.5, 0.1], 'y-');
     b.box(wall, [0, 3.0, 0.1], [w / 2, 0.25, 0.1]);
     b.box(plain(0x8a8478, 0.9), [0, 3.25, D / 2], [w / 2, 0.05, D / 2]);
     b.box(plain(0x3a3632, 0.9), [0, 0.26, D / 2], [w / 2 - 0.2, 0.01, D / 2 - 0.2]);
     b.roof(M.mtile, [0, 0, D / 2], [w / 2 + 0.35, D / 2 + 0.4], [w / 2 + 0.35, 0.05], 3.3, 4.6, { sag: 0.05, rows: 3, sides: [0, 2] });
+
     for (const s of [-1, 1]) b.tri(wall, [s * (w / 2 - 0.05), 3.3, -0.35], [s * (w / 2 - 0.05), 3.3, D + 0.35], [s * (w / 2 - 0.05), 4.58, D / 2], [s, 0, 0]);
     // The tin awning out over the step, on two thin posts
     b.plane(M.tin, [-w / 2 - 0.1, 2.75, -1.5], [w / 2 + 0.1, 2.75, -1.5], [w / 2 + 0.1, 3.05, 0], [-w / 2 - 0.1, 3.05, 0], [0, 1, -0.2]);
     b.plane(M.tin, [-w / 2 - 0.1, 2.73, -1.5], [w / 2 + 0.1, 2.73, -1.5], [w / 2 + 0.1, 3.03, 0], [-w / 2 - 0.1, 3.03, 0], [0, -1, 0.2]);
+
     for (const s of [-1, 1]) b.tube(M.steel, [s * (w / 2 - 0.05), 0.25, -1.4], 0.025, 0.025, 2.5, 6);
     b.box(M.steel, [0, 2.74, -1.45], [w / 2 + 0.05, 0.02, 0.02]);
+
     // Posters pasted on the side walls, peeling
     // (often two or three of the same, side by side, the way a film's are pasted up)
     for (let i = 0; i < 3; i++) {
@@ -211,12 +243,14 @@ export function buildStreet() {
       const z = 0.6 + r() * 2.6;
       const k = posterAt(w * 7.1 + i, z);
       const copies = FILMS.includes(k) && hashed(w, z, 3) < 0.6 ? 2 : 1;
+
       for (let j = 0; j < copies; j++) {
         const zz = z + (j - (copies - 1) / 2) * 0.53;
         b.poster([s * (w / 2 + 0.012 + i * 0.002), y, zz], [s, 0, 0], 0.5, 0.66, k, (hashed(zz, y, 4) - 0.5) * 0.06);
       }
     }
   };
+
   /** A rolling shutter from the floor up to `h`, its slats horizontal. */
   const shutter = (w: number, h: number) => {
     b.plane(M.tin, [-w / 2 + 0.2, 0.26, 0.02], [-w / 2 + 0.2, 0.26 + h, 0.02], [w / 2 - 0.2, 0.26 + h, 0.02], [w / 2 - 0.2, 0.26, 0.02], [0, 0, -1]);
@@ -224,23 +258,28 @@ export function buildStreet() {
     b.box(M.tin, [0, 2.92, -0.06], [w / 2 - 0.2, 0.13, 0.12]);
     b.box(M.steel, [0, 0.32, -0.02], [0.08, 0.04, 0.02]);
   };
+
   /** Shelves of boxed and bottled goods against the back wall. */
   const shelves = (w: number, z: number) => {
     for (let k = 0; k < 4; k++) {
       const y = 0.7 + k * 0.55;
       b.box(M.teak, [0, y, z], [w / 2 - 0.25, 0.02, 0.22]);
+
       for (let x = -w / 2 + 0.35; x < w / 2 - 0.35; x += 0.12 + r() * 0.1) {
         const hh = 0.08 + r() * 0.16;
+
         if (r() < 0.3) b.tube(GOODS[Math.floor(r() * GOODS.length)]!, [x, y + 0.02, z], 0.04, 0.04, hh * 1.2, 6, { cap: true });
         else b.box(GOODS[Math.floor(r() * GOODS.length)]!, [x, y + 0.02 + hh / 2, z + (r() - 0.5) * 0.1], [0.04 + r() * 0.03, hh / 2, 0.06]);
       }
     }
   };
+
   /** Strips of snack sachets hanging from the front beam. */
   const sachets = (x: number, z: number, n: number) => {
     for (let i = 0; i < n; i++) {
       const mat = GOODS[Math.floor(r() * GOODS.length)]!;
       b.bar(M.dark, [x + i * 0.14, 2.7, z], [x + i * 0.14, 1.5, z], 0.004);
+
       for (let k = 0; k < 9; k++) b.box(mat, [x + i * 0.14, 2.6 - k * 0.13, z], [0.05, 0.055, 0.004]);
     }
   };
@@ -249,19 +288,23 @@ export function buildStreet() {
   {
     const x = 3.4;
     const w = 4.6;
+
     const at = beside(x, FRONT, () => {
       shell(w, WALLS[2]!);
       shelves(w, 3.6);
       // Counter with glass jars of snacks and a steel tray of fritters
       b.box(M.teak, [0.4, 0.75, 0.55], [1.6, 0.5, 0.3], 'y-');
       b.box(plain(0xe0dcd0, 0.5), [0.4, 1.27, 0.55], [1.65, 0.02, 0.34]);
+
       for (let j = 0; j < 7; j++) {
         const jx = -1.0 + j * 0.36;
         b.tube(GOODS[(j * 3) % GOODS.length]!, [jx, 1.29, 0.42], 0.1, 0.1, 0.2, 10, { cap: false });
         b.tube(S.glass, [jx, 1.29, 0.42], 0.11, 0.11, 0.28, 10, { cap: false });
         b.tube(S.aluminium, [jx, 1.57, 0.42], 0.1, 0.1, 0.03, 10, { cap: true });
       }
+
       b.box(S.aluminium, [0.9, 1.31, 0.72], [0.35, 0.02, 0.15]);
+
       for (let k = 0; k < 14; k++) b.blob(plain(0xb06818, 0.7), [0.65 + (k % 7) * 0.08, 1.36, 0.65 + Math.floor(k / 7) * 0.12], [0.04, 0.025, 0.04], 5, 3, 0.4);
       // The big kettle on its stove, a blue gas flame under it
       b.box(M.steel, [-1.55, 1.0, 0.7], [0.3, 0.25, 0.25]);
@@ -270,11 +313,14 @@ export function buildStreet() {
       b.seeded(0.43, () => {
         for (let i = 0; i < 6; i++) b.flame(M.flame, [-1.55 + Math.sin(i) * 0.08, 1.24, 0.7 + Math.cos(i) * 0.08], 0.03);
       });
+
       // Glass tumblers upside down on a tray
       for (let k = 0; k < 6; k++) b.tube(S.glass, [-0.4 + k * 0.09, 1.29, 0.68], 0.03, 0.035, 0.1, 8, { cap: true });
+
       // Bananas hanging from the front beam
       for (const bx of [-1.7, -1.25, 1.95]) {
         b.bar(M.teak, [bx, 2.95, -0.1], [bx, 2.2, -0.1], 0.02);
+
         for (let k = 0; k < 26; k++) {
           const a = k * 2.4;
           const y = 2.85 - (k / 26) * 0.6;
@@ -282,6 +328,7 @@ export function buildStreet() {
           b.blob(g, [bx + Math.sin(a) * 0.09, y, -0.1 + Math.cos(a) * 0.09], [0.025, 0.08, 0.025], 5, 3);
         }
       }
+
       sachets(-2.0, -0.05, 3);
       // A stray asleep on the swept ground by the corner of the shop, curled nose to tail the way
       // the tan pariah dogs of every Kerala junction sleep, ignored by everyone and ignoring them
@@ -291,6 +338,7 @@ export function buildStreet() {
         const dark = plain(0x3a2a1e, 0.6);
         // The body, bent round in a C: a chain of soft lumps along an arc
         const R = 0.2;
+
         // Haunch big and round at one end, narrowing through the ribs to the shoulders
         for (let i = 0; i <= 12; i++) {
           const k = i / 12;
@@ -298,31 +346,39 @@ export function buildStreet() {
           const fat = 0.085 + 0.05 * Math.exp(-((k - 0.2) ** 2) * 14) + 0.02 * Math.sin(k * Math.PI);
           b.blob(coat, [Math.cos(a) * R, fat * 0.8, Math.sin(a) * R], [fat * 1.05, fat * 0.8, fat * 1.05], 12, 6);
         }
+
         // Pale belly and folded legs tucked inside the curl
         b.blob(pale, [0.03, 0.05, 0.02], [0.1, 0.05, 0.13], 6, 3);
+
         for (const [lx, lz] of [[0.08, -0.08], [0.1, 0.06]] as const) b.blob(pale, [lx, 0.035, lz], [0.08, 0.035, 0.03], 5, 3);
         // A darker saddle along the spine, the way these dogs are coloured
         const saddle = plain(0x6e4a2a, 0.85);
+
         for (let i = 1; i <= 9; i++) {
           const a = -1.9 + (i / 12) * 3.4;
           b.blob(saddle, [Math.cos(a) * (R + 0.03), 0.15, Math.sin(a) * (R + 0.03)], [0.07, 0.035, 0.07], 8, 4);
         }
+
         // The head resting on the front paws, raised clear of the curl, eyes shut
         const hx = Math.cos(1.5) * R - 0.02;
         const hz = Math.sin(1.5) * R + 0.05;
+
         for (const s2 of [-1, 1]) b.blob(pale, [hx - 0.12, 0.03, hz + s2 * 0.04], [0.09, 0.03, 0.03], 6, 3);
         b.blob(coat, [hx, 0.12, hz], [0.095, 0.08, 0.09], 12, 6);
         b.blob(coat, [hx - 0.1, 0.1, hz], [0.07, 0.05, 0.05], 10, 5);
         b.blob(dark, [hx - 0.15, 0.09, hz], [0.035, 0.035, 0.038], 8, 4);
         b.blob(dark, [hx - 0.185, 0.1, hz], [0.014, 0.013, 0.016], 5, 3);
+
         // Ears pricked up, the way the pariah dogs carry them even half asleep
         for (const s2 of [-1, 1]) b.blob(saddle, [hx + 0.03, 0.22, hz + s2 * 0.055], [0.022, 0.05, 0.03], 6, 3);
         // The tail wrapped round over the nose, its tip paler
         const tail: V3[] = [];
+
         for (let i = 0; i <= 5; i++) {
           const a = -1.9 - (i / 5) * 1.2;
           tail.push([Math.cos(a) * (R + 0.08), 0.05 + Math.sin((i / 5) * Math.PI) * 0.03, Math.sin(a) * (R + 0.08)]);
         }
+
         b.sweep(coat, tail, [0.04, 0.035, 0.02], 6);
         b.blob(pale, tail[5]!, [0.025, 0.022, 0.025], 5, 3);
       });
@@ -338,6 +394,7 @@ export function buildStreet() {
       // The tube light under the awning, serial lights along its edge, the signboard above
       b.box(M.steel, [0, 2.92, -0.9], [0.62, 0.02, 0.04]);
       b.seeded(0.29, () => b.box(S.tube, [0, 2.88, -0.9], [0.6, 0.018, 0.018]));
+
       for (let i = 0; i <= 40; i++) b.blob(S.serial, [-w / 2 + (i / 40) * w, 2.72, -1.5], [0.022, 0.022, 0.022], 4, 2);
       b.box(M.steel, [0, 3.5, -0.02], [w / 2 - 0.1, 0.32, 0.03]);
       b.seeded(0.13, () => b.box(S.signRed, [0, 3.5, -0.06], [w / 2 - 0.2, 0.28, 0.01]));
@@ -356,6 +413,7 @@ export function buildStreet() {
       b.prop('bottles', [-1.1, 2.37, 3.62], 0);
       b.prop('bottles', [0.6, 1.82, 3.62], 0);
     });
+
     // Shining down and out over the benches; the tin just above it stays in its own shadow
     light(world(x, FRONT, [0, 2.78, -1.0]), TUBE, 2.6, 9, 'tube', 0.29, { spot: [1.15, 1.5] });
     light(world(x, FRONT, [1.6, 2.4, 2.9]), [0.6, 0.72, 1], 0.5, 4.5, 'tv', 0.07);
@@ -370,17 +428,22 @@ export function buildStreet() {
     beside(x, FRONT, () => {
       shell(w, WALLS[0]!);
       shelves(w, 3.6);
+
       for (const s of [-1, 1]) {
         b.box(M.teak, [s * (w / 2 - 0.4), 1.4, 1.9], [0.2, 1.15, 1.4]);
+
         for (let k = 0; k < 4; k++) for (let i = 0; i < 9; i++) b.box(GOODS[(i + k) % GOODS.length]!, [s * (w / 2 - 0.62), 0.6 + k * 0.5, 0.7 + i * 0.28], [0.03, 0.09, 0.1]);
       }
+
       // The shutter rolled two-thirds up, sacks of rice and a scale at the front
       shutter(w, 0.55);
       b.plane(M.tin, [-w / 2 + 0.2, 1.95, 0.02], [-w / 2 + 0.2, 2.8, 0.02], [w / 2 - 0.2, 2.8, 0.02], [w / 2 - 0.2, 1.95, 0.02], [0, 0, -1]);
+
       for (let k = 0; k < 3; k++) {
         b.blob(S.sack, [-1.1 + k * 0.5, 0.55, 0.45], [0.22, 0.32, 0.2], 8, 5, 0.15);
         b.disc(S.rice, [-1.1 + k * 0.5, 0.86, 0.45], 0.17, 8, 1);
       }
+
       b.box(S.aluminium, [0.9, 0.95, 0.4], [0.2, 0.06, 0.15]);
       b.prop('crate', [1.2, 0, -0.7], 0.2);
       b.prop('crate', [1.2, 0.25, -0.7], 0.15);
@@ -406,12 +469,14 @@ export function buildStreet() {
       shell(w, wall);
       b.prop('shutter', [0, 0.26, 0.05], 0, [(w - 0.4) / 3.08, 2.7 / 2.4, 1]);
       b.box(M.steel, [0, 3.5, -0.02], [w / 2 - 0.1, 0.3, 0.03]);
+
       if (sign) b.seeded(0.23, () => b.box(S.sign, [0, 3.5, -0.06], [w / 2 - 0.2, 0.26, 0.01]));
       else {
         r();
         // Posters pasted across the shut shutter, a row of one film and a party notice
         const film = FILMS[Math.floor(hashed(x, 5) * FILMS.length)]!;
         const n = Math.floor((w - 0.6) / 0.56);
+
         for (let j = 0; j < n; j++) {
           const k = j === n - 1 ? POLITICAL[Math.floor(hashed(x, 6) * POLITICAL.length)]! : film;
           b.poster([-((n - 1) / 2) * 0.56 + j * 0.56, 1.55 + (hashed(x, j) - 0.5) * 0.08, -0.16], [0, 0, -1], 0.5, 0.66, k, (hashed(x, j + 9) - 0.5) * 0.05);
@@ -419,6 +484,7 @@ export function buildStreet() {
       }
     });
   }
+
   beside(8.2, FRONT, () => {
     b.box(M.steel, [1.35, 2.35, -0.2], [0.03, 0.03, 0.2]);
     b.box(S.cross, [1.35, 2.35, -0.42], [0.05, 0.17, 0.03]);
@@ -433,6 +499,7 @@ export function buildStreet() {
     b.box(M.concrete, [0, 1.5, 1.4], [2.2, 1.3, 0.08], 'y-');
     b.box(paint(0x1868b0), [0, 1.6, 1.31], [1.4, 0.65, 0.01]);
     b.box(paint(0xf0c010), [-0.5, 1.75, 1.3], [0.6, 0.2, 0.005]);
+
     for (const s of [-1, 1]) b.box(M.concrete, [s * 2.2, 1.5, 0.7], [0.08, 1.3, 0.75], 'y-');
     b.plane(M.tin, [-2.5, 2.8, -0.35], [2.5, 2.8, -0.35], [2.5, 2.95, 1.6], [-2.5, 2.95, 1.6], [0, 1, 0]);
     b.plane(M.tin, [-2.5, 2.78, -0.35], [2.5, 2.78, -0.35], [2.5, 2.93, 1.6], [-2.5, 2.93, 1.6], [0, -1, 0]);
@@ -450,6 +517,7 @@ export function buildStreet() {
       b.lathe(S.rubber, [0, -wid / 2, 0], [[0, 0], [rad * 0.6, 0], [rad, wid * 0.2], [rad, wid * 0.8], [rad * 0.6, wid], [0, wid]], 12);
     });
   };
+
   beside(7.2, ROAD.half + 1.2, () => {
     b.with({ at: [0, 0, -0.1], yaw: Math.PI / 2 }, () => {
       // The autorickshaw: a yellow-and-black body, a canvas top, three wheels
@@ -458,15 +526,18 @@ export function buildStreet() {
       b.box(S.yellow, [0, 0.72, -0.35], [0.6, 0.12, 0.55]);
       b.box(S.black, [0, 1.62, -0.15], [0.66, 0.05, 0.95]);
       b.box(S.black, [0, 1.15, -1.05], [0.63, 0.5, 0.04]);
+
       for (const s of [-1, 1]) {
         b.box(S.black, [s * 0.64, 1.25, -0.6], [0.02, 0.38, 0.4]);
         b.tube(M.steel, [s * 0.6, 0.65, 0.5], 0.015, 0.015, 0.98, 4);
       }
+
       b.box(S.glass, [0, 1.25, 0.72], [0.5, 0.3, 0.02]);
       b.box(S.chrome, [0, 1.0, 0.9], [0.32, 0.015, 0.015]);
       b.blob(S.chrome, [0, 0.82, 1.17], [0.06, 0.06, 0.03], 6, 3);
       b.box(plain(0x6a2a18, 0.8), [0, 0.95, -0.55], [0.55, 0.12, 0.25]);
       wheel([0, 0.2, 1.05], 0.2, 0.1);
+
       for (const s of [-1, 1]) wheel([s * 0.58, 0.2, -0.55], 0.2, 0.12);
     });
   });
@@ -489,9 +560,11 @@ export function buildStreet() {
       // A black roadster bicycle leaning on the pole
       for (const z of [-0.5, 0.5]) {
         const ring: V3[] = [];
+
         for (let i = 0; i <= 16; i++) ring.push([0, 0.34 + Math.cos((i / 16) * Math.PI * 2) * 0.33, z + Math.sin((i / 16) * Math.PI * 2) * 0.33]);
         b.sweep(S.black, ring, ring.map(() => 0.012), 4);
       }
+
       b.bar(S.black, [0, 0.34, -0.5], [0, 0.9, -0.1], 0.015);
       b.bar(S.black, [0, 0.34, -0.5], [0, 0.4, 0.05], 0.015);
       b.bar(S.black, [0, 0.4, 0.05], [0, 0.9, -0.1], 0.015);

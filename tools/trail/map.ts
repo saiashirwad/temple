@@ -10,14 +10,19 @@ const c = createCanvas(nx, nz);
 const g = c.getContext('2d');
 const img = g.createImageData(nx, nz);
 const px = trailMap();
+
 // Blue: the bare wet earth along the brooks and where the elephants trampled across
 const { lo, res } = TRAIL_MAP;
+
 const ss = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+
   return t * t * (3 - 2 * t);
 };
+
 for (let j = 0; j < nz; j++) {
   const z = lo[1] + (j + 0.5) * res;
+
   for (let i = 0; i < nx; i++) {
     const x = lo[0] + (i + 0.5) * res;
     const k = (j * nx + i) * 4;
@@ -27,7 +32,11 @@ for (let j = 0; j < nz; j++) {
     px[k + 3] = 255;
   }
 }
+
 img.data.set(px);
+
 g.putImageData(img, 0, 0);
+
 writeFileSync(new URL('../../public/tex/trail.png', import.meta.url).pathname, c.toBuffer('image/png'));
+
 console.log('trail map', nx, 'x', nz);

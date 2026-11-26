@@ -19,14 +19,17 @@ export type FarLight = { at: readonly [number, number, number]; color: readonly 
 export function createFarLights(lights: FarLight[], time: { $: number }, wanderer: { $: d.v4f }) {
   const m = Math.max(lights.length, 1);
   const n = m + 1;
+
   const where = tgpu.const(
     d.arrayOf(d.vec4f, m),
     (lights.length ? lights : [{ at: [0, -999, 0], color: [0, 0, 0], strength: 0 } as FarLight]).map((l, i) => d.vec4f(l.at[0], l.at[1], l.at[2], i * 0.618 + l.strength * 0)),
   );
+
   const tint = tgpu.const(
     d.arrayOf(d.vec3f, m),
     (lights.length ? lights : [{ at: [0, 0, 0], color: [0, 0, 0], strength: 0 } as FarLight]).map((l) => d.vec3f(l.color[0] * l.strength, l.color[1] * l.strength, l.color[2] * l.strength)),
   );
+
   const quad = tgpu.const(
     d.arrayOf(d.vec2f, 6),
     [
@@ -38,6 +41,7 @@ export function createFarLights(lights: FarLight[], time: { $: number }, wandere
       [-1, 1],
     ].map(([x, y]) => d.vec2f(x!, y!)),
   );
+
   const drawing: passes.Drawing<typeof Corner, d.Infer<typeof Seen>> = {
     label: 'far lights',
     Vertex: Corner,
@@ -62,20 +66,25 @@ export function createFarLights(lights: FarLight[], time: { $: number }, wandere
       const world = w.xyz + pull + cam.right * q.x * size + cam.up * q.y * size;
       const fade = std.exp(-dist * 0.0016);
       const color = std.select(tint.$[std.min(instanceIndex, m - 1)], d.vec3f(1, 0.6, 0.28) * wv.w, last);
+
       return Corner({ position: cameras.toClip(world), uv: q, color: color * shimmer * fade * show });
     },
     pixelOf: (corner) => {
       'use gpu';
       const r = std.length(corner.uv);
+
       // Opaque, so only the bright heart is drawn; bloom gives it its halo
       if (r > 0.55) {
         std.discard();
       }
+
       const k = 0.35 + 0.65 * (1 - r / 0.55);
+
       return Seen({ color: d.vec4f(corner.color * k, 1) });
     },
     color: passes.shaded,
     draw: (pass) => pass.draw(6, n),
   };
+
   return drawing;
 }

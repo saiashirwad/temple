@@ -16,5 +16,6 @@ export const grade = (color: d.v3f, uv: d.v2f) => {
   c = std.mix(grey, c, 1.18);
   // Lift the blacks just off zero so the night has a body to it
   c = c * 0.97 + d.vec3f(0.006, 0.008, 0.016);
+
   return std.max(c, d.vec3f(0)) + uv.x * 0;
 };

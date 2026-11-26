@@ -93,9 +93,11 @@ function steer(b: Beast, x: number, z: number, speed: number, dt: number, turn: 
   const d = hypot2(dx, dz);
   const want = d > M.arrive ? Math.min(speed, d * M.brake) : 0;
   b.speed = approach(b.speed, want, M.accel, dt);
+
   if (d > M.arrive) b.yaw += wrap(Math.atan2(dx, dz) - b.yaw) * Math.min(1, dt * turn);
   b.x += Math.sin(b.yaw) * b.speed * dt;
   b.z += Math.cos(b.yaw) * b.speed * dt;
+
   return d;
 }
 
@@ -109,6 +111,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
   let hurtAt = -99;
   let clock = 0;
   const said = new Set<string>();
+
   const once = (key: string, text: string, seconds = 7) => {
     if (said.has(key)) return;
     said.add(key);
@@ -117,6 +120,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
 
   // ---- the pack
   type Wolf = Beast & { slot: number; lunge: number; back: number; feint: boolean };
+
   const wolves: Wolf[] = Array.from({ length: D.size[1] }, (_, i) => ({ x: 0, z: 0, yaw: 0, speed: 0, phase: random() * 6, on: false, alert: 0, slot: i, lunge: 0, back: 0, feint: false }));
   /** How long you've held them off, facing them; they give up at HOLD. */
   let nerve = 0;
@@ -135,12 +139,15 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
 
   // ---- the herd: a cow, her sister and a calf, wandering about the glade
   type Elephant = Beast & { size: number; goal: [number, number]; wait: number };
+
   const herd: Elephant[] = H.sizes.map((s, i) => {
     const a = glade.facing + Math.PI + (i - 1) * H.spreadAngle;
     const x = glade.x + Math.sin(a) * H.spacing * i;
     const z = glade.z + Math.cos(a) * H.spacing * i;
+
     return { x, z, yaw: glade.facing + rand(-H.startYaw, H.startYaw), speed: 0, phase: 0, on: true, alert: 0, size: s, goal: [x, z] as [number, number], wait: randIn(H.firstWait) };
   });
+
   let alarm = 0;
   let warned = 0;
   let charge: { from: [number, number]; mock: boolean; t: number } | null = null;
@@ -151,12 +158,15 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
     hurtAt = clock;
     const [ux, uz] = toward(from[0], from[1], p.x, p.z);
     hooks.shove(ux * push, uz * push);
+
     if (health <= 0) knockOut();
   };
+
   /** Set when you go down this step: the rest of the step is skipped, nothing hits you again. */
   let downed = false;
   /** Set by startle(): the herd's alarm jumps to this on the next step. */
   let startled = 0;
+
   /** Everything after you've gone down: you wake somewhere safe, the night calm again. */
   const knockOut = () => {
     hooks.down();
@@ -170,7 +180,9 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
     alarm = 0;
     warned = 0;
     charge = null;
+
     for (const w of wolves) Object.assign(w, { on: false, lunge: 0, back: 0, speed: 0 });
+
     for (const e of herd) e.alert = 0;
   };
 
@@ -183,12 +195,15 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
 
     // ---- wolves
     packTime += dt;
+
     if (answer && (answer.in -= dt) <= 0) {
       hooks.sound.whistle(answer.at, 0.7);
       answer = null;
     }
+
     if (pack === 'away') {
       if (summoned || hooks.wild(p.x, p.z)) packIn -= dt;
+
       if (packIn < 0 && (summoned || !hooks.safe(p.x, p.z))) {
         // A howl close by, then another answering: they've got your scent
         size = random() < D.smallChance ? D.size[0] : D.size[1];
@@ -223,6 +238,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
       const c = live().reduce((s, w) => [s[0] + w.x / size, s[1] + w.z / size], [0, 0]);
       const dist = hypot2(c[0] - p.x, c[1] - p.z);
       growlIn -= dt;
+
       if (pack === 'coming') {
         // At a trot, nose down, in a loose line
         // Trotting in on the scent, then slowing to a stalk and fanning out as they get close
@@ -233,10 +249,12 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
           steer(w, p.x + -uz * side, p.z + ux * side, stalk ? DC.stalk : DC.trot, dt);
         });
         whistleIn -= dt;
+
         if (whistleIn < 0) {
           whistleIn = randIn(DC.whistleEvery);
           hooks.sound.whistle(at(live()[Math.floor(random() * size)]!, 0.6), 0.45);
         }
+
         if (dist < DC.noticeDist) {
           if (hidden) {
             // They haven't seen you: they'll pass by, a little off to one side, and sniff about
@@ -254,18 +272,22 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
             hooks.sound.growl(at(live()[0]!), 0.6);
           }
         }
+
         if (packTime > DC.giveUp) pack = 'leaving';
       } else if (pack === 'searching') {
         live().forEach((w, i) => {
           const sniff = Math.sin(clock * DS.sniffRate + i * DS.sniffPhase) * DS.sniffAmp;
           steer(w, pass[0] + sniff + i * DS.spacing, pass[1] - sniff, DS.speed, dt, DS.turn);
         });
+
         if (growlIn < 0 && dist < DS.growlDist) {
           growlIn = randIn(DS.growlEvery);
           hooks.sound.growl(at(live()[Math.floor(random() * size)]!), 0.35);
         }
+
         // Up and about while they're close: they see you
         const nearest = Math.min(...live().map((w) => hypot2(w.x - p.x, w.z - p.z)));
+
         if (!hidden && nearest < DS.seeDist) {
           pack = 'attack';
           packTime = 0;
@@ -282,6 +304,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
         const inView = (w: Wolf) => facingCos(w.x - p.x, w.z - p.z, p.fx, p.fz) > DA.viewCos;
         const tall = !p.crouching && !p.running && p.pace < DA.tallPace;
         const facing = live().some(inView);
+
         // Held off: standing tall, facing them, the light in their eyes; braver with your back to
         // a tree or a rock. Running undoes it at once: you're prey again.
         if (p.running) nerve = Math.max(0, nerve - dt * DA.nerveRun);
@@ -289,24 +312,30 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
         else if (tall && facing) nerve += dt * DA.nerveDark;
         else nerve = Math.max(0, nerve - dt * DA.nerveDecay);
         nextLunge -= dt * (p.running ? DA.runHaste : 1);
+
         if (nextLunge < 0) {
           // The one coming in is one you're not looking at, if there is one
           const behind = live().filter((w) => !inView(w) && w.lunge === 0);
           const pick = behind.length ? behind : live().filter((w) => w.lunge === 0);
           const w = pick[Math.floor(random() * pick.length)];
+
           if (w) {
             w.lunge = 0.01;
             // From in front and you standing your ground with a light on it: it only tests you
             w.feint = inView(w) && tall;
             hooks.sound.yap(at(w), 0.6);
           }
+
           nextLunge = randIn(DA.lungeEvery);
         }
+
         live().forEach((w, i) => {
           const a = clock * DA.ringSpin * (i % 2 ? 1 : -1) + (i / size) * Math.PI * 2;
+
           if (w.lunge > 0) {
             w.lunge += dt;
             const d = steer(w, p.x, p.z, DA.lungeSpeed, dt, DA.lungeTurn);
+
             if (w.feint && d < DA.feintAt) {
               // Stops short, snarls, wheels away
               hooks.sound.growl(at(w), 0.7);
@@ -318,6 +347,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
               hooks.sound.bite([p.x, heightAt(p.x, p.z) + 0.8, p.z]);
               hooks.sound.growl(at(w), 0.7);
               hurt(randIn(DA.bite) * (seen ? DA.seen : DA.behind), [w.x, w.z], p, DA.push);
+
               if (downed) return;
               hooks.mark('bitten');
               nerve = Math.max(0, nerve - DA.nervePerBite);
@@ -331,14 +361,18 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
             steer(w, p.x + Math.sin(a) * r, p.z + Math.cos(a) * r, w.back > 0 ? DA.backSpeed : DA.ringSpeed, dt, DA.ringTurn);
           }
         });
+
         if (growlIn < 0) {
           growlIn = randIn(DA.growlEvery);
           const w = live()[Math.floor(random() * size)]!;
+
           if (random() < 0.5) hooks.sound.growl(at(w), 0.6);
           else hooks.sound.whistle(at(w, 0.6), 0.5);
         }
+
         if (downed) return { hidden };
         once('attacked', "They've found you. Don't run, and don't crouch. Turn and face them, torch in their eyes, stand tall. Back to a tree if you can. They bite what turns away.", 9);
+
         if (nerve > HOLD) {
           pack = 'leaving';
           hooks.say('They break off, one by one, and melt into the dark.', 5);
@@ -349,6 +383,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
           const [ux, uz] = toward(p.x, p.z, w.x, w.z);
           steer(w, w.x + ux * DL.ahead, w.z + uz * DL.ahead, DL.speed, dt, DL.turn);
         });
+
         if (dist > DL.goneDist) {
           for (const w of wolves) w.on = false;
           pack = 'away';
@@ -356,10 +391,12 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
         }
       }
     }
+
     for (const w of wolves) w.phase += (w.speed / D.stride) * Math.PI * 2 * dt;
 
     // ---- the herd
     const near = hypot2(p.x - glade.x, p.z - glade.z);
+
     if (near < H.range) {
       if (near < H.warnDist) once('herd', 'Elephants, feeding right by the path. Crouch (C), torch out (F), keep the wind in your face, and creep past.', 9);
       const cow = herd[0]!;
@@ -371,10 +408,12 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
       const ez = cow.z - p.z;
       const ed = hypot2(ex, ez) || 1;
       let lit = 0;
+
       if (p.torch) {
         if (facingCos(ex, ez, p.fx, p.fz) > HS.beamCos && ed < HS.beamDist) lit = HS.lit;
         else lit = HS.glow;
       }
+
       const reach = p.aloft ? 0 : clamp((HS.near - closest) / HS.span, 0, HS.reachMax);
       // The wind: carrying your scent to her if you're upwind, however quiet you are; carrying
       // your sounds away if you're downwind
@@ -382,15 +421,19 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
       const scent = p.aloft ? 0 : Math.max(0, along - HS.scentCos) * Math.max(0, 1 - ed / HS.scentDist) * HS.scentGain;
       const carried = along < HS.downCos ? HS.downMuffle : 1;
       const rise = (noise * carried + lit) * reach * HS.gain + scent * HS.scentRate;
+
       if (scent > HS.scentTell && alarm > HS.scentAlarm) {
         if (!said.has('scent')) hooks.mark('scented');
         once('scent', 'Her trunk is up, tasting the air. The wind is at your back: she can smell you. Get round so the wind is in your face.', 9);
       }
+
       alarm = clamp(alarm + (rise > HS.riseMin ? rise : -HS.decay) * dt, 0, 1);
+
       if (startled) {
         alarm = Math.max(alarm, startled);
         startled = 0;
       }
+
       if (!charge) {
         if (alarm > HA.rumble && warned < 1) {
           warned = 1;
@@ -399,12 +442,15 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
           hooks.sound.alarm?.([cow.x + rand(-40, 40), heightAt(cow.x, cow.z) + 6, cow.z + rand(-40, 40)]);
           hooks.say('The big one has stopped feeding. She is facing you.', 5);
         }
+
         if (alarm > HA.trumpet && warned < 2) {
           warned = 2;
           hooks.sound.trumpet(at(cow, 3), false);
           hooks.say('Back off. Slowly.', 4);
         }
+
         if (alarm < HA.calm) warned = 0;
+
         if (alarm >= HA.charge) {
           charge = { from: [cow.x, cow.z], mock: random() < HC.mockChance, t: 0 };
           hooks.mark('charge');
@@ -412,22 +458,29 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
           hooks.say('She is charging. Run!', 3);
         }
       }
+
       herd.forEach((e, i) => {
         e.alert = approach(e.alert, alarm > HA.alert || (charge && i === 0) ? 1 : 0, HA.alertRate, dt);
+
         if (i === 0 && charge) {
           charge.t += dt;
           const d = steer(e, p.x, p.z, charge.mock ? HC.mockSpeed : HC.speed, dt, HC.turn);
+
           if (p.aloft) charge.mock = true;
           thudIn -= dt;
+
           if (thudIn < 0) {
             thudIn = HC.thudEvery;
             hooks.sound.thud(at(e, 0.1), 1);
           }
+
           const far = hypot2(e.x - charge.from[0], e.z - charge.from[1]);
+
           if (d < HC.hitDist && !charge.mock) {
             hurt(HC.dmg, [e.x, e.z], p, HC.push);
             hooks.mark('trampled');
             charge = null;
+
             if (!downed) alarm = HC.afterHit;
           } else if ((charge.mock && (far > HC.mockRun || d < HC.mockStop)) || far > HC.maxRun || charge.t > HC.maxT) {
             // She stops short, shakes her head, and goes back to the others
@@ -435,8 +488,10 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
             alarm = HC.afterStop;
             hooks.sound.trumpet(at(e, 3), false);
           }
+
           return;
         }
+
         if (e.alert > 0.5) {
           // Alert: turn to face you, and keep still; the calf goes to its mother
           const tx = i === 2 ? cow.x - Math.sin(cow.yaw) * H.alert.calfBehind : e.x;
@@ -446,16 +501,20 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
         } else {
           // Feeding: a few steps, a long pause, a few steps; back toward the glade's middle
           e.wait -= dt;
+
           if (e.wait < 0) {
             e.wait = randIn(H.feed.wait);
             const a = random() * Math.PI * 2;
             const r = random() * glade.r * H.feed.roam;
             e.goal = [glade.x + Math.sin(a) * r, glade.z + Math.cos(a) * r];
+
             if (i === 2) e.goal = [herd[0]!.x + rand(-H.feed.calfNear, H.feed.calfNear), herd[0]!.z + rand(-H.feed.calfNear, H.feed.calfNear)];
           }
+
           steer(e, e.goal[0], e.goal[1], i === 2 ? H.feed.calfSpeed : H.feed.speed, dt, H.feed.turn);
         }
       });
+
       for (const e of herd) e.phase += (e.speed / (H.stride * e.size)) * Math.PI * 2 * dt;
     } else {
       // Far away (you went on, or woke at a shrine): they settle, and forget you
@@ -466,9 +525,11 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
 
     // ---- getting better, slowly; quicker by a lamp
     const calm = pack === 'away' || pack === 'leaving';
+
     // Sitting down up on a machan: out of reach, so you get your strength back whatever's below
     if (p.aloft && p.crouching && clock - hurtAt > P.aloftWait) health = Math.min(1, health + dt * P.healAloft);
     else if (calm && !charge && clock - hurtAt > P.wait) health = Math.min(1, health + dt * (hooks.safe(p.x, p.z) ? P.healSafe : P.healWild));
+
     return { hidden };
   };
 
@@ -483,10 +544,12 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
       dt,
       (h) => {
         out = step(h, p);
+
         return !downed;
       },
       TUNING.maxStep,
     );
+
     return out;
   };
 
@@ -531,6 +594,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
       wolves.forEach((w, i) => {
         const a = at[i];
         w.on = !!a;
+
         if (a) Object.assign(w, a);
       });
       pack = mood;

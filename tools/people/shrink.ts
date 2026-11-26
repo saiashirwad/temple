@@ -22,6 +22,7 @@ const BACKUP = join(homedir(), 'people-orig');
 const MAX = 512;
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+
 // Keep every node (leaf bones like the nubs too), attribute, index and texture slot
 const PRUNE = { keepLeaves: true, keepAttributes: true, keepIndices: true, keepSolidTextures: true, keepExtras: true };
 
@@ -34,8 +35,11 @@ function shrinkImage(image: Uint8Array, mime: string, w: number, h: number): Uin
   const W = Math.max(1, Math.round(w * s));
   const H = Math.max(1, Math.round(h * s));
   const scale = ['-vf', `scale=${W}:${H}:flags=lanczos`];
+
   if (mime === 'image/jpeg') return ff(['-f', 'jpeg_pipe', '-i', 'pipe:0', ...scale, '-q:v', '2', '-f', 'image2pipe', '-c:v', 'mjpeg', 'pipe:1'], image);
+
   if (mime === 'image/png') return ff(['-f', 'png_pipe', '-i', 'pipe:0', ...scale, '-f', 'image2pipe', '-c:v', 'png', '-pred', 'mixed', 'pipe:1'], image);
+
   return null;
 }
 
@@ -43,14 +47,18 @@ async function shrinkAvatar(doc: Document) {
   for (const t of doc.getRoot().listTextures()) {
     const size = t.getSize();
     const image = t.getImage();
+
     if (!size || !image || Math.max(size[0], size[1]) <= MAX) continue;
     const out = shrinkImage(image, t.getMimeType(), size[0], size[1]);
+
     if (!out) {
       console.warn(`  ${t.getName() || t.getURI()}: ${t.getMimeType()} left as is`);
       continue;
     }
+
     if (out.byteLength < image.byteLength) t.setImage(out);
   }
+
   await doc.transform(prune(PRUNE), dedup({ keepUniqueNames: true }));
 }
 
@@ -62,6 +70,7 @@ async function shrinkClip(doc: Document) {
 /** What src/render/actors/people.ts and the kit rely on; must match between backup and output. */
 function shape(doc: Document) {
   const r = doc.getRoot();
+
   return JSON.stringify({
     nodes: r.listNodes().map((n) => n.getName()),
     skins: r.listSkins().map((s) => s.listJoints().map((j) => j.getName())),
@@ -90,6 +99,7 @@ function shape(doc: Document) {
 
 function counts(doc: Document) {
   const r = doc.getRoot();
+
   return [r.listNodes().length, r.listSkins().length, r.listAnimations().length, r.listMeshes().length];
 }
 
@@ -100,13 +110,16 @@ const files = [
 
 let before = 0;
 let after = 0;
+
 for (const { rel, clip } of files) {
   const src = join(OUT, rel);
   const orig = join(BACKUP, rel);
+
   if (!existsSync(orig)) {
     mkdirSync(join(orig, '..'), { recursive: true });
     copyFileSync(src, orig, constants.COPYFILE_EXCL);
   }
+
   const doc = await io.read(orig);
   await (clip ? shrinkClip(doc) : shrinkAvatar(doc));
   const bytes = await io.writeBinary(doc);
@@ -114,7 +127,9 @@ for (const { rel, clip } of files) {
   const ref = await io.read(orig);
   const back = await io.readBinary(bytes);
   const [a, b] = [counts(ref), counts(back)];
+
   if (a.join() !== b.join()) throw new Error(`${rel}: nodes/skins/animations/meshes ${a} became ${b}`);
+
   if (shape(ref) !== shape(back)) throw new Error(`${rel}: structure changed`);
 
   writeFileSync(src, bytes);
@@ -123,5 +138,7 @@ for (const { rel, clip } of files) {
   after += bytes.byteLength;
   console.log(`${rel.padEnd(40)} ${(was / 1024).toFixed(0).padStart(6)} KB -> ${(bytes.byteLength / 1024).toFixed(0).padStart(6)} KB  (n/s/a/m ${b.join('/')})`);
 }
+
 const mb = (n: number) => (n / 1048576).toFixed(2);
+
 console.log(`total ${mb(before)} MB -> ${mb(after)} MB (${((1 - after / before) * 100).toFixed(0)}% smaller)`);

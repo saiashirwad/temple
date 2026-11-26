@@ -42,12 +42,15 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
         chord = true;
         e.preventDefault();
         e.stopImmediatePropagation();
+
         return;
       }
+
       if (!chord) return;
       chord = false;
       e.preventDefault();
       e.stopImmediatePropagation();
+
       if (scene) run(e.key, scene);
       else queued.push(e.key);
     },
@@ -58,47 +61,67 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     if (Object.hasOwn(RELOAD_PRESETS, key)) {
       const url = new URL(location.href);
       url.hash = '';
+
       if (key === '0') url.search = '';
       else {
         for (const option of Object.values(RELOAD_PRESETS).flat()) url.searchParams.delete(option);
+
         if (Object.hasOwn(RELOAD_PRESETS, url.searchParams.get('preset') ?? '')) url.searchParams.delete('preset');
+
         for (const option of RELOAD_PRESETS[key]) url.searchParams.set(option, '');
       }
+
       location.assign(url.href);
+
       return;
     }
+
     if (key === 'j') {
       shown = !shown;
+
       return;
     }
+
     if (key === 'b' || key === 'x' || key === 'X' || key === 't') {
       shown = true;
+
       if (key === 'b') s.test.bench();
       else if (key === 't') s.test.timeScale = s.test.timeScale === 1 ? 4 : s.test.timeScale === 4 ? 10 : 1;
       else s.test.skip += key === 'X' ? 5 : 1;
+
       return;
     }
+
     shown = true;
     const spot = SPOTS[key];
     const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : RUNS[key];
+
     if (!r) return;
     delete stateBox.dataset.error;
     const active: NonNullable<typeof current> = { run: r, t0: performance.now(), from: [...s.walker.at], verdict: null, ready: false };
     current = active;
+
     try {
       const view = spot ?? SPOTS[RUNS[key]?.spot ?? ''];
+
       if (view) await s.test.prepareView(view);
+
       if (current !== active) return;
       await r.start(s);
+
       if (current !== active) return;
+
       if (spot) pendingView = key;
       active.t0 = performance.now();
       active.from = [...s.walker.at];
     } catch (error) {
       active.verdict = `FAIL: ${String(error)}`;
+
       if (current === active) stateBox.dataset.error = active.verdict;
     }
+
     active.ready = true;
+
     return current === active && !active.verdict;
   };
 
@@ -106,7 +129,9 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
   addEventListener('temple:view', async event => {
     const key = (event as CustomEvent<string>).detail;
     const spot = SPOTS[key];
+
     if (!scene || !spot) return;
+
     if (await run(key, scene)) {
       const url = new URL(location.href);
       url.searchParams.set('preset', key);
@@ -117,17 +142,22 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
   let lastText = '';
   setInterval(() => {
     stateBox.hidden = !shown;
+
     if (!shown || !scene) return;
     const st = scene.inspect();
     let head = 'no scenario';
+
     if (current) {
       const t = (performance.now() - current.t0) / 1000;
+
       if (current.ready && !current.verdict && current.run.judge) current.verdict = current.run.judge(st, t, scene);
       const moved = Math.hypot(st.at[0]! - current.from[0], st.at[1]! - current.from[1]);
       head = `${current.run.name} · ${current.verdict ?? (!current.ready ? 'setting up' : current.run.judge ? 'waiting' : 'running')} · ${t.toFixed(0)}s · moved ${moved.toFixed(1)}m`;
     }
+
     const fields = Object.entries(st).map(([key, value]) => `${key}  ${JSON.stringify(value)}`);
     const text = [head, `clock ×${scene.test.timeScale}`, ...fields].join('\n');
+
     if (text !== lastText) stateBox.textContent = lastText = text;
   }, 250);
 
@@ -136,12 +166,15 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     takeViewChange() {
       const key = pendingView;
       pendingView = null;
+
       return key;
     },
     attach(s: Scene) {
       scene = s;
+
       if (replay.active) void replay.start(s);
       else if (launch.preset) void run(launch.preset, s).then(() => { prepared = true; });
+
       for (const key of queued.splice(0)) void run(key, s);
     },
   };

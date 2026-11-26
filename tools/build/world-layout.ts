@@ -19,6 +19,7 @@ export function encodeWorldLayout({ plans, planted, grassAt, land }: WorldLayout
   const rows = new Float32Array(rowWords);
   const ids = new Map(CATALOG.map((s, i) => [s, i]));
   let i = 0;
+
   const plant = (p: Planted | FarTree, kindOrStiffness: number) => {
     rows.set(p.at, i); i += 3;
     rows[i++] = p.yaw;
@@ -27,29 +28,39 @@ export function encodeWorldLayout({ plans, planted, grassAt, land }: WorldLayout
     rows[i++] = p.specimen ? ids.get(p.specimen)! : -1;
     rows[i++] = kindOrStiffness;
   };
+
   for (const p of trees) plant(p, p.stiff);
+
   for (const p of plants) plant(p, p.stiff);
+
   for (const p of far) plant(p, FAR_KINDS.indexOf(p.kind));
+
   for (const p of grassAt) {
     rows.set(p.at, i); i += 3;
     rows[i++] = p.yaw;
     rows[i++] = p.scale;
     rows[i++] = GRASS_LENGTHS.indexOf(p.length);
   }
+
   const raw = new Uint8Array(rows.buffer);
   const stored = new Uint8Array(buffer, HEADER_WORDS * 4, raw.length);
   let block = 0;
+
   function storeRows(count: number, stride: number) {
     let dest = block;
+
     for (let byte = 0; byte < stride; byte++) {
       for (let row = 0; row < count; row++) stored[dest++] = raw[block + row * stride + byte];
     }
+
     block = dest;
   }
+
   storeRows(trees.length + plants.length + far.length, PLANT_WORDS * 4);
   storeRows(grassAt.length, GRASS_WORDS * 4);
   new Uint8Array(buffer, (HEADER_WORDS + rowWords) * 4).set(land.pixels);
   new Uint8Array(buffer, buffer.byteLength - planBytes.byteLength).set(planBytes);
+
   return buffer;
 }
 
@@ -60,5 +71,6 @@ export function bakeWorldLayout(level = 9) {
   const solids = [...buildTemple().solids, ...grounds.solids, ...buildStreet().solids, ...village.solids];
   const plans = plansClear(village.tulsi, village.seats, solids);
   const grassAt = meadowPlaces(land.pixels, planted.walked);
+
   return gzipSync(new Uint8Array(encodeWorldLayout({ plans, planted, grassAt, land })), { level });
 }

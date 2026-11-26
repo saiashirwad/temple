@@ -20,18 +20,21 @@ export const mirrored = tgpu.slot(false);
 
 const n3 = (p: d.v3f) => {
   'use gpu';
+
   return perlin3d.sample(p);
 };
 
 /** Ripples on the river, carried downstream along x. */
 const riverWave = (r: d.v2f, t: number) => {
   'use gpu';
+
   return perlin3d.sample(d.vec3f(r.x * 0.7 - t * 1.6, r.y * 1.4, t * 0.25)) * 0.05 + perlin3d.sample(d.vec3f(r.x * 2.3 - t * 2.4, r.y * 3.1, t * 0.6)) * 0.02;
 };
 
 /** Wall-plane coordinates: along the wall and up it, picked from the normal. */
 const wallUv = (p: d.v3f, nrm: d.v3f) => {
   'use gpu';
+
   return d.vec2f(std.select(p.x, p.z, std.abs(nrm.x) > std.abs(nrm.z)), p.y);
 };
 
@@ -44,6 +47,7 @@ const TILED = [
   P.LATERITE, P.WATERSTONE, P.PLASTER, P.PAINT, P.CONCRETE, P.GRANITE, P.MURAL, P.BRASS, P.GOLD, P.STEEL,
   P.CLOTH, P.TILE, P.MTILE, P.COPPER, P.TIN, P.WOOD, P.LACQUER, P.POSTER, P.BOARD,
 ];
+
 if (TILED.length !== TEXTURED.size || !TILED.every((p) => TEXTURED.has(p))) {
   throw new Error('surfaces.ts: the tiled patterns and geo.ts TEXTURED differ');
 }
@@ -52,6 +56,7 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
   return instances.define('Built', {
     carry: (vertexIndex) => {
       'use gpu';
+
       return d.vec4f(pool.extra.pat(vertexIndex), pool.extra.col(vertexIndex).xyz);
     },
     surface: (pixel, base) => {
@@ -70,6 +75,7 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
       // Which baked tile, and whether it follows the mesh's UVs (roofs, wood) or the world
       let layer = d.f32(-1);
       let useUv = false;
+
       if (pat === P.LATERITE || pat === P.WATERSTONE) {
         layer = TEX.laterite;
       } else if (pat === P.PLASTER) {
@@ -113,6 +119,7 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
         layer = d.f32(SIGN_LAYER);
         useUv = true;
       }
+
       const tx = tex.sample(std.max(layer, 0), nrm, p, uv, useUv);
       let normal = d.vec3f(nrm);
 
@@ -123,17 +130,21 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
         const own = d.vec3f(tx.color.xyz);
         const painted = tex.tinted(layer, tint, own);
         let c = d.vec3f(painted);
+
         if (tx.metal > 0.5) {
           m.metallic = tx.color.w;
         } else {
           c = std.mix(own, painted, tx.color.w);
           m.metallic = 0;
         }
+
         c = c * (0.86 + big * 0.28);
         const masonry = pat === P.LATERITE || pat === P.PLASTER || pat === P.PAINT || pat === P.CONCRETE || pat === P.GRANITE;
         const grime = std.saturate(1 - (p.y - 0.9) / 1.3) * std.smoothstep(-0.3, 0.4, big + n3(p * 1.7) * 0.4);
+
         if (masonry) c = std.mix(c, c * d.vec3f(0.22, 0.24, 0.18), grime * 0.6);
         m.roughness = tx.rough;
+
         if (pat === P.WATERSTONE) {
           // Pond stone: dark and slick below the waterline, mossy just above it
           const wet = 1 - std.smoothstep(0.0, 0.25, p.y);
@@ -141,6 +152,7 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
           c = std.mix(c, d.vec3f(0.03, 0.05, 0.02), moss * 0.7) * std.mix(1, 0.4, wet);
           m.roughness = std.mix(m.roughness, 0.15, wet);
         }
+
         if (pat === P.GOLD) m.roughness = m.roughness * 0.7;
         m.color = d.vec3f(c);
         normal = d.vec3f(tx.normal);
@@ -192,6 +204,7 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
         m.emission = colour * s.x;
       } else if (pat === P.TUBE || pat === P.CFL || pat === P.BULB) {
         let k = mainsGpu(t);
+
         if (pat === P.TUBE) k = k * tubeGpu(t, seed);
         m.emission = base.emission * k;
       } else if (pat === P.TUBE_BAD) {
@@ -209,8 +222,11 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
         const idx = std.floor((p.x + p.z) * 9.0);
         const colourAt = std.fract(idx * 0.25);
         let c = d.vec3f(6, 0.4, 0.3);
+
         if (colourAt > 0.2) c = d.vec3f(0.4, 5, 0.6);
+
         if (colourAt > 0.45) c = d.vec3f(0.5, 1.2, 7);
+
         if (colourAt > 0.7) c = d.vec3f(6, 3.2, 0.3);
         const step = std.floor(t * 2.6);
         const on = std.fract((idx + step) * 0.25) < 0.5;
@@ -227,6 +243,7 @@ export function defineBuilt(pool: meshPool.MeshPool<{ pat: d.F32; col: d.Vec4f }
 
       const moved = shading.Point(pixel.point);
       moved.normal = d.vec3f(normal);
+
       return instances.Shaded({ point: moved, material: m });
     },
   });
@@ -251,11 +268,13 @@ export function defineFlame() {
       const up = v * tall * (0.55 + 0.45 * f * f);
       const side = (vertex.position.xz - base.xz) * (0.8 + 0.25 * f);
       const bend = lean * v * v * tall * 0.45;
+
       return d.vec3f(base.x + side.x + bend.x, base.y + up, base.z + side.y + bend.y);
     },
     deformShadow: false,
     bounds: (_flame, b) => {
       'use gpu';
+
       return instances.Sphere({ center: b.center, radius: b.radius + 0.1 });
     },
     // Seen edge-on the flame thins to nothing, so it reads as a glowing volume, not a shell
@@ -263,6 +282,7 @@ export function defineFlame() {
       'use gpu';
       const facing = std.saturate(std.abs(std.dot(pixel.point.normal, pixel.point.view)));
       const v = pixel.point.uv.y;
+
       return std.smoothstep(0.05, 0.55, facing) * (1 - std.smoothstep(0.8, 1, v) * 0.7) * std.smoothstep(0, 0.06, v);
     },
     material: (pixel, base) => {
@@ -283,6 +303,7 @@ export function defineFlame() {
       const m = shading.Material(base);
       m.color = d.vec3f(0);
       m.emission = (blue + body + mantle) * dark * (0.6 + 0.4 * f);
+
       return m;
     },
   });

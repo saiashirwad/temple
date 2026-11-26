@@ -28,6 +28,7 @@ test('facts arrive in order and retries become possible after prerequisites', ()
     { kind: 'acquire', item: 'note' }, { kind: 'ask', topic: 'journey' },
     { kind: 'equip', item: 'torch' }, { kind: 'leave' }, { kind: 'leave' },
   ]);
+
   assert.deepEqual(trace[5]!.facts, [{ kind: 'quest', state: 'offered' }, { kind: 'quest', state: 'ready' }]);
   assert.deepEqual(trace[6]!.facts, []);
   assert.equal(trace[7]!.state.quest, 'departed');

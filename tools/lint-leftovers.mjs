@@ -10,15 +10,19 @@ const rules = [
   [/\bconst coarse\s*=\s*true/, 'touch layout forced (use ?phone or the `c chord)'],
   [/danger\.update\(.*'held'/, 'danger running while held'],
 ];
+
 let bad = 0;
+
 for (const dir of ['src', 'tests']) {
   for (const f of readdirSync(dir, { recursive: true })) {
     if (!f.endsWith('.ts') || f.endsWith('.gen.ts')) continue;
+
     if (f.split('/').at(-1).startsWith('_')) {
       console.error(`${dir}/${f}: a scratch file (starts with _)`);
       bad++;
       continue;
     }
+
     readFileSync(`${dir}/${f}`, 'utf8').split('\n').forEach((line, i) => {
       for (const [re, what] of rules)
         if (re.test(line)) {
@@ -28,5 +32,7 @@ for (const dir of ['src', 'tests']) {
     });
   }
 }
+
 if (bad) process.exit(1);
+
 console.log('no leftovers');

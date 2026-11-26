@@ -7,6 +7,7 @@ const make = () => {
   const told: string[] = [];
   const flags = { gone: false, ended: false };
   const story = createStory({ tell: (t) => void told.push(t), guardGone: () => void (flags.gone = true), end: () => void (flags.ended = true) });
+
   return { story, told, flags };
 };
 

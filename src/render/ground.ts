@@ -33,14 +33,17 @@ const corners = tgpu.const(
 
 const v = (h: number) => {
   const c = hex(h);
+
   return d.vec3f(c[0], c[1], c[2]);
 };
+
 const MUD = v(0x2a1e16);
 
 const inside = (p: d.v2f, lo: d.v2f, hi: d.v2f) => {
   'use gpu';
   const a = std.smoothstep(lo - 0.05, lo + 0.05, p);
   const b = 1 - std.smoothstep(hi - 0.05, hi + 0.05, p);
+
   return a.x * a.y * b.x * b.y;
 };
 
@@ -49,6 +52,7 @@ const warp = (g: number) => {
   'use gpu';
   const s = g * 2 - 1;
   const a = std.abs(s);
+
   return std.sign(s) * (0.22 * a + 0.78 * a * a * a) * HALF;
 };
 
@@ -59,6 +63,7 @@ const shapeAt = (p: d.v2f) => {
   const hx = heightGpu(p + d.vec2f(e, 0)) - heightGpu(p - d.vec2f(e, 0));
   const hz = heightGpu(p + d.vec2f(0, e)) - heightGpu(p - d.vec2f(0, e));
   const normal = std.normalize(d.vec3f(-hx, 2 * e, -hz));
+
   return d.vec4f(normal, heightGpu(p));
 };
 
@@ -75,43 +80,56 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
   const riverOut = riverShape.as('mutable');
   const landIn = landShape.as('readonly');
   const riverIn = riverShape.as('readonly');
+
   /** Where the land grid's corner (ix, iz) sits, in metres. */
   const landPoint = (ix: number, iz: number) => {
     'use gpu';
+
     return d.vec2f(warp(ix / N), warp(iz / N));
   };
+
   /** Where the river strip's corner (column, row) sits, following the bends. */
   const riverPoint = (c: number, r: number) => {
     'use gpu';
     const s = -PATCH.length + c * PATCH.step;
     const o = meanderGpu(s) - PATCH.half + r * PATCH.step;
+
     return d.vec2f(RIVER.c[0] + RIVER.u[0] * s - RIVER.u[1] * o, RIVER.c[1] + RIVER.u[1] * s + RIVER.u[0] * o);
   };
+
   const bakeLand = tgpu.computeFn({ workgroupSize: [64], in: { gid: d.builtin.globalInvocationId } })(({ gid }) => {
     'use gpu';
+
     if (gid.x >= d.u32(V * V)) {
       return;
     }
+
     const f = d.f32(gid.x);
     const iz = std.floor(f / V);
     const p = landPoint(f - iz * V, iz);
     const shape = shapeAt(p);
     // Along the river the finer strip draws the land: this coarse grid sinks under it
     const rq = riverLocalGpu(p);
+
     if (std.abs(rq.x) < PATCH.length - 3 && std.abs(rq.y) < PATCH.half - 5) {
       shape.w = shape.w - 40;
     }
+
     landOut.$[gid.x] = d.vec4f(shape);
   });
+
   const bakeRiver = tgpu.computeFn({ workgroupSize: [64], in: { gid: d.builtin.globalInvocationId } })(({ gid }) => {
     'use gpu';
+
     if (gid.x >= d.u32(RV * (rows + 1))) {
       return;
     }
+
     const f = d.f32(gid.x);
     const r = std.floor(f / RV);
     riverOut.$[gid.x] = shapeAt(riverPoint(f - r * RV, r));
   });
+
   root.createComputePipeline({ compute: bakeLand }).dispatchWorkgroups(Math.ceil((V * V) / 64));
   root.createComputePipeline({ compute: bakeRiver }).dispatchWorkgroups(Math.ceil((RV * (rows + 1)) / 64));
 
@@ -130,14 +148,17 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       const p = landPoint(ix, iz);
       const shape = landIn.$[d.u32(iz * V + ix)];
       const world = d.vec3f(p.x, shape.w, p.y);
+
       return Corner({ position: cameras.toClip(world), world, normal: shape.xyz });
     },
     pixelOf: (corner) => {
       'use gpu';
       const p = corner.world.xz;
+
       if (mirrored.$ && corner.world.y < -0.01) {
         std.discard();
       }
+
       const big = perlin2d.sample(p * 0.08);
       const mid = perlin2d.sample(p * 0.6);
       const slope = 1 - corner.normal.y;
@@ -196,6 +217,7 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       // (only where there is paddy: no texture reads inside, so the branch is allowed)
       const pw = lu.w;
       const tr = land.trail(p);
+
       if (pw > 0) {
         const field = p - d.vec2f(PADDY.x, PADDY.z);
         const fu = field.x * 0.94 + field.y * 0.34 + perlin2d.sample(field * 0.05) * 3.0;
@@ -216,6 +238,7 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       // The forest: a deep floor of fallen leaves under the trees, dark and damp, and the path
       // worn through it to red earth, roots and stones showing, mossy at its edges
       const rq = riverLocalGpu(p);
+
       if (tr.x + tr.y > 0) {
         // ...but not down the ravine under the bridge, where nobody walks
         const pathW = tr.x * (1 - (1 - std.smoothstep(8, 14, std.abs(rq.x))) * (1 - std.smoothstep(7.5, 9.5, std.abs(rq.y))));
@@ -235,6 +258,7 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
         rough = std.mix(rough, 0.8, pathW);
         slopeXZ = std.mix(slopeXZ, gPath.slope, pathW);
       }
+
       // Bare wet earth: the brooks' muddy banks and the trampled elephant crossing
       const bare = tr.z;
       const mud = std.mix(d.vec3f(0.05, 0.03, 0.018), d.vec3f(0.09, 0.055, 0.03), std.saturate(mid + 0.5));
@@ -284,6 +308,7 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       // The river's edges: wet stones and gravel at the waterline, dark with damp a little up
       // the banks, green with moss in between
       const edgeK = (1 - std.smoothstep(RIVER.length - 30, RIVER.length, std.abs(rq.x))) * (1 - std.smoothstep(WATER_HALF + 0.6, WATER_HALF + 2.4, std.abs(rq.y)));
+
       if (edgeK > 0) {
         const above = corner.world.y - riverLevelGpu(rq.x);
         const pebble = std.smoothstep(-0.1, 0.4, perlin2d.sample(p * 5.3)) * 0.6 + std.smoothstep(0.0, 0.5, perlin2d.sample(p * 1.7 + d.vec2f(5))) * 0.4;
@@ -301,11 +326,13 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       const normal = std.normalize(corner.normal + d.vec3f(slopeXZ.x, 0, slopeXZ.y));
 
       const lit = shading.shade(materials.glossy(color, rough), shading.pointAt(corner.world, normal));
+
       return Seen({ color: d.vec4f(lit, 1) });
     },
     color: passes.shaded,
     draw: (pass) => pass.draw(N * N * 6),
   };
+
   // The strip along the river, a metre a cell, following its bends
   const river: passes.Drawing<typeof Corner, d.Infer<typeof Seen>> = {
     ...drawing,
@@ -321,9 +348,11 @@ export function createGround(root: TgpuRoot, tex: Tex, land: { at: (p: d.v2f) =>
       const p = riverPoint(c, r);
       const shape = riverIn.$[d.u32(r * RV + c)];
       const world = d.vec3f(p.x, shape.w, p.y);
+
       return Corner({ position: cameras.toClip(world), world, normal: shape.xyz });
     },
     draw: (pass) => pass.draw(cols * rows * 6),
   };
+
   return { land: drawing, river };
 }

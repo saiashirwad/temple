@@ -10,19 +10,23 @@ export function numericSettings<K extends string>(
   controls: readonly [K, string, number, number, number][], redraw: () => void,
 ) {
   const settings = { ...defaults };
+
   for (const [key, label, min, max, step] of controls) {
     if (params.has(key)) {
       const raw = params.get(key)!;
       const value = raw.trim() ? Number(raw) : NaN;
+
       if (!Number.isFinite(value) || value < min || value > max) throw new Error(`Expected ${key} between ${min} and ${max}`);
       settings[key] = value;
     }
+
     slider(root, label, settings[key], min, max, step, value => {
       settings[key] = value;
       setParam(key, String(value));
       redraw();
     });
   }
+
   return settings;
 }
 
@@ -47,6 +51,7 @@ function slider(
   range.oninput = () => {
     out.textContent = range.value;
   };
+
   range.onchange = () => change(range.valueAsNumber);
   field.append(label, range, out);
   root.append(field);
@@ -62,5 +67,6 @@ export function exportSettings(root: HTMLElement, filename: string, settings: ob
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   };
+
   root.append(button);
 }

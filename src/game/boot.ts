@@ -5,14 +5,18 @@ export const RELOAD_PRESETS: Record<string, string[]> = {
 
 export function launchOptions(search = '', hash = '') {
   const params = new URLSearchParams(search);
+
   for (const [key, value] of new URLSearchParams(hash.replace(/^#/, ''))) {
     if (!params.has(key)) params.set(key, value);
   }
+
   const key = params.get('preset');
+
   if (key && Object.hasOwn(RELOAD_PRESETS, key)) {
     for (const flag of RELOAD_PRESETS[key]) params.set(flag, '');
     params.delete('preset');
   }
+
   return params;
 }
 

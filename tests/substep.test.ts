@@ -13,9 +13,11 @@ const approach = (dt: number, n: number, seed = 1) => {
   const danger = createDanger(GLADE, hooks, seeded(seed));
   danger.summon();
   const p = player(P);
+
   for (let i = 0; i < n; i++) danger.update(dt, p);
   const on = danger.wolves.filter((w) => w.on);
   const dists = on.map((w) => Math.hypot(w.x - p.x, w.z - p.z));
+
   return { debug: danger.debug, dists, marks: log.marks, sounds: log.sounds };
 };
 
@@ -47,9 +49,12 @@ test('the story keeps its pace at 16x', () => {
   const tell = (dt: number, n: number) => {
     const told: string[] = [];
     const story = createStory({ tell: (t) => void told.push(t), guardGone: () => {}, end: () => {} });
+
     for (let i = 0; i < n; i++) story.update(dt, { along: 100, moving: true, busy: false });
+
     return told;
   };
+
   // 60 s of walking: 3600 frames at 60 fps, or 222 frames of 0.27 s
   assert.deepEqual(tell(0.27, 222), tell(1 / 60, 3600));
 });

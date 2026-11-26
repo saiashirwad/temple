@@ -12,6 +12,7 @@ export { TEX };
 
 /** The poster atlas's layer, read with the mesh's own UVs. */
 export const POSTER_LAYER = TEX_LAYERS.length;
+
 /** The path's painted signs. */
 export const SIGN_LAYER = TEX_LAYERS.length + 1;
 const TINTED = new Set(['laterite', 'plaster', 'paint', 'concrete', 'granite', 'copper', 'tin', 'teak', 'lacquer', 'brass', 'steel', 'cloth', 'bark', 'palmbark']);
@@ -44,22 +45,27 @@ function materialLink(id: string) {
 
 async function readBytes(url: string) {
   const response = await fetch(url);
+
   if (!response.ok) throw new Error(`Missing material ${url} (${response.status})`);
+
   return response.arrayBuffer();
 }
 
 function packedTile(bytes: ArrayBuffer, i: number) {
   const offsets = new DataView(bytes);
   const start = offsets.getUint32(4 * i, true);
+
   return new Uint8Array(bytes, start, offsets.getUint32(4 * (i + 1), true) - start);
 }
 
 async function fullTiles(id: string, suffix: string, mimeType: string) {
   const pack = materialLink(id);
   const bytes = pack && await readBytes(pack.href);
+
   return Promise.all(LAYERS.map(async (layer, i) => {
     const tile = bytes ? packedTile(bytes, i) : new Uint8Array(await readBytes(
       `${import.meta.env.BASE_URL}tex/${layer.name}_${suffix}?v=${layer.mean.join('_')}`));
+
     return images.decodeBitmap({ bytes: tile, mimeType });
   }));
 }
@@ -90,14 +96,18 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     const offset = color === 'linear' ? 0 : LAYERS.length;
     const pictures = preview ? await previewTiles(preview, offset, width) : await fullTiles(id, suffix, mime);
     const texture = upload(pictures, color);
+
     const refine = async () => {
       const full = await fullTiles(id, suffix, mime);
+
       try {
         if (disposed) return;
+
         for (const [layer, picture] of full.entries()) texture.write(picture, { origin: [0, 0, layer] });
         texture.generateMipmaps();
       } finally { for (const picture of full) picture.close(); }
     };
+
     return { texture, refine };
   }
 
@@ -105,8 +115,11 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     make(`color-${size}`, `${size}_c.webp`, 'image/webp', size, 'srgb'),
     make('data', '512_d.jpg', 'image/jpeg', 512, 'linear'),
   ]);
+
   const color = colors.texture, data = normals.texture;
+
   if (!preview) performance.mark('game:materials-ready');
+
   const refine = () => {
     if (!preview || refining || disposed) return;
     refining = true;
@@ -121,17 +134,20 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
       console.warn('Material detail', error);
     });
   };
+
   const colorView = color.createView(d.texture2dArray(d.f32));
   const dataView = data.createView(d.texture2dArray(d.f32));
   const smooth = images.sampler(root, { anisotropy: Q.anisotropy });
 
   const scales = tgpu.const(d.arrayOf(d.f32, LAYERS.length), LAYERS.map((l) => 1 / l.metres));
   const metals = tgpu.const(d.arrayOf(d.f32, LAYERS.length), LAYERS.map((l) => (l.metal ? 1 : 0)));
+
   const refs = tgpu.const(
     d.arrayOf(d.vec4f, LAYERS.length),
     LAYERS.map((l) => {
       if (!TINTED.has(l.name)) return d.vec4f(1, 1, 1, 0);
       const c = l.mean;
+
       return d.vec4f(1 / Math.max(c[0]!, 2e-3), 1 / Math.max(c[1]!, 2e-3), 1 / Math.max(c[2]!, 2e-3), 1);
     }),
   );
@@ -141,6 +157,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     'use gpu';
     const xy = t.xy * 2 - 1;
     const z = std.sqrt(std.max(1 - std.dot(xy, xy), 0.04));
+
     return d.vec3f(xy, z);
   };
 
@@ -150,6 +167,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     let bend = (d.vec3f(0, 0, 1) * ax.x + d.vec3f(0, -1, 0) * ax.y) * (w.x / ax.z);
     bend = bend + (d.vec3f(1, 0, 0) * ay.x + d.vec3f(0, 0, 1) * ay.y) * (w.y / ay.z);
     bend = bend + (d.vec3f(1, 0, 0) * az.x + d.vec3f(0, -1, 0) * az.y) * (w.z / az.z);
+
     return bend;
   };
 
@@ -157,6 +175,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
   const weightsOf = (nrm: d.v3f) => {
     'use gpu';
     const w = std.pow(std.abs(nrm), d.vec3f(6));
+
     return w / (w.x + w.y + w.z);
   };
 
@@ -187,6 +206,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     let cz = d.vec4f(0);
     let ny = d.vec4f(0);
     let nz = d.vec4f(0);
+
     if (useUv) {
       qx = d.vec2f(qu);
       w = d.vec3f(1, 0, 0);
@@ -200,6 +220,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
       ny = std.textureSampleGrad(dataView.$, smooth.$, qy, L, gy1, gy2);
       nz = std.textureSampleGrad(dataView.$, smooth.$, qz, L, gz1, gz2);
     }
+
     const cx = std.textureSample(colorView.$, smooth.$, qx, L);
     const nx = std.textureSample(dataView.$, smooth.$, qx, L);
     const color = cx * w.x + cy * w.y + cz * w.z;
@@ -207,12 +228,15 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     // Each projection's slope along its own axes, added to the surface normal
     const ax = unpack(nx);
     let bend = d.vec3f(0);
+
     if (useUv) {
       bend = (tu * inv * ax.x + tv * inv * ax.y) / ax.z;
     } else {
       bend = bendOf(w, ax, unpack(ny), unpack(nz));
     }
+
     const bent = std.normalize(nrm + bend - nrm * std.dot(nrm, bend));
+
     return Sampled({ color, normal: bent, rough, metal: metals.$[L], ratioOn: refs.$[L].w });
   };
 
@@ -240,6 +264,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     const rough = nx.z * w.x + ny.z * w.y + nz.z * w.z;
     const bend = bendOf(w, unpack(nx), unpack(ny), unpack(nz));
     const bent = std.normalize(nrm + bend - nrm * std.dot(nrm, bend));
+
     return Sampled({ color, normal: bent, rough, metal: metals.$[L], ratioOn: refs.$[L].w });
   };
 
@@ -247,6 +272,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
   const ratioOf = (layer: number, tint: d.v3f) => {
     'use gpu';
     const r = refs.$[d.i32(layer)];
+
     return std.select(d.vec3f(1), std.min(tint * r.xyz, d.vec3f(8)), r.w > 0.5);
   };
 
@@ -261,6 +287,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     const meanLum = std.dot(d.vec3f(1) / std.max(r.xyz, d.vec3f(1e-3)), W);
     const flat = tint * (std.dot(c, W) / std.max(meanLum, 1e-3));
     const hued = tint * c * r.xyz;
+
     return std.select(d.vec3f(c), std.min(std.mix(flat, hued, 0.3), d.vec3f(8)), r.w > 0.5);
   };
 
@@ -271,6 +298,7 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     const c = std.textureSample(colorView.$, smooth.$, q, L);
     const t = std.textureSample(dataView.$, smooth.$, q, L);
     const n = unpack(t);
+
     return Flat({ color: c, slope: n.xy / n.z, rough: t.z });
   };
 

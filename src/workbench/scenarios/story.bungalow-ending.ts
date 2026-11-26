@@ -10,16 +10,20 @@ export function rehearseBungalow() {
   const add = (event: string, detail?: string) => trace.push({ at: +time.toFixed(2), event, ...(detail === undefined ? {} : { detail }) });
   const story = createStory({ tell: (text) => add('line', text), guardGone: () => add('guard gone'), end: () => add('end') });
   const bungalow = createBungalowStory(() => { add('sit'); story.sit(); });
+
   const step = (dt: number, reading = false) => {
     time += dt;
     bungalow.update(time, reading);
     story.update(dt, { along: 960, moving: false, busy: reading });
   };
+
   const examine = (id: BungalowInteraction) => {
     const accepted = bungalow.examine(id, time);
     add(accepted ? 'examine' : 'rejected', id);
+
     return accepted;
   };
+
   return { trace, step, examine, get interaction() { return bungalow.interaction; }, get sitting() { return bungalow.sitting; } };
 }
 
@@ -30,7 +34,9 @@ export function replayBungalow() {
   run.step(1, true);
   run.step(0.1);
   run.examine('bungalow.chair');
+
   for (let i = 0; i < 440; i++) run.step(0.1);
+
   return run;
 }
 
@@ -45,6 +51,7 @@ export function mount(root: HTMLElement, params: URLSearchParams) {
   output.dataset.trace = '';
   let run = rehearseBungalow();
   let reading = false;
+
   const show = () => {
     const events = run.trace.map((entry) => entry.event);
     const sit = events.indexOf('sit');
@@ -53,22 +60,28 @@ export function mount(root: HTMLElement, params: URLSearchParams) {
     root.dataset.verdict = sit >= 0 && gone > sit && end > gone && events.slice(sit + 1).filter((e) => e === 'line').length === 4 ? 'pass' : 'running';
     output.textContent = JSON.stringify(run.trace, null, 2);
   };
+
   const button = (label: string, action: () => void) => {
     const b = document.createElement('button');
     b.textContent = label;
     b.addEventListener('click', () => { action(); show(); });
+
     return b;
   };
+
   const note = button('Read note', () => { if (run.examine('bungalow.note')) reading = true; });
   const close = button('Put note down', () => { reading = false; run.step(1, false); });
   const chair = button('Sit in chair', () => { run.examine('bungalow.chair'); });
   const advance = button('Advance 10 seconds', () => { for (let i = 0; i < 100; i++) run.step(0.1, reading); });
   const reset = button('Reset', () => { run = rehearseBungalow(); reading = false; });
+
   const replay = button('Replay', () => {
     run = replayBungalow();
     reading = false;
   });
+
   root.replaceChildren(game, note, close, chair, advance, reset, replay, output);
+
   if (params.get('run') === '1') replay.click();
   else show();
 }

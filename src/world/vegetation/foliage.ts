@@ -18,6 +18,7 @@ export const unit = (r: () => number): V3 => {
   const y = r() * 2 - 1;
   const a = r() * Math.PI * 2;
   const s = Math.sqrt(1 - y * y);
+
   return [Math.cos(a) * s, y, Math.sin(a) * s];
 };
 
@@ -73,6 +74,7 @@ export function crown(
 ) {
   const lump = rag.lump ?? 0;
   const holeCos = rag.hole ?? 0.84;
+
   const put = (mat: Mat, pos: V3, dir: V3) => {
     const out = nrm(add(sc(nrm(sub(pos, centre)), 0.55), sc(dir, 0.45)));
     const rough = unit(r);
@@ -81,37 +83,48 @@ export function crown(
     const faced = nrm(add(out, sc(unit(r), 0.35)));
     const l = size[0] * (0.75 + r() * 0.5);
     const w = size[1] * (0.8 + r() * 0.4);
+
     if (oval) b.blade(mat, sub(pos, sc(along, l * 0.3)), along, faced, l, w, 0.3, 0.1 + r() * 0.12);
     else leaf(b, mat, sub(pos, sc(along, l * 0.3)), along, faced, l, w);
   };
+
   for (const k of clumps) {
     const s = k.s ?? [1, 0.82, 1];
     // The lump field: a few broad lobes in and out, seeded per clump
     const ph = lump > 0 ? [r() * 6.3, r() * 6.3, r() * 6.3] : [0, 0, 0];
     const lobe = (d: V3) => 1 + lump * (Math.sin(d[0] * 2.3 + ph[0]!) * Math.sin(d[1] * 2.9 + ph[1]!) * 0.6 + Math.sin(d[2] * 3.7 + d[0] * 1.9 + ph[2]!) * 0.4);
     const holes: V3[] = [];
+
     for (let i = 0; i < (rag.holes ?? 0); i++) {
       const u = unit(r);
       holes.push(nrm([u[0], u[1] * 0.6, u[2]]));
     }
+
     const cs = 0.72 * (1 - lump * 0.55);
+
     if (core) b.blob(core, k.c, [k.r * s[0] * cs, k.r * s[1] * cs * 0.9, k.r * s[2] * cs], 8, 5, 0.15 + lump * 0.5);
     // Enough leaves to cover `cover` of the clump's skin
     const area = (s[0] * s[1] + s[1] * s[2] + s[0] * s[2]) / (0.82 + 0.82 + 1);
     const n = Math.round((cover * 4 * Math.PI * k.r * k.r * area) / (size[0] * size[1] * 0.5));
+
     for (let i = 0; i < n; i++) {
       const dir = unit(r);
+
       if (dir[1] < -0.5 && r() < 0.6) dir[1] *= -0.5;
       const sk = 0.72 + 0.3 * Math.sqrt(r());
       const mat = mats[Math.floor(r() * mats.length)]!;
       let gap = false;
+
       for (const h of holes) if (dt(dir, h) > holeCos) gap = true;
+
       if (gap) continue;
       const f = sk * (lump > 0 ? lobe(dir) : 1);
       put(mat, add(k.c, [dir[0] * k.r * s[0] * f, dir[1] * k.r * s[1] * f, dir[2] * k.r * s[2] * f]), dir);
     }
+
     // Twigs through the skin, bare but for a few leaves at the end
     const twigs = rag.twig ? (rag.twigs ?? 0) : 0;
+
     for (let i = 0; i < twigs; i++) {
       const u = unit(r);
       const dir = nrm([u[0], u[1] * 0.5 + 0.15, u[2]]);
@@ -120,6 +133,7 @@ export function crown(
       const tip = add(k.c, [dir[0] * k.r * s[0] * reach, dir[1] * k.r * s[1] * reach - k.r * 0.08, dir[2] * k.r * s[2] * reach]);
       b.sweep(rag.twig!, [from, lerp(from, tip, 0.55), tip], [0.022 * k.r, 0.012 * k.r, 0.005 * k.r], 3);
       const m = 2 + Math.floor(r() * 3);
+
       for (let j = 0; j < m; j++) put(mats[Math.floor(r() * mats.length)]!, add(tip, sc(unit(r), size[0] * 0.35)), dir);
     }
   }
@@ -136,9 +150,11 @@ export function uneven(clumps: Clump[], r: () => number, o: { base: V3; yaw: num
   const s0 = o.s ?? [1, 0.82, 1];
   const sj = o.sj ?? 0.3;
   const out: Clump[] = [];
+
   for (const k of clumps) {
     const rel = sub(k.c, o.base);
     const lit = dt(nrm([rel[0], 0, rel[2]]), L);
+
     // Thinner on the shaded side, never down to nothing
     if (out.length > 1 && r() < (o.drop ?? 0.12) * (1 - lit)) continue;
     const up = Math.max(rel[1], 0);
@@ -147,6 +163,7 @@ export function uneven(clumps: Clump[], r: () => number, o: { base: V3; yaw: num
     const s: V3 = [s0[0] * (1 + (r() - 0.5) * sj), s0[1] * (1 + (r() - 0.5) * sj), s0[2] * (1 + (r() - 0.5) * sj)];
     out.push({ c, r: rr, s });
   }
+
   return out;
 }
 
@@ -162,16 +179,20 @@ export function frond(b: Builder, mat: Mat, rib: Mat, base: V3, yaw: number, ris
   b.with({ at: base, yaw }, () => {
     const spine: V3[] = [];
     const radii: number[] = [];
+
     for (let i = 0; i <= 10; i++) {
       spine.push(at(i / 10));
       radii.push(0.035 * (1 - i / 11));
     }
+
     b.sweep(rib, spine, radii, 3);
+
     for (let k = 0; k < K; k++) {
       const u = 0.07 + (0.93 * k) / K;
       const p = at(u);
       const T = nrm(sub(at(Math.min(u + 0.01, 1)), at(u - 0.01)));
       const L = (reach * Math.pow(Math.sin(Math.PI * Math.min(u * 1.2, 1)), 0.5) * (1 - 0.45 * u) + 0.12) * (opts.wear ? 0.7 + 0.3 * opts.wear() : 1);
+
       for (const s of [-1, 1]) {
         if (opts.wear && opts.wear() < 0.06) continue;
         // Each leaflet leaves the rachis angled toward the tip, then hangs in a soft curve, more
@@ -187,10 +208,13 @@ export function frond(b: Builder, mat: Mat, rib: Mat, base: V3, yaw: number, ris
         const p1 = add(p, sc(d1, L * 0.36));
         const p2 = add(p1, sc(d2, L * 0.34));
         const p3 = add(p2, sc(d3, L * 0.3));
+
         const up = (dir: V3) => {
           const m = nrm(crs(dir, T));
+
           return m[1] < 0 ? sc(m, -1) : m;
         };
+
         const w = sc(T, width);
         b.card(mat, p, add(p, sc(w, 0.8)), add(p1, w), p1, up(d1), [0, 0, 1, 0.36]);
         b.card(mat, p1, add(p1, w), add(p2, sc(w, 0.85)), p2, up(d2), [0, 0.36, 1, 0.7]);
@@ -215,14 +239,18 @@ export function bananaLeaf(b: Builder, mat: Mat, base: V3, yaw: number, lift: nu
     // The midrib, thick at the base
     const spine: V3[] = [];
     const radii: number[] = [];
+
     for (let i = 0; i <= 8; i++) {
       spine.push(at(i / 8));
       radii.push(0.022 * (1 - i / 9));
     }
+
     b.sweep(mat, spine, radii, 3);
     const strips = 22;
+
     for (const s of [-1, 1]) {
       let u0 = 0.04;
+
       for (let i = 0; i < strips; i++) {
         const step = (0.96 / strips) * (0.7 + r() * 0.6);
         const u1 = Math.min(u0 + step, 1);
@@ -231,21 +259,26 @@ export function bananaLeaf(b: Builder, mat: Mat, base: V3, yaw: number, lift: nu
         const ua = u0;
         const ub = u1 - shrink;
         u0 = u1;
+
         if (ub <= ua) continue;
         const missing = torn && r() < 0.12;
         const reach = missing ? 0.25 + r() * 0.3 : 1;
         const fold = torn ? 0.15 + r() * 0.5 : 0.08;
+
         const pts = (u: number, k: number): V3 => {
           const a = at(u);
           const w = width(u) * reach * k;
           const T = nrm(sub(at(Math.min(u + 0.01, 1)), at(Math.max(u - 0.01, 0))));
           // across the blade, sloping down from the rib, more steeply further out
           const drop = w * (0.18 + fold * k) + (k > 0.6 ? (k - 0.6) * w * fold : 0);
+
           return add(add(a, [0, -drop, s * w]), sc(T, -k * w * 0.12));
         };
+
         // Four bands across: each strip arches gently, its outer edge curling under
         const K = [0, 0.3, 0.6, 0.82, 1];
         const up = (n: V3) => (n[1] * s < 0 ? sc(n, -1) : n);
+
         for (let j = 0; j < K.length - 1; j++) {
           const a0 = pts(ua, K[j]!), b0 = pts(ub, K[j]!);
           const a1 = pts(ua, K[j + 1]!), b1 = pts(ub, K[j + 1]!);

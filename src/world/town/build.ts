@@ -13,6 +13,7 @@ export function buildTown() {
   const solids = [...temple.solids, ...grounds.solids, ...street.solids, ...village.solids];
   const meshes = models.flatMap(m => m.meshes);
   const isFlame = (mesh: typeof meshes[number]) => Math.round(mesh.extra?.pat?.[0] ?? 0) === P.FLAME;
+
   return {
     buildings: mergeModels([{ meshes: meshes.filter(m => !isFlame(m)), images: [] }]),
     flames: mergeModels([{ meshes: meshes.filter(isFlame), images: [] }]),

@@ -7,23 +7,30 @@ export const GROUND = 0.9;
 
 /** The outer compound wall (prakaram), its gatehouse at +z facing the road. */
 export const COMPOUND = { x: 15, z0: -17, z1: 17, height: 2.9, thick: 0.6 };
+
 /** The cloister (nalambalam) around the shrine, with its lamp lattice on the outside. */
 export const CLOISTER = { x: 7.2, z0: -8.5, z1: 5.5, height: 2.5, depth: 2.4 };
 export const SHRINE: V3 = [0, GROUND, -2.4];
 export const MANDAPAM: V3 = [0, GROUND, 2.0];
+
 /** The great offering stone's pavilion (valiya balikkalpura), before the cloister door. */
 export const BALIKKAL: V3 = [0, GROUND, 7.6];
+
 /** The temple theatre (koothambalam), to the left of the way in, long side along z. */
 export const KOOTH: V3 = [-7.6, GROUND, 9.6];
+
 /** A small Ganapathi shrine behind the cloister. */
 export const GANAPATHI: V3 = [-6, GROUND, -14.6];
 export const FLAGSTAFF: V3 = [0, GROUND, 9];
 export const LAMP_TOWER: V3 = [0, GROUND, 11.2];
 export const GATE: V3 = [0, GROUND, COMPOUND.z1];
+
 /** The pond, east of the compound: an irregular bank round a centre, the temple's ghat on its west. */
 export const POND = { x: 39, z: -2, r: 14 };
+
 /** The road runs along x in front of the gate. */
 export const ROAD = { z: 29.5, half: 3.6 };
+
 /** The paddy fields, where the valley opens out west of the town, and their level. */
 export const PADDY = { x: -168, z: 18, rx: 52, rz: 46, y: GROUND + 0.45 };
 export const BANYAN: V3 = [-11, GROUND, 21.6];

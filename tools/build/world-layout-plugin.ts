@@ -19,6 +19,7 @@ export function worldLayout(): Plugin {
   let file = '@temple/layout.bin';
   let base: string;
   let production: boolean;
+
   return {
     name: 'temple-world-layout',
     configResolved(config) { base = config.base; production = config.command === 'build'; },
@@ -37,6 +38,7 @@ export function worldLayout(): Plugin {
         if (duringBake) duringBake.add(path);
         else if (inputs.has(path)) cached = undefined;
       });
+
       function current(): NonNullable<typeof cached> {
         if (cached) return cached;
         const edits = duringBake = new Set<string>();
@@ -44,25 +46,34 @@ export function worldLayout(): Plugin {
           inputs = new Set(files);
           server.watcher.add(files);
           duringBake = undefined;
+
           // An edit can arrive while the worker is reading its dependency graph.
           if (files.some(path => edits.has(path))) {
             cached = undefined;
+
             return current();
           }
+
           return { source, etag: '"' + digest(source) + '"' };
         }).catch(error => {
           cached = undefined;
           duringBake = undefined;
           throw error;
         });
+
         return cached;
       }
+
       server.middlewares.use((req, res, next) => {
         if (req.url?.split('?')[0] !== base + file) return next();
         void current().then(({ source, etag }) => {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('ETag', etag);
-          if (req.headers['if-none-match'] === etag) { res.writeHead(304).end(); return; }
+
+          if (req.headers['if-none-match'] === etag) { res.writeHead(304).end();
+
+ return; }
+
           res.setHeader('Content-Type', 'application/octet-stream');
           res.end(source);
         }).catch(next);
@@ -70,6 +81,7 @@ export function worldLayout(): Plugin {
     },
     transformIndexHtml(_html, context) {
       if (context.path !== '/index.html') return;
+
       return [{ tag: 'link', attrs: { id: 'world-layout', rel: 'preload', as: 'fetch', crossorigin: 'anonymous', href: base + file }, injectTo: 'head-prepend' }];
     },
   };

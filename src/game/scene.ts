@@ -88,8 +88,10 @@ const occludedSky = (material: shading.Material, point: shading.Point) => {
   'use gpu';
   const m = shading.Material(material);
   m.metallic = std.max(material.metallic, 0);
+
   return shading.hemisphere(m, point) * ao.at(point.position);
 };
+
 /**
  * Leaves let light through: a material with negative metallic is foliage, transmitting that
  * share of each lamp that shines on its back, brightest looking toward the light, so palm
@@ -101,18 +103,23 @@ const leafLit = (material: shading.Material, point: shading.Point, direction: d.
   const m = shading.Material(material);
   m.metallic = std.max(material.metallic, 0);
   let lit = shading.pbr(m, point, direction, radiance);
+
   if (through > 0) {
     const back = std.saturate(-std.dot(point.normal, direction));
     const toward = std.saturate(-std.dot(direction, point.view));
     const t2 = toward * toward;
     lit += material.color * d.vec3f(1.1, 1.25, 0.55) * radiance * (through * (back * 0.35 + t2 * t2 * 0.9));
   }
+
   return lit;
 };
+
 const LAMP_AO = 0.7;
+
 const occludedLamp = (point: shading.Point, toLight: d.v3f, distance: number, range: number, slot: number) => {
   'use gpu';
   const open = std.mix(1, ao.at(point.position), LAMP_AO);
+
   return shading.reaching(point, toLight, distance, range, slot) * open;
 };
 
@@ -127,6 +134,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   // which TAA builds back up to the canvas
   // The bench (`b chord): leaves out each drawing group in turn and keeps its scene-pass samples
   const bench = { on: false, step: 0, at: -1, since: 0, sums: new Map<number, [number, number]>(), table: '' };
+
   const gpu = profiler.create(root, {
     skip: 10,
     onSample: (timing, ms) => {
@@ -137,6 +145,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       bench.sums.set(key, [got[0] + ms, got[1] + 1]);
     },
   });
+
   const opening = gpu.timer('opening');
   const closing = gpu.timer('closing');
   const sceneTime = gpu.timer('scene');
@@ -147,6 +156,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const lampTime = gpu.timer('lampsh');
   const preTime = gpu.timer('pre');
   const detail = dynamicResolution.create(gpu.frame, { budget: (interval) => 0.8 * interval, range: [0.55, 1] });
+
   const screen = targets.create(
     root,
     surface,
@@ -157,12 +167,15 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     },
     { resolution: () => detail.scale },
   );
+
   /** Stages that can be switched off while comparing: `o` toggles the occlusion. */
   const look = { occlusion: !boot.has('noao'), props: true };
   addEventListener('keydown', (e) => {
     if (e.key === 'o') look.occlusion = !look.occlusion;
+
     if (e.key === 'p') look.props = !look.props;
   });
+
   // Half-size depth of everything solid, drawn first, for the occlusion to read
   const early = targets.create(
     root,
@@ -170,6 +183,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     { depth: { format: 'depth32float', scale: 0.5, sampled: true } },
     { resolution: () => detail.scale },
   );
+
   const view = cameras.orbit(root, {
     size: surface,
     target: [-12, heightAt(-12, 27.6) + 1.62, 27.6],
@@ -184,11 +198,14 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     far: 900,
     fov: 0.95,
   });
+
   const walker = createWalker(view);
+
   if (launch.camera) {
     walker.hold(...launch.camera);
     view.jump();
   }
+
   const occlusion = ao.create(root, view, {
     depth: () => early.textures.depth,
     region: early.regions.depth,
@@ -197,6 +214,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     enabled: () => look.occlusion,
     settings: { radius: 0.7, power: 3 },
   });
+
   const prepass = passes.create(root, early, { depth: passes.depth }, { label: 'prepass' }).pipe(view.inject());
 
   // ---- what is built, and what grows
@@ -204,26 +222,34 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** When each startup stage finished, in milliseconds since the page began loading (for the readout). */
   performance.mark('game:scene', { startTime: t0 });
   const stages = [{ name: 'scene', ms: Math.round(t0) }];
+
   const stage = (name: string) => {
     const n = document.querySelector('#note');
+
     if (n && PROBE_STAGES) n.textContent = (n.textContent ?? '') + ` ${name}:${((performance.now() - t0) / 1000).toFixed(1)}`;
+
     if (PROBE_STAGES) {
       const tag = document.querySelector('#stages') ?? document.body.appendChild(Object.assign(document.createElement('div'), { id: 'stages' }));
       (tag as HTMLElement).style.cssText = 'position:fixed;left:8px;top:8px;color:#fc6;font:14px monospace;z-index:9;text-shadow:0 0 3px #000';
       tag.textContent += ` ${name}:${((performance.now() - t0) / 1000).toFixed(2)}`;
     }
+
     console.log('stage', name, ((performance.now() - t0) / 1000).toFixed(2));
     const mark = performance.mark('game:' + name);
     stages.push({ name, ms: Math.round(mark.startTime) });
   };
+
   // Downloads first, so the files arrive while the town is being built
   const loadPeople = peopleLoader();
   const textures = loadTextures(root, Math.min(surface.width, surface.height) > 700);
+
   // The forest path's map, baked by tools/trail/map.ts
   const trailPicture = fetch(`${import.meta.env.BASE_URL}tex/trail.png`)
     .then((r) => r.arrayBuffer())
     .then((b) => images.decode({ bytes: new Uint8Array(b), mimeType: 'image/png' }));
+
   const engine = launch.physics ? loadPhysics() : undefined;
+
   const aa = taa.create(root, {
     source: () => screen.textures.hdr,
     region: screen.regions.hdr,
@@ -232,10 +258,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     depth: () => screen.textures.depth,
     camera: view,
   });
+
   const glow = bloom.create(root, { source: () => aa.output, settings: { threshold: 1.1, knee: 0.5 } });
   // The eye adapts: opening a little in a dark lane, closing before a blaze of lamps, held to a
   // narrow range so the night always stays night
   const eye = exposure.create(root, { source: aa, settings: { key: 0.035, lowest: 1.0, highest: 2.3, rise: 0.45, fall: 1.4 } });
+
   const final = finish.create(root, {
     format: surface.format,
     source: () => aa.output,
@@ -245,6 +273,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     exposure: eye,
     settings: { exposure: 1.0, glowIntensity: 0.24, vignette: 0.4 },
   });
+
   // These passes depend only on the surface and camera. Compile while workers and downloads run.
   const screenPasses = { occlusion, aa, glow, eye, final };
   const screenReady = PROBE_STAGES ? undefined : pipelines.compile(Object.values(screenPasses));
@@ -258,11 +287,14 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const isWatcher = (p: typeof plans[number]) => p.kind === 'walk' && p.watcher;
   // A town capture includes all residents. Other views can stream them after the first frame.
   const customCamera = launch.camera && !launch.forest && !launch.people;
+
   const cameraNearResidents = customCamera && plans.some(p => {
     if (isWatcher(p)) return false;
     const points = p.kind === 'walk' ? p.route : [p.at];
+
     return points.some(([x, z]) => Math.hypot(x - launch.camera![0], z - launch.camera![1]) <= 180);
   });
+
   const streamResidents = !cameraNearResidents && (launch.forest || !launch.people) && !boot.has('lineup');
   const initialPlans = streamResidents ? plans.filter(isWatcher) : plans;
   const peopleFiles = loadPeople(initialPlans);
@@ -271,6 +303,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   // One model per size of wheel, shared by every wheel of that size
   const wheelModels = new Map<string, ReturnType<typeof wheelModel>>();
   const wheelKey = (w: { rad: number; wid: number }) => `${w.rad}/${w.wid}`;
+
   for (const r of riders) for (const w of r.wheels) if (!wheelModels.has(wheelKey(w))) wheelModels.set(wheelKey(w), wheelModel(w.rad, w.wid));
   // The solid world: walls, plinths, steps, posts and trunks, set up while the files download
   const [propModels, folk, models] = await Promise.all([propFiles, peopleFiles, specimensReady]);
@@ -285,13 +318,16 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const scenarioEntry = launch.tour || launch.bungalow || !!launch.preset;
   let userPlaying = false;
   const input = new AbortController();
+
   const beginPlay = (event: Event) => {
     if (!event.isTrusted) return;
     userPlaying = true;
     input.abort();
   };
+
   for (const type of ['keydown', 'pointerdown', 'wheel'])
     window.addEventListener(type, beginPlay, { capture: true, passive: true, signal: input.signal });
+
   /** Adds the townspeople to the picture, its reflection and the moon's shadow once they compile. */
   const addPeople = async (group: ReturnType<typeof createPeople>) => {
     const walking = boot.has('nopeople') ? [] : group.renderers;
@@ -299,12 +335,16 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     const inPond = walking.map((w) => pond.reflection.add(w));
     const inShadow = walking.map((w) => light.shadow.add(w));
     const drawings = [...inScene, ...inPond, ...inShadow];
+
     try {
       await pipelines.compile(pond.prepareActors ? drawings : [...inScene, ...inShadow]);
+
       if (disposed) {
         for (const drawing of drawings) drawing.destroy();
+
         return;
       }
+
       // Solid things first, before the water, flames and air drawn over them
       drawn.splice(3, 0, ...inScene);
       drawnNames.splice(3, 0, ...inScene.map((_, i) => 'actor:' + i));
@@ -316,7 +356,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       throw error;
     }
   };
+
   let physicsLoading: Promise<void> | undefined;
+
   const requirePhysics = () =>
     physicsLoading ??= (engine ?? loadPhysics()).then((b3) => createPhysics(solidShape, b3)).then((p) => {
       stage('physics');
@@ -325,6 +367,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       vehicleBodies = riders.map((r) => p.vehicle(VEHICLE[r.kind] ?? [0.5, 0.7, 1]));
       herdBodies = TUNING.herd.sizes.map((sz) => p.vehicle([0.85 * sz, 1.4 * sz, 1.9 * sz]));
       console.log('physics', p.count, 'shapes');
+
       if (PROBE_STAGES) {
         const tag = document.createElement('div');
         tag.style.cssText = 'position:fixed;left:8px;bottom:8px;color:#fc6;font:13px monospace;z-index:9;pointer-events:none';
@@ -332,6 +375,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
         setInterval(() => (tag.textContent = `${walker.mode} eye ${view.pose.target.map((v) => v.toFixed(1)).join(',')} yaw ${view.pose.yaw.toFixed(2)}`), 200);
       }
     });
+
   const VEHICLE: Record<string, V3> = { scooter: [0.36, 0.6, 0.95], auto: [0.72, 0.85, 1.4], bus: [1.25, 1.5, 5.3] };
   let vehicleBodies: number[] = [];
   let herdBodies: number[] = [];
@@ -342,6 +386,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     ...meshPool.roomFor([buildings, flameModel, ...riders.map((r) => r.model), ...wheelModels.values(), lanternModel]),
     extra: { pat: d.f32, col: d.vec4f },
   });
+
   const tex = await textures;
   tex.refine();
   stage('tex');
@@ -371,14 +416,19 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** Where wick smoke rises: the open oil lights, thinned so no two plumes start too close. */
   const wicksOf = (list: Lamp[]) => {
     const out: [number, number, number][] = [];
+
     for (const l of list) {
       if (l.kind !== 'oil' || out.length >= 48) continue;
       const p = l.position as [number, number, number];
+
       if (out.every((q) => Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) > 0.6)) out.push(p);
     }
+
     return out;
   };
+
   const lamps = table.create(root, lighting.SpotLight, { capacity: all.length + 16, defaults: { ...lighting.WHITE_SPOT } });
+
   const ids = all.map((l) =>
     lamps.add({
       position: l.position,
@@ -388,6 +438,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       ...(l.spot ? { aim: [0, -1, 0.05] as V3, cone: lighting.cone(l.spot[0], l.spot[1]) } : {}),
     }),
   );
+
   const heads = riders.map(() => lamps.add({ position: [0, -50, 0], color: [1, 0.9, 0.75], intensity: 0, range: 26, aim: [0, -0.15, 1], cone: lighting.cone(0.22, 0.5) }));
   const tails = riders.map(() => lamps.add({ position: [0, -50, 0], color: [1, 0.08, 0.03], intensity: 0, range: 3 }));
   // A hand torch: a cool LED beam, tight, reaching a good way down the lane
@@ -396,6 +447,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const ownTorch = lamps.add({ position: [0, -50, 0], color: [1, 0.92, 0.8], intensity: 0, range: 22, aim: [0, -0.3, -1], cone: lighting.cone(0.2, 0.62) });
   const guardLamp = lamps.add({ position: [0, -50, 0], color: [1, 0.6, 0.28], intensity: 0, range: 10 });
   const glows = riders.map((r) => (r.glow ? lamps.add({ position: [0, -50, 0], color: r.glow.color, intensity: 0, range: r.glow.range }) : null));
+
   const cells = grid.create(root, {
     ...lamps.live(),
     low: d.vec3f(-150, -5, -110),
@@ -403,11 +455,13 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     sight: 15,
     position: lamps.gpu.position,
   });
+
   /** The far moon cascade, widened and snapped to a coarse grid so it holds still while you walk
    *  inside it; it then only needs redrawing for what moves within it. */
   const heldFar: lighting.CascadeFit = (input, places) => {
     if (!lighting.fitSlices(input, places)) return false;
     const place = places[1];
+
     if (place) {
       place.radius *= 1.3;
       const step = ((place.radius * 2) / input.size) * Math.floor(input.size / 10);
@@ -415,9 +469,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       place.y = Math.round(place.y / step) * step;
       place.z = Math.round(place.z / step) * step;
     }
+
     return true;
   };
+
   let shadowFrame = 0;
+
   const light = lighting.create(root, {
     settings: MOON,
     shading: { ambient: occludedSky, attenuation: occludedLamp, reflect: leafLit },
@@ -425,9 +482,11 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     shadow: { eye: view, cascades: 2, far: Q.shadowFar, size: 1024, fit: heldFar },
     pointShadow: pointShadow.define({ count: 3, filter: 9 }),
   });
+
   light.pointShadow.cast(ids.filter((_, i) => all[i]!.shadow));
 
   const shared = bindings.share(root, { shadow: light.shadow.part, pointShadow: light.pointShadow.part, ao: occlusion.part });
+
   const scene = passes
     .create(root, screen, { hdr: passes.color, motion: taa.motion, depth: passes.depth }, { jitter: aa.jitter, shared })
     .pipe(view.inject())
@@ -451,14 +510,19 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const people = createPeople(root, folk, initialPlans, feet, random.people);
   const population = [people];
   let residents: typeof people | undefined;
+
   async function loadResidents() {
     const town = plans.filter(p => !isWatcher(p));
     const files = await loadPeople(town);
+
     if (disposed) return;
     const group = createPeople(root, files, town, feet, random.people);
+
     try {
       await Promise.all([group.ready, group.initAsync()]);
+
       if (!disposed) await addPeople(group);
+
       if (disposed) group.destroy();
       else { residents = group; population.push(group); }
     } catch (error) {
@@ -466,15 +530,19 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       throw error;
     }
   }
+
   let loadingResidents: Promise<void> | undefined;
   const residentsReady = () => loadingResidents ??= streamResidents ? loadResidents() : Promise.resolve();
   const laterProps = Map.groupBy(propGroups.later, p => p.name);
   const loadingProps = new Map<string, Promise<void>>();
+
   async function propsReady(at?: readonly number[]) {
     const near: Promise<void>[] = [];
+
     for (const [name, placements] of laterProps) {
       if (at && !placements.some(p => propNear(p, at))) continue;
       let ready = loadingProps.get(name);
+
       if (!ready) {
         ready = loadProps(placements).then(async files => {
           if (disposed) return;
@@ -482,10 +550,13 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
         });
         loadingProps.set(name, ready);
       }
+
       near.push(ready);
     }
+
     await Promise.all(near);
   }
+
   async function prepareView(spot: { shot: string; at: readonly number[] }) {
     const [x, z, yaw, pitch, height] = spot.at;
     await Promise.all([
@@ -495,6 +566,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       (spot.shot.startsWith('herd-') || (spot.shot === 'camera' && facesHerd(spot.at))) && requireWildlife('herd'),
     ]);
   }
+
   // The townspeople have a pipeline each, three times over; they compile after the first picture
   let herd: ReturnType<typeof createHerd> | null = null;
   let dholes: ReturnType<typeof createPack> | null = null;
@@ -505,18 +577,23 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const landSmp = images.sampler(root, { wrap: 'clamp-to-edge' });
   const trailTex = images.create(root, await trailPicture, { color: 'linear' });
   const trailView = trailTex.createView(d.texture2d(d.f32));
+
   const ground = createGround(root, tex, {
     at: (p: d.v2f) => {
       'use gpu';
+
       return std.textureSample(landView.$, landSmp.$, (p + d.vec2f(LAND)) / (2 * LAND));
     },
     trail: (p: d.v2f) => {
       'use gpu';
+
       return std.textureSample(trailView.$, landSmp.$, (p - d.vec2f(TRAIL_MAP.lo[0], TRAIL_MAP.lo[1])) / d.vec2f(TRAIL_MAP.size[0], TRAIL_MAP.size[1]));
     },
   });
+
   const pond = createPond(root, { view, light, size: surface, time, shared });
   const eyes = createEyes(root);
+
   // The town's lamps and the far hamlet, as points of light seen from the hills
   const farLights = createFarLights(
     [
@@ -528,12 +605,14 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     time,
     farLantern,
   );
+
   const sim = clock.fixedStep({ step: 1 / 60 });
   const air = createAir(root, view, sim.step, streetLights, wicksOf(all), village.chimneys);
   const thingsDrawn = scene.add(things);
   const drawnNames = ['land', 'river', 'built', 'moving', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'pond', 'farLights', 'eyes', 'flames', 'sky', 'mist', 'riverAir', 'smoke', 'kitchen', 'flies', 'moths'];
   /** The groups the bench times: the big ones, so a run fits in one short check. */
   const BENCHED = ['land', 'built', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'sky', 'mist'];
+
   const drawn = [
     scene.add(ground.land),
     scene.add(ground.river),
@@ -548,16 +627,19 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     scene.add(sky),
     ...air.drawings.map((a) => scene.add(a)),
   ];
+
   const mirrored = [
     pond.reflection.add(things),
     pond.reflection.add(ground.land),
     pond.reflection.add(sky),
     ...[solid, passing, nearTrees, farMeshes, ...farCards, flaming].map((c) => pond.reflection.add(c)),
   ];
+
   // What occludes: everything solid near enough for its creases to show
   const early_ = [prepass.add(things), prepass.add(ground.land), prepass.add(ground.river), ...[solid, nearTrees, farMeshes, plants].map((c) => prepass.add(c))];
   const moonCast = [light.shadow.add(things), ...[solid, nearTrees, farMeshes, plants].map((c) => light.shadow.add(c))];
   const lampCast = [light.pointShadow.add(things), light.pointShadow.add(solid)];
+
   // Start after the first submitted picture. Each species can succeed independently; no late
   // completion may register drawings or retain resources after the scene has been destroyed.
   const prepareWildlife = async <T extends ReturnType<typeof createHerd> | ReturnType<typeof createPack>>(
@@ -565,17 +647,27 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   ) => {
     let made: T | undefined;
     const added: { destroy(): void }[] = [];
+
     try {
       const model = await load();
+
       if (disposed) return;
       made = make(model);
       await Promise.all([made.ready, made.initAsync()]);
-      if (disposed) { made.destroy(); return; }
+
+      if (disposed) { made.destroy();
+
+ return; }
+
       const inScene = scene.add(made.renderer); added.push(inScene);
       const inPond = pond.reflection.add(made.renderer); added.push(inPond);
       const inShadow = light.shadow.add(made.renderer); added.push(inShadow);
       await pipelines.compile(pond.prepareActors ? [inScene, inPond, inShadow] : [inScene, inShadow]);
-      if (disposed) { for (const drawing of added) drawing.destroy(); made.destroy(); return; }
+
+      if (disposed) { for (const drawing of added) drawing.destroy(); made.destroy();
+
+ return; }
+
       drawn.splice(3, 0, inScene);
       drawnNames.splice(3, 0, name);
       mirrored.splice(1, 0, inPond);
@@ -588,7 +680,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       throw error;
     }
   };
+
   const wildlife: Partial<Record<'herd' | 'dholes', Promise<void>>> = {};
+
   // A free camera may point at the elephants from outside their simulation range.
   // Include the glade and the ground a charging cow can cover in the camera frustum.
   function facesHerd([x, z, yaw, pitch, eyeHeight]: readonly number[]) {
@@ -601,32 +695,40 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     const vertical = Math.tan(view.pose.fov / 2);
     const horizontal = vertical * surface.width / Math.max(1, surface.height);
     const radius = GLADE.r + TUNING.herd.charge.maxRun;
+
     return forward >= -radius && Math.abs(right) <= forward * horizontal + radius * Math.hypot(1, horizontal)
       && Math.abs(up) <= forward * vertical + radius * Math.hypot(1, vertical);
   }
+
   function requireWildlife(species: 'herd' | 'dholes') {
     return wildlife[species] ??= species === 'herd'
       ? prepareWildlife('herd', loadHerd, model => createHerd(root, model, TUNING.herd.sizes.length), made => { herd = made; })
       : prepareWildlife('dholes', loadPack, model => createPack(root, model, TUNING.dholes.size[1]), made => { dholes = made; });
   }
+
   /** While comparing, `p` leaves the props out of every pass: each list starts with them. */
   const keep = <T,>(list: T[], first = 0) => (look.props ? list : list.filter((_, i) => i !== first));
 
   const mist = createAtmosphere(root, view, light, 'rgba16float', shared as never);
   /** Each lamp's light this frame, for choosing the halos nearest the eye. */
   const lampNow = new Float32Array(all.length);
+
   const chooseHalos = () => {
     const eyeHere = tick.eye;
     const near: { i: number; d: number }[] = [];
+
     for (let i = 0; i < all.length; i++) {
       const l = all[i]!;
       const p = l.position;
       const dd = Math.hypot(p[0] - eyeHere[0], p[1] - eyeHere[1], p[2] - eyeHere[2]);
+
       if (dd < 45 && lampNow[i]! > 0.01) near.push({ i, d: dd / Math.sqrt(Math.max(l.intensity, 0.2)) });
     }
+
     near.sort((a, b) => a.d - b.d);
     const v = mist.values;
     v.count = Math.min(HALOS, near.length);
+
     for (let k = 0; k < v.count; k++) {
       const l = all[near[k]!.i]!;
       const I = lampNow[near[k]!.i]!;
@@ -642,6 +744,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
   const compileList = { pool, treePool, propPool, prepass, light, cells, scene, pond, air, mist };
+
   if (PROBE_STAGES) {
     // One at a time, to see which take longest
     for (const [name, item] of Object.entries({ ...screenPasses, ...compileList })) {
@@ -659,23 +762,30 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** Riders already put away out of sight. */
   const parked = new Set<number>();
   const personBodies: number[] = [];
+
   const ride = (t: number) => {
     riders.forEach((r, i) => {
       const at = rideAt(r, t);
       const id = rideIds[i]!;
       const head = heads[i]!;
       const tail = tails[i]!;
+
       if (physics && vehicleBodies[i] !== undefined) physics.place(vehicleBodies[i]!, at.on ? at.position : [0, -100, 0], at.yaw);
+
       if (!at.on) {
         if (parked.has(id)) return;
         parked.add(id);
         moving.write(id, { position: [0, -50, 0] });
+
         for (const w of wheelIds[i]!) moving.write(w, { position: [0, -50, 0] });
         lamps.fields.intensity.set(head, 0);
         lamps.fields.intensity.set(tail, 0);
+
         if (glows[i] !== null) lamps.fields.intensity.set(glows[i]!, 0);
+
         return;
       }
+
       parked.delete(id);
       const q = qmul(yawQ(at.yaw), [Math.sin(-at.pitch / 2), 0, 0, Math.cos(-at.pitch / 2)]);
       moving.write(id, { position: at.position, rotation: q });
@@ -697,21 +807,25 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       lamps.fields.position.set(tail, x - fx * r.lamp.back, y + 0.7, z - fz * r.lamp.back);
       lamps.fields.intensity.set(tail, 0.35);
       const glow = glows[i];
+
       if (glow !== null && r.glow) {
         lamps.fields.position.set(glow, x, y + r.glow.up, z);
         lamps.fields.intensity.set(glow, r.glow.intensity);
       }
     });
   };
+
   // CPU time per step of the frame, for the profile readout
   const cpu = new Map<string, number>();
   let cpuLast = 0;
   let cpuFrames = 0;
+
   const mark = (name: string) => {
     const t = performance.now();
     cpu.set(name, (cpu.get(name) ?? 0) + t - cpuLast);
     cpuLast = t;
   };
+
   const profile = boot.has('profile');
 
 
@@ -722,7 +836,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
   // ---- what the night sounds like
   const walls: V3[] = [];
+
   for (let z = COMPOUND.z0; z <= COMPOUND.z1; z += 5) for (const x of [-COMPOUND.x, COMPOUND.x, -CLOISTER.x, CLOISTER.x]) walls.push([x, GROUND, z]);
+
   for (let x = -COMPOUND.x; x <= COMPOUND.x; x += 5) for (const z of [COMPOUND.z0, COMPOUND.z1]) walls.push([x, GROUND, z]);
   const sound = createSound({ homes: village.homes, walls, fires: wicksOf(all).map((w) => [w[0], w[1], w[2]] as V3) }, random.audio);
   // Your sandals, on whatever is underfoot (only on foot, not while held or flying)
@@ -732,6 +848,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** This frame, as every system sees it: one object, filled in place by `fillTick` once the view has moved. */
   const tick: Tick = { seconds: 0, dt: 0, eye: [0, 0, 0], fwd: [0, 0, -1], yaw: 0, x: 0, z: 0 };
   const eyeAt = tick.eye;
+
   const fillTick = (dt: number) => {
     const { yaw, pitch } = view.pose;
     tick.seconds = seconds;
@@ -750,18 +867,23 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** Things to happen a little later, on the night's clock (so they speed up in tests, and stop with the scene). */
   const pending: { in: number; run: () => void }[] = [];
   const later = (seconds: number, run: () => void) => void pending.push({ in: seconds, run });
+
   /** Runs what's due; whether anything ran. */
   const runLater = (dt: number) => {
     let ran = false;
+
     for (let i = pending.length - 1; i >= 0; i--) {
       const p = pending[i]!;
+
       if ((p.in -= dt) > 0) continue;
       pending.splice(i, 1);
       p.run();
       ran = true;
     }
+
     return ran;
   };
+
   const journey = createJourney({
     random,
     walker,
@@ -786,6 +908,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       });
     },
   });
+
   const { danger, story } = journey;
   const walk = journey.state;
   const staticSets = [built, flames, near, far, undergrowth, meadow, ...cardSets, props];
@@ -819,6 +942,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     get fullMaterialFrame() { return drewFullMaterials; },
     inspect() {
       const [x, z] = walker.at;
+
       return {
         t: +seconds.toFixed(1),
         mode: walker.mode,
@@ -857,11 +981,13 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       seconds += dt;
       frames++;
       spent += frame.dt;
+
       if (spent > 1) {
         fpsNow = frames / spent;
         frames = 0;
         spent = 0;
       }
+
       cpuLast = performance.now();
       walker.update(frame.dt);
       mark('walker');
@@ -870,36 +996,45 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       view.update(walker.mode === 'walk' ? Math.min(frame.dt * 4, 0.2) : frame.dt);
       mark('camera');
       pond.updateVisibility(framesShown > 0);
+
       // A camera turn can reach the pond while an explicit viewpoint jump is still warming it.
       // Present the last finished picture until those pipelines can draw the complete reflection.
       if (framesShown && pond.waitingForPicture) {
         final.record(frame, surface.view(frame));
+
         return;
       }
+
       time.write(seconds);
       farLantern.write(d.vec4f(...farLanternAt(story.sitting)));
+
       for (let i = 0; i < all.length; i++) {
         const l = all[i]!;
         const now = lampAt(l, seconds);
         lamps.fields.intensity.set(ids[i]!, l.intensity * now.level);
         lampNow[i] = l.intensity * now.level;
+
         if (l.kind === 'sodiumBad') {
           const w = now.warm;
           lamps.fields.color.set(ids[i]!, RED[0] + (l.color[0] - RED[0]) * w, RED[1] + (l.color[1] - RED[1]) * w, RED[2] + (l.color[2] - RED[2]) * w);
         }
       }
+
       mark('lamps');
       framesShown++;
       // A scripted walk or seated replay prepares its own resources. A real gesture resumes free play.
       const exploring = walker.mode !== 'held' && (!scenarioEntry || userPlaying);
+
       if (exploring && (userPlaying || framesShown >= (PROBE_STAGES ? 2 : 30)) && !physicsLoading)
         void requirePhysics().catch(e => console.error('physics', e));
+
       // Give the idle camera its full detail before fetching the rest of the village.
       // A player's first gesture starts the residents and props immediately.
       if (exploring && framesShown >= 2 && !streamingWorld && (userPlaying || tex.detail !== 'preview')) {
         streamingWorld = true;
         void Promise.all([residentsReady(), propsReady()]).catch(e => console.error('village assets', e));
       }
+
       ride(seconds);
       riders.forEach((r, i) => {
         const at = rideAt(r, seconds);
@@ -910,11 +1045,14 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       });
       mark('traffic');
       fillTick(dt);
+
       // Timers first; if one moved you (waking up after going down), the frame starts from there
       if (runLater(dt)) fillTick(dt);
       journey.step(tick);
+
       if (exploring && !wildlife.herd && Math.hypot(tick.x - GLADE.x, tick.z - GLADE.z) < TUNING.herd.range)
         void requireWildlife('herd').catch(error => console.warn('herd', error));
+
       if (exploring && !wildlife.dholes && journey.onHuntingGround)
         void requireWildlife('dholes').catch(error => console.warn('dholes', error));
       mark('journey');
@@ -926,14 +1064,17 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       cells.move(cellsLow);
       const ph = physics;
       let body = 0;
+
       for (const group of population) {
         group.setPlayer(walker.at[0], walker.at[1]);
         group.step(seconds, frame.dt);
+
         if (ph) for (const position of group.where) {
           ph.place(personBodies[body] ?? (personBodies[body] = ph.person()), position, 0);
           body++;
         }
       }
+
       const lp = people.guard.lantern;
       moving.write(lanternId, { position: lp, rotation: yawQ(people.guard.yaw) });
       lamps.fields.position.set(guardLamp, lp[0], lp[1] + 0.05, lp[2]);
@@ -946,8 +1087,10 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       // Every write above lands now: lamps, the guard's lantern and the torches this frame, not the next
       vegetation.populateAround(eyeAt[0], eyeAt[2]);
       lamps.flush();
+
       for (const set of staticSets) set.flush();
       moving.flush(frame);
+
       for (const group of population) group.flush(frame);
       herd?.flush(frame);
       dholes?.flush(frame);
@@ -961,14 +1104,20 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
         } else {
           bench.on = false;
           test.skip = -1;
-          const avg = (k: number) => { const g = bench.sums.get(k); return g && g[1] ? g[0] / g[1] : NaN; };
+
+          const avg = (k: number) => { const g = bench.sums.get(k);
+
+ return g && g[1] ? g[0] / g[1] : NaN; };
+
           const wholes = BENCHED.map((_, k) => avg(2 * k)).filter((v) => v === v);
           const whole = wholes.reduce((a, b) => a + b, 0) / Math.max(1, wholes.length);
           bench.table = `all ${whole.toFixed(2)} | ` + BENCHED.map((n, k) => [n, avg(2 * k) - avg(2 * k + 1)] as const).sort((a, b) => b[1] - a[1]).map(([n, d]) => `${n} ${d.toFixed(2)}`).join(', ');
           console.log('bench', bench.table);
         }
       }
+
       const steps = sim.update(frame.dt);
+
       if (bench.on || profile) detail.scale = 1;
       else detail.update(frame);
       const compute = frame.encoder.beginComputePass({ timestampWrites: opening.writes() });
@@ -978,11 +1127,14 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       shadowFrame++;
       light.shadow.prepare({ redraw: (cascade) => cascade === 0 || shadowFrame % 3 === 0 });
       light.pointShadow.prepare({ redraw: () => false });
+
       for (const c of culled) c.cull(compute);
+
       for (const group of population) group.animate(compute, seconds);
       herd?.animate(compute, seconds);
       dholes?.animate(compute, seconds);
       air.spawn(compute);
+
       for (let i = 0; i < steps; i++) air.step(compute);
       air.compact(compute, sim.ahead);
       compute.end();
@@ -990,6 +1142,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
       screen.fit();
       early.fit();
+
       if (look.occlusion) prepass.record(frame, keep(early_), { timestampWrites: preTime.writes() });
       occlusion.record(frame, { timestampWrites: aoTime.writes() });
       mark('r.ao');
@@ -1016,6 +1169,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       disposed = true;
       herd?.destroy();
       dholes?.destroy();
+
       for (const made of [tex, gpu, screen, early, occlusion, lamps, cells, light, aa, built, props, flames, moving, vegetation, landTex, trailTex, ...population, pool, propPool, pond, air, glow, mist, eye]) made.destroy();
     },
   };

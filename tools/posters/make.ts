@@ -10,8 +10,11 @@ import { writeFileSync } from 'node:fs';
 
 const A = new URL('./assets/', import.meta.url).pathname;
 const OUT = new URL('../../public/tex/', import.meta.url).pathname;
+
 GlobalFonts.registerFromPath(A + 'NotoSansMalayalam.ttf', 'Mal');
+
 GlobalFonts.registerFromPath(A + 'Anton.ttf', 'Anton');
+
 GlobalFonts.registerFromPath(A + 'Oswald.ttf', 'Oswald');
 
 export const COLS = 4;
@@ -36,6 +39,7 @@ const tinted = (img: Awaited<ReturnType<typeof loadImage>>, colour: string) => {
   x.globalCompositeOperation = 'source-in';
   x.fillStyle = colour;
   x.fillRect(0, 0, img.width, img.height);
+
   return c;
 };
 
@@ -43,12 +47,14 @@ const centred = (x: SKRSContext2D, text: string, cx: number, y: number, font: st
   x.font = font;
   x.textAlign = 'center';
   x.textBaseline = 'alphabetic';
+
   if (font.includes('bold') && parseInt(font.replace('bold ', '')) >= 36) {
     x.lineWidth = 5;
     x.strokeStyle = 'rgba(0,0,0,0.8)';
     x.lineJoin = 'round';
     x.strokeText(text, cx, y, max);
   }
+
   x.fillStyle = fill;
   x.fillText(text, cx, y, max);
 };
@@ -56,8 +62,10 @@ const centred = (x: SKRSContext2D, text: string, cx: number, y: number, font: st
 /** Lines of small print, as a film poster's credits or a notice's details. */
 const smallPrint = (x: SKRSContext2D, y0: number, rows: number, colour: string) => {
   x.fillStyle = colour;
+
   for (let i = 0; i < rows; i++) {
     const w = W * (0.5 + r() * 0.35);
+
     for (let k = 0; k < 6 + r() * 5; k++) {
       const wx = W / 2 - w / 2 + (k / 9) * w;
       x.fillRect(wx, y0 + i * 9, 4 + r() * 14, 4);
@@ -84,6 +92,7 @@ const hero = (x: SKRSContext2D, cx: number, cy: number, s: number, light: string
     x.bezierCurveTo(cx + 50 * s, cy + 80 * s, cx + 95 * s, cy + 95 * s, cx + 100 * s, cy + 175 * s);
     x.closePath();
   };
+
   // The rim: the figure in the light's colour, nudged toward it, then the black over it
   x.save();
   x.shadowColor = light;
@@ -114,6 +123,7 @@ const hero = (x: SKRSContext2D, cx: number, cy: number, s: number, light: string
   x.quadraticCurveTo(cx + 12 * s, cy + 14 * s, cx + 24 * s, cy + 28 * s);
   x.quadraticCurveTo(cx, cy + 22 * s, cx - 24 * s, cy + 28 * s);
   x.fill();
+
   if (glasses) {
     x.fillStyle = '#000';
     x.beginPath();
@@ -142,11 +152,13 @@ const heroine = (x: SKRSContext2D, cx: number, cy: number, s: number, light: str
   x.ellipse(cx - 6 * s, cy, 26 * s, 34 * s, 0, 0, Math.PI * 2);
   x.fill();
   x.fillStyle = '#f4efe0';
+
   for (let i = 0; i < 6; i++) {
     x.beginPath();
     x.arc(cx + 24 * s, cy - 10 * s + i * 9 * s, 3.5 * s, 0, Math.PI * 2);
     x.fill();
   }
+
   x.fillStyle = '#b01818';
   x.beginPath();
   x.arc(cx - 6 * s, cy - 14 * s, 2.5 * s, 0, Math.PI * 2);
@@ -162,6 +174,7 @@ const flare = (x: SKRSContext2D, cx: number, cy: number, rad: number, colour: st
 };
 
 type Poster = (x: SKRSContext2D) => void;
+
 const fill = (x: SKRSContext2D, c: string) => {
   x.fillStyle = c;
   x.fillRect(0, 0, W, H);
@@ -248,6 +261,7 @@ const POSTERS: Poster[] = [
   // A comedy: three faces in a row on yellow, red title
   (x) => {
     fill(x, '#f4d020');
+
     for (const [i, cx] of [70, 128, 190].entries()) hero(x, cx, 120 + (i % 2) * 16, 0.62, '#e0a070', '#8a5030', i === 1);
     centred(x, 'പഞ്ചവാദ്യം', W / 2, 262, 'bold 40px Mal', '#c81010');
     centred(x, 'ഇന്നു മുതൽ', W / 2, 296, 'bold 22px Mal', '#1a1008');
@@ -283,7 +297,9 @@ const POSTERS: Poster[] = [
     x.fillStyle = '#d01a10';
     x.beginPath();
     x.moveTo(30, 40);
+
     for (let i = 0; i <= 20; i++) x.lineTo(30 + i * 10, 40 + Math.sin(i * 0.5) * 12);
+
     for (let i = 20; i >= 0; i--) x.lineTo(30 + i * 10, 200 + Math.sin(i * 0.5 + 0.6) * 12);
     x.fill();
     x.fillStyle = '#c8b090';
@@ -321,11 +337,13 @@ for (const [i, poster] of POSTERS.entries()) {
   fade.addColorStop(1, 'rgba(240,230,210,0.02)');
   g.fillStyle = fade;
   g.fillRect(0, 0, W, H);
+
   // Rain streaks running down
   for (let k = 0; k < 26; k++) {
     g.fillStyle = `rgba(40,30,20,${0.04 + r() * 0.06})`;
     g.fillRect(r() * W, r() * H * 0.4, 1 + r() * 2, 40 + r() * 160);
   }
+
   // Glue blotches where the paste soaked through
   for (let k = 0; k < 5; k++) {
     g.fillStyle = `rgba(90,70,30,${0.05 + r() * 0.06})`;
@@ -333,6 +351,7 @@ for (const [i, poster] of POSTERS.entries()) {
     g.ellipse(r() * W, r() * H, 10 + r() * 30, 6 + r() * 20, r() * 3, 0, Math.PI * 2);
     g.fill();
   }
+
   // A torn corner or two, showing the grey wall paper beneath
   for (let k = 0; k < 2; k++) {
     if (r() < 0.4) continue;
@@ -345,22 +364,30 @@ for (const [i, poster] of POSTERS.entries()) {
     const a = 20 + r() * 50;
     const b = 20 + r() * 60;
     g.lineTo(ox + (corner % 2 ? -a : a), oy);
+
     for (let j = 0; j < 5; j++) g.lineTo(ox + (corner % 2 ? -1 : 1) * a * (1 - j / 5) * (0.6 + r() * 0.5), oy + (corner > 1 ? -1 : 1) * b * (j / 5));
     g.lineTo(ox, oy + (corner > 1 ? -b : b));
     g.fill();
   }
+
   g.restore();
 }
 
 // Out as the texture array wants it: colour at 1024 and 512, and flat data (paper: no relief,
 // fairly rough, a little glossier where the paste is)
 const raw = '/tmp/posters_raw.rgba';
+
 writeFileSync(raw, canvas.data());
+
 const ff = (args: string[]) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args]);
+
 for (const size of [1024, 512]) {
   const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
   ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', raw, ...scale, '-c:v', 'libwebp', '-quality', '88', '-pix_fmt', 'yuva420p', `${OUT}posters_${size}_c.webp`]);
 }
+
 ff(['-f', 'lavfi', '-i', 'color=c=0x8080b0:s=512x512', '-frames:v', '1', '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}posters_512_d.jpg`]);
+
 ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', raw, '-frames:v', '1', '/tmp/posters_atlas.png']);
+
 console.log('posters', POSTERS.length);

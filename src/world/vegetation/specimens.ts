@@ -13,6 +13,7 @@ function variants(path: string, count: number, seed: number, draw: (b: Builder, 
     build(usingSeed = seed + i) {
       const b = new Builder(merged);
       draw(b, rng(usingSeed), i);
+
       return b.model();
     },
   }));

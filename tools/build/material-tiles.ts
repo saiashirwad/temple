@@ -32,12 +32,14 @@ export function materialTiles(): Plugin {
   let dir: string;
   let base: string;
   let links: HtmlTagDescriptor[];
+
   return {
     name: 'temple-material-tiles',
     apply: 'build',
     configResolved(config) { dir = join(config.publicDir, 'tex'); base = config.base; },
     async buildStart() {
       const { default: sharp } = await import('sharp');
+
       const pack = (id: string, tiles: Buffer[], media?: string): HtmlTagDescriptor => {
         const offsets = Buffer.alloc((tiles.length + 1) * 4);
         let offset = offsets.length;
@@ -50,22 +52,28 @@ export function materialTiles(): Plugin {
         const hash = createHash('sha256').update(source).digest('hex').slice(0, 12);
         const file = `assets/material-${id}-${hash}.bin`;
         this.emitFile({ type: 'asset', fileName: file, source });
+
         return {
           tag: 'link', injectTo: 'head',
           attrs: { id: `material-${id}`, as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'low', href: base + file, ...(media && { media }) },
         };
       };
+
       const sets = await Promise.all(packs.map(async ({ id, suffix, media }) => {
         const tiles = await Promise.all(materialLayers.map(({ name }) => {
           const path = join(dir, name + '_' + suffix);
           this.addWatchFile(path);
+
           return readFile(path);
         }));
+
         const previews = id === 'color-1024' ? [] : await Promise.all(tiles.map(tile =>
           // Keep RGB even at near-zero alpha: alpha holds a surface mask on the mural.
           sharp(tile).resize(128, 128).webp({ quality: 80 }).toBuffer()));
+
         return { link: pack(id, tiles, media), previews };
       }));
+
       // Store data, then colour, in the same order as the two 512px source sets above.
       links = [...sets.map(set => set.link), pack('preview', sets.flatMap(set => set.previews)),
         { tag: 'script', children: preload, injectTo: 'head' }];

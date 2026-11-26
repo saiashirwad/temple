@@ -55,6 +55,7 @@ export interface JourneyDeps {
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+
   return t * t * (3 - 2 * t);
 };
 
@@ -71,6 +72,7 @@ const BUNGALOW_FRONT = [BUNGALOW.x + Math.sin(BUNGALOW.yaw) * 8, BUNGALOW.z + Ma
 /** The stretch of path seen from his chair where the light walks at the end: going down toward the river. */
 const FAR_FROM = 905;
 const FAR_TO = 870;
+
 /** The lantern far down the hill at the end, `sat` seconds after sitting: xyz and brightness. */
 export const farLanternAt = (sat: number): [number, number, number, number] => {
   // Coming into view, walking down toward the river, stopping; then gone
@@ -79,7 +81,9 @@ export const farLanternAt = (sat: number): [number, number, number, number] => {
   const p = trailAt(FAR_FROM + (FAR_TO - FAR_FROM) * k);
   const swing = sat < 15 ? Math.sin(sat * 3.4) * 0.15 : 0;
   let w = 16 * Math.min(1, (sat - 2) / 2) * (0.9 + Math.sin(sat * 11) * 0.06);
+
   if (sat > 22) w *= Math.max(0, 1 - (sat - 22) / 1.2);
+
   return [p.x, heightAt(p.x, p.z) + 0.7 + swing * 0.2, p.z, w];
 };
 
@@ -100,13 +104,16 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
   let howlIn = 30 + random.ambience() * 40;
   let replyIn = -1;
   let fogNow = fog.base;
+
   const farOff = (): V3 => {
     const a = random.ambience() * Math.PI * 2;
     const d = 380 + random.ambience() * 300;
     const hx = tk.eye[0] + Math.sin(a) * d;
     const hz = tk.eye[2] + Math.cos(a) * d;
+
     return [hx, heightAt(hx, hz) + 25, hz];
   };
+
   const unease = createUnease({ sound, eyes, later }, random.unease);
   const aloft = (x: number, z: number) => cover.aloft(x, z, tk.eye[1] - 0.8);
 
@@ -121,9 +128,11 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
       hud?.end();
     },
   });
+
   /** Seconds left lying in the dark after going down: nothing hunts you meanwhile. */
   let downFor = 0;
   let onHuntingGround = false;
+
   const danger = createDanger(GLADE, {
     cover: cover.inCover,
     mark: story.mark,
@@ -159,6 +168,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
   const progress = (t: Tick) => {
     const { dt, x, z, seconds } = t;
     const near = trailNear(x, z, 30);
+
     if (near.distance < 25) state.furthest = Math.max(state.furthest, near.along);
     // How far into the trees: along the path, or just how far out of town
     const along = near.distance < 30 ? near.along : 0;
@@ -166,16 +176,19 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     state.deep += (goal - state.deep) * Math.min(1, dt * 0.5);
     onHuntingGround = state.deep > 0.5 && !state.arrived && near.along > 230 && near.along < TRAIL_LENGTH - 50 && Math.hypot(x - GLADE.x, z - GLADE.z) > 70;
     sound.forest = state.deep;
+
     // The crickets fall silent round a big animal: the forest's own warning that the herd is near
     if (danger.herd.some((e) => e.on && Math.hypot(e.x - x, e.z - z) < 26)) {
       sound.hush(1.5);
       story.mark('hush');
       state.metHerd = true;
     }
+
     // Past the herd, unhurt: something learned
     if (state.metHerd && near.distance < 20 && near.along > GLADE.along + 45 && Math.hypot(x - GLADE.x, z - GLADE.z) > 45) story.mark('herdPassed');
     // Walking in the dark with your torch off, deep in the trees
     state.darkFor = state.torchOff && state.deep > 0.5 && walker.pace > 0.4 ? state.darkFor + dt : 0;
+
     if (state.darkFor > 14) story.mark('dark');
     // The wind, turning slowly through the night
     const wa = 0.8 + Math.sin(seconds * 0.011) * 1.6 + Math.sin(seconds * 0.037 + 2) * 0.5;
@@ -186,6 +199,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
   /** The bridge, the river, the far wolves, the air. */
   const ambience = (t: Tick) => {
     const { dt, x, z } = t;
+
     // The bridge creaking under you as you cross
     if (onBridge(x, z) && walker.pace > 0.4) {
       if ((creakIn -= dt * walker.pace) < 0) {
@@ -193,29 +207,38 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
         creakIn = 1.2 + random.ambience() * 2.4;
       }
     }
+
     // The river, heard from its nearest stretch
     const rl = riverLocal(x, z);
+
     if (Math.abs(rl.s) < RIVER.length && Math.abs(rl.v) < 90) {
       const s = Math.max(-RIVER.length, Math.min(RIVER.length, rl.s));
       const [rx, rz] = riverPoint(s);
       sound.river = [rx, riverLevel(s) + 0.3, rz];
     } else sound.river = null;
+
     // A wolf, now and then, somewhere far off in the hills; sometimes another answers
     if (state.deep > 0.35 && !state.arrived) {
       howlIn -= dt;
+
       if (howlIn < 0) {
         sound.howl(farOff(), 0.55 + random.ambience() * 0.25);
         story.mark('howl');
         howlIn = 55 + random.ambience() * 95;
+
         if (random.ambience() < 0.35) replyIn = 4 + random.ambience() * 5;
       }
+
       if (replyIn > 0) {
         replyIn -= dt;
+
         if (replyIn <= 0) sound.howl(farOff(), 0.4 + random.ambience() * 0.2);
       }
     }
+
     // The air clears a little up in the forest, so the views carry
     const fogWant = fog.base * (1 - state.deep * 0.6);
+
     if (Math.abs(fogWant - fogNow) > 0.0002) {
       fogNow = fogWant;
       fog.set(fogNow);
@@ -227,27 +250,35 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     const { x, z, seconds } = t;
     let spot: Interest | null = null;
     let best = Infinity;
+
     for (const it of INTEREST) {
       const dd = Math.hypot(x - it.x, z - it.z);
+
       if (dd < it.r && dd < best) {
         best = dd;
         spot = it;
       }
     }
+
     // The guard, if you've caught him up
     const gd = people.guard;
+
     if (!gd.gone && Math.hypot(x - gd.at[0], z - gd.at[2]) < GUARD_TALK_R) {
       const at = Math.floor(seconds / GUARD_LINE_PERIOD);
+
       if (!guardLine || guardLine.at !== at) guardLine = { at, text: GUARD_LINES[guardTalks++ % GUARD_LINES.length]! };
       spot = { x: gd.at[0], z: gd.at[2], r: GUARD_TALK_R, low: false, label: 'Talk', text: guardLine.text };
     }
+
     if (up) spot = { x, z, r: 3, low: false, sit: true, label: 'Sit and rest', text: REST_TEXT };
     // Once you've read the note, and put it down or stepped back: his chair
     bungalow.update(seconds, state.reading);
+
     if (Math.hypot(x - NOTE_AT.x, z - NOTE_AT.z) < NOTE_R) {
       if (bungalow.interaction === 'bungalow.note') spot = { id: 'bungalow.note', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, label: 'Read the note', text: COOK_NOTE };
       else if (bungalow.interaction === 'bungalow.chair') spot = { id: 'bungalow.chair', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, sit: true, label: 'Sit in his chair', text: ' ' };
     }
+
     state.near = spot;
   };
 
@@ -278,6 +309,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     beasts(t);
     // Your own breath after a run, and your heart when you're hurt
     sound.body(dt, walker.winded ? 1 : Math.max(0, Math.min(1, (0.7 - walker.stamina) * 1.6)), danger.health < 0.4 ? (0.4 - danger.health) / 0.4 : danger.threat && danger.hunting ? 0.25 : 0);
+
     // Arriving: the bungalow's steps
     if (!state.arrived && Math.hypot(x - BUNGALOW_FRONT[0], z - BUNGALOW_FRONT[1]) < ARRIVE_R) {
       state.arrived = true;

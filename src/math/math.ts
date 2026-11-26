@@ -9,6 +9,7 @@ export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** Hermite smoothstep: 0 below `a`, 1 above `b`, smooth between (like WGSL smoothstep). */
 export const smooth = (a: number, b: number, x: number) => {
   const t = clamp((x - a) / (b - a), 0, 1);
+
   return t * t * (3 - 2 * t);
 };
 
@@ -26,6 +27,7 @@ export const toward = (ax: number, az: number, bx: number, bz: number): [ux: num
   const dx = bx - ax;
   const dz = bz - az;
   const d = Math.hypot(dx, dz) || 1;
+
   return [dx / d, dz / d, d];
 };
 
@@ -46,6 +48,8 @@ export const between = (random: () => number, a: number, b: number) => a + rando
 export function stepFixed(dt: number, fn: (h: number, i: number) => boolean | void, max = 1 / 30) {
   const n = dt > 0 ? Math.max(1, Math.ceil(dt / max - 1e-9)) : 1;
   const h = dt > 0 ? dt / n : 0;
+
   for (let i = 0; i < n; i++) if (fn(h, i) === false) return i + 1;
+
   return n;
 }

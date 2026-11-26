@@ -22,6 +22,7 @@ export function createAtmosphere(
 ) {
   const STEPS = steps;
   const HALOS = halos;
+
   const Air = d.struct({
     /** Lamps: position and range, and colour times intensity. */
     at: d.arrayOf(d.vec4f, HALOS),
@@ -33,11 +34,14 @@ export function createAtmosphere(
     moonDensity: d.f32,
     moon: d.vec3f,
   });
+
   const layout = tgpu.bindGroupLayout({
     depth: { texture: d.textureDepth2d() },
     air: { uniform: Air },
   });
+
   const air = root.createUniform(Air);
+
   const values = {
     at: Array.from({ length: HALOS }, () => d.vec4f()),
     glow: Array.from({ length: HALOS }, () => d.vec4f()),
@@ -61,6 +65,7 @@ export function createAtmosphere(
     const far = cameras.distanceOf(camera, z) / std.max(0.1, std.dot(ray.direction, cameras.forwardOf(camera)));
     // Each lamp's halo: the in-scattered light of a point source along the ray, in closed form
     let lit = d.vec3f(0);
+
     for (let i = d.u32(0); i < a.count; i++) {
       const L = a.at[i];
       const toL = L.xyz - ray.origin;
@@ -73,11 +78,13 @@ export function createAtmosphere(
       const reach = 1 - std.smoothstep(L.w * 0.1, L.w * 0.55, h);
       lit += a.glow[i].xyz * std.max(span, 0) * reach;
     }
+
     lit = lit * a.lampDensity;
     // Moonlight shafts: march the moon's shadow, a little denser near the ground
     const dist = std.min(far, 40);
     const n = std.fract(52.98292 * std.fract(0.06711 * position.x + 0.00584 * position.y) + d.f32(a.frame % 64) * 0.618034);
     let beam = d.f32(0);
+
     for (let s = d.u32(0); s < STEPS; s++) {
       // Steps packed closer near the eye, where a shaft between two trunks is widest on screen
       const u = (d.f32(s) + n) / d.f32(STEPS);
@@ -89,10 +96,12 @@ export function createAtmosphere(
       const thick = std.exp(-std.max(w.y - 0.9, 0) * 0.08) * (1 - std.smoothstep(13, 22, w.y));
       beam += shading.sunShare(shading.pointAt(w, d.vec3f(0, 1, 0))) * thick * stride;
     }
+
     // Mostly forward scattering, as in real mist: faint looking away, bright toward the moon
     const toward = std.saturate(std.dot(ray.direction, shading.towardsSun()));
     const facing = std.pow(toward, 8) * 4 + std.pow(toward, 2) * 0.8;
     lit += a.moon * (beam * a.moonDensity * (0.25 + facing));
+
     return d.vec4f(std.min(lit, d.vec3f(8)), 0);
   });
 
@@ -110,6 +119,7 @@ export function createAtmosphere(
         },
       },
     });
+
   const bound = memo((depth: targets.Depth) => pipeline.with(root.createBindGroup(layout, { depth, air })));
 
   return {

@@ -4,6 +4,7 @@ import { qrot, yawQ } from '../math/quat.ts';
 import { heightAt } from '../world/terrain.ts';
 
 type V3 = [number, number, number];
+
 const WOLF_HEAD: V3 = [0, 0.7, 0.53];
 const WOLF_EYE: V3 = [0.036, 0, 0];
 
@@ -11,11 +12,14 @@ const WOLF_EYE: V3 = [0.036, 0, 0];
 export function updateDholeEyes(eyes: ReturnType<typeof createEyes>, wolves: readonly Beast[], eyeAt: V3, [fx, fy, fz]: V3, torch: number) {
   wolves.forEach((w, i) => {
     const slot = eyes.chance + i * 2;
+
     if (!w.on) {
       eyes.set(slot, 0, -99, 0, 0);
       eyes.set(slot + 1, 0, -99, 0, 0);
+
       return;
     }
+
     const q = yawQ(w.yaw);
     const head = qrot(q, WOLF_HEAD);
     const side = qrot(q, WOLF_EYE);

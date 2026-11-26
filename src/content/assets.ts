@@ -1,5 +1,7 @@
 export type Sex = 'm' | 'f';
+
 export const CLIP_NAMES = ['walk_neutral_01', 'walk_slow_01', 'idle_neutral_01', 'idle_neutral_02', 'gestic_talk_neutral_01', 'sit_chair_idle_neutral_01', 'crouch_idle', 'idle_look_around_01'] as const;
+
 export type ClipName = (typeof CLIP_NAMES)[number];
 
 export const AVATARS = {

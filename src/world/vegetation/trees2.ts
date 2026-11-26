@@ -59,6 +59,7 @@ interface Tier {
   len: number;
   r: number;
 }
+
 interface Spec {
   bark: Mat;
   /** Bole height, base radius, how much it wanders, how far its top leans out. */
@@ -99,21 +100,28 @@ function grow(b: Builder, r: () => number, spec: Spec, size: number) {
   const radii: number[] = [];
   let wx = 0;
   let wz = 0;
+
   for (let k = 0; k <= 7; k++) {
     const t = k / 7;
+
     if (k > 1) {
       wx += (r() - 0.5) * spec.crook * size;
       wz += (r() - 0.5) * spec.crook * size;
     }
+
     bole.push([L[0] * spec.lean * H * t * t + wx * t, -0.3 + (H + 0.3) * t, L[2] * spec.lean * H * t * t + wz * t]);
     radii.push(R0 * (1 - 0.5 * t) + (t < 0.15 ? (0.15 - t) * R0 * 2.2 : 0));
   }
+
   b.sweep(spec.bark, bole, radii, 9);
+
   const on = (t: number): V3 => {
     const f = Math.min(t, 1) * 7;
     const i = Math.min(Math.floor(f), 6);
+
     return lerp(bole[i]!, bole[i + 1]!, f - i);
   };
+
   // Buttresses: fins of root running down from the bole and out across the ground
   for (let i = 0; i < (spec.buttress ?? 0); i++) {
     const a = (i / spec.buttress!) * Math.PI * 2 + r() * 0.5;
@@ -121,24 +129,29 @@ function grow(b: Builder, r: () => number, spec: Spec, size: number) {
     const out = R0 * (2.2 + r() * 1.8);
     const pts: V3[] = [];
     const rr: number[] = [];
+
     for (let k = 0; k <= 4; k++) {
       const v = k / 4;
       const d = R0 * 0.6 + out * v;
       pts.push([Math.sin(a + v * 0.2) * d, top * Math.pow(1 - v, 1.7) - 0.12, Math.cos(a + v * 0.2) * d]);
       rr.push(R0 * (0.32 - v * 0.24));
     }
+
     b.sweep(spec.bark, pts, rr, 5);
   }
+
   const clumps: Clump[] = [];
   const tips: V3[] = [];
   const [c0, c1] = spec.clump;
   const clumpR = () => (c0 + r() * (c1 - c0)) * size;
   spec.tiers.forEach((tier, ti) => {
     const phase = ti * 2.4 + r();
+
     for (let i = 0; i < tier.n; i++) {
       const a = phase + (i / tier.n) * Math.PI * 2 + (r() - 0.5) * 0.7;
       const d: V3 = [Math.sin(a), 0, Math.cos(a)];
       const lit = d[0] * L[0] + d[2] * L[2];
+
       // Limbs on the shaded side are shorter, a few never grew at all
       if (lit < -0.3 && r() < spec.light * 0.5) continue;
       const from = on(tier.at + (r() - 0.5) * 0.06);
@@ -147,7 +160,9 @@ function grow(b: Builder, r: () => number, spec: Spec, size: number) {
       const tip = limb(b, spec.bark, from, dir, len, tier.r * size, tier.r * size * 0.28, r, spec.curl ?? 0.25);
       tips.push(tip);
       clumps.push({ c: tip, r: clumpR() });
+
       if (spec.mid) clumps.push({ c: add(lerp(from, tip, 0.6), [d[2] * len * 0.25 * (r() - 0.5), len * 0.08, -d[0] * len * 0.25 * (r() - 0.5)]), r: clumpR() * 0.85 });
+
       for (let j = 0; j < spec.branch; j++) {
         const at = lerp(from, tip, 0.4 + r() * 0.45);
         const turn = (r() < 0.5 ? -1 : 1) * (0.5 + r() * 0.6);
@@ -161,13 +176,16 @@ function grow(b: Builder, r: () => number, spec: Spec, size: number) {
   const base = on(spec.tiers[0]?.at ?? 0.7);
   const shaped = uneven(clumps, r, { base, yaw, lean: spec.light, drop: spec.drop, jitter: 0.3, s: spec.shape });
   let cx = 0, cy = 0, cz = 0;
+
   for (const k of shaped) {
     cx += k.c[0];
     cy += k.c[1];
     cz += k.c[2];
   }
+
   const n = Math.max(shaped.length, 1);
   crown(b, r, spec.leaves, spec.core, [cx / n, cy / n - 0.5 * size, cz / n], shaped, spec.cover, spec.leaf, spec.droop, false, { twig: spec.bark, ...spec.rag });
+
   return { clumps: shaped, tips, top: on(1), on, yaw };
 }
 
@@ -220,11 +238,13 @@ export function irul(b: Builder, r: () => number, size: number) {
  */
 export function fig(b: Builder, r: () => number, size: number, peepal = false) {
   const bk = peepal ? W.peepalBark : W.figBark;
+
   // Two or three stems twisted together in the bole
   for (let s = 0; s < 3; s++) {
     const a = (s / 3) * Math.PI * 2 + r();
     const pts: V3[] = [];
     const rr: number[] = [];
+
     for (let k = 0; k <= 5; k++) {
       const v = k / 5;
       const aa = a + v * 1.1;
@@ -232,8 +252,10 @@ export function fig(b: Builder, r: () => number, size: number, peepal = false) {
       pts.push([Math.sin(aa) * o, -0.2 + v * 4.6 * size, Math.cos(aa) * o]);
       rr.push(0.22 * size * (1 - v * 0.35));
     }
+
     b.sweep(bk, pts, rr, 7);
   }
+
   const g = grow(b, r, {
     bark: bk, height: 4.4, girth: 0.3, crook: 0.1, lean: 0.06, buttress: peepal ? 4 : 6,
     tiers: [{ at: 0.78, n: 4, up: peepal ? 0.6 : 0.3, len: peepal ? 4.2 : 5.4, r: 0.17 }, { at: 1, n: 2, up: 1.0, len: 3, r: 0.12 }],
@@ -241,11 +263,14 @@ export function fig(b: Builder, r: () => number, size: number, peepal = false) {
     leaves: peepal ? W.peepal : W.fig, core: peepal ? null : W.core, cover: peepal ? 0.3 : 0.38, leaf: peepal ? [0.3, 0.17] : [0.3, 0.15], droop: peepal ? 0.6 : 0.35,
     rag: { lump: 0.3, holes: peepal ? 2 : 1, twigs: 2 },
   }, size);
+
   if (peepal) return;
+
   // Aerial roots in thin curtains out of the undersides of the low leaf masses, a few grown down
   // to the ground into pillars
   for (const k of g.clumps) {
     if (k.c[1] > 7.5 * size || r() < 0.35) continue;
+
     for (let i = 0; i < 4; i++) {
       const u = unit(r);
       const p: V3 = [k.c[0] + u[0] * k.r * 0.5, k.c[1] - k.r * 0.2, k.c[2] + u[2] * k.r * 0.5];
@@ -269,6 +294,7 @@ export function silkCotton(b: Builder, r: () => number, size: number) {
     branch: 1, reach: 0.4, curl: 0.12, clump: [0.75, 1.05], light: 0.2, drop: 0.12, shape: [1.5, 0.42, 1.5],
     leaves: W.silk, core: null, cover: 0.3, leaf: [0.32, 0.15], droop: 0.45, rag: { lump: 0.3, holes: 1, twigs: 2 },
   }, size);
+
   // Conical thorns on the lower bole
   for (let i = 0; i < 40; i++) {
     const a = r() * Math.PI * 2;
@@ -315,6 +341,7 @@ export function tamarind(b: Builder, r: () => number, size: number) {
     branch: 2, clump: [1.3, 1.75], light: 0.25, drop: 0.1, shape: [1.05, 0.72, 1.05],
     leaves: W.tamarind, core: W.core, cover: 0.32, leaf: [0.28, 0.14], droop: 0.45, rag: { lump: 0.4, holes: 1, twigs: 3 },
   }, size);
+
   hang(b, r, W.pod, g.clumps, 40, 0.14 * size, 0.012 * size);
 }
 
@@ -326,6 +353,7 @@ export function gulmohar(b: Builder, r: () => number, size: number) {
     branch: 3, reach: 0.4, curl: 0.22, clump: [1.0, 1.35], light: 0.35, drop: 0.12, shape: [1.55, 0.42, 1.55],
     leaves: W.gulmohar, core: null, cover: 0.3, leaf: [0.26, 0.13], droop: 0.55, rag: { lump: 0.3, holes: 2, twigs: 2 },
   }, size);
+
   hang(b, r, W.pod, g.clumps, 26, 0.45 * size, 0.018 * size);
 }
 
@@ -337,6 +365,7 @@ export function drumstick(b: Builder, r: () => number, size: number) {
     branch: 2, curl: 0.35, clump: [0.55, 0.85], light: 0.4, drop: 0.25, shape: [1.25, 0.6, 1.25],
     leaves: W.drumstick, core: null, cover: 0.24, leaf: [0.16, 0.1], droop: 0.65, rag: { lump: 0.4, holes: 2, twigs: 2 },
   }, size);
+
   hang(b, r, W.greenPod, g.clumps, 22, 0.5 * size, 0.01 * size);
 }
 
@@ -348,6 +377,7 @@ export function papaya(b: Builder, r: () => number, size: number) {
   b.tube(W.papayaStem, [0, -0.1, 0], 0.11 * size, 0.07 * size, h, 9, { rings: 6, lean: (v) => [lx * v * v, lz * v * v], radius: (v) => (0.11 - v * 0.04) * size + Math.sin(v * 70) * 0.004 });
   const top: V3 = [lx, h, lz];
   const n = 14 + Math.floor(r() * 6);
+
   for (let i = 0; i < n; i++) {
     const age = i / n;
     const yaw = i * 2.4 + r() * 0.3;
@@ -357,10 +387,12 @@ export function papaya(b: Builder, r: () => number, size: number) {
     const rise = 0.9 - age * 1.3;
     const end: V3 = add(top, [d[0] * L, rise * L * 0.6 - age * 0.1, d[2] * L]);
     b.sweep(W.papayaStalk, [top, add(lerp(top, end, 0.5), [0, 0.06, 0]), end], [0.018, 0.014, 0.01], 3);
+
     if (age > 0.9 && r() < 0.6) continue;
     // A leaf of seven lobes fanned out from the stalk's end, cupped a little
     const R = (0.32 + r() * 0.12) * size;
     const normal = nrm([d[0] * (0.2 + age), 1, d[2] * (0.2 + age)]);
+
     for (let k = 0; k < 7; k++) {
       const a = yaw + (k / 6 - 0.5) * 2.6;
       const out: V3 = nrm([Math.sin(a), -0.15 - age * 0.4 - Math.abs(k / 6 - 0.5) * 0.3, Math.cos(a)]);
@@ -369,6 +401,7 @@ export function papaya(b: Builder, r: () => number, size: number) {
       b.card(W.papaya[k % 3]!, end, add(mid, sc(side, R * 0.2)), add(end, sc(out, R)), add(mid, sc(side, -R * 0.2)), normal, [0.5, 0, 0.5, 1]);
     }
   }
+
   // Fruit clustered round the stem under the leaves, a ripe one or two
   for (let i = 0; i < 6 + Math.floor(r() * 8); i++) {
     const a = r() * Math.PI * 2;
@@ -385,6 +418,7 @@ export function screwpine(b: Builder, r: () => number, size: number) {
   const H = (2.4 + r() * 1.2) * size;
   const tip: V3 = [Math.sin(a0) * lean * H, H, Math.cos(a0) * lean * H];
   b.sweep(W.pandanBark, [[0, 0.3, 0], lerp([0, 0.3, 0], tip, 0.5), tip], [0.09 * size, 0.08 * size, 0.07 * size], 7);
+
   // Stilt roots from the lower trunk, splaying into the mud
   for (let i = 0; i < 7; i++) {
     const a = r() * Math.PI * 2;
@@ -392,15 +426,19 @@ export function screwpine(b: Builder, r: () => number, size: number) {
     const foot: V3 = [from[0] + Math.sin(a) * (0.5 + r() * 0.5) * size, -0.2, from[2] + Math.cos(a) * (0.5 + r() * 0.5) * size];
     b.sweep(W.pandanBark, [from, add(lerp(from, foot, 0.5), [0, 0.1, 0]), foot], [0.035 * size, 0.032 * size, 0.03 * size], 5);
   }
+
   // Two or three branches, each with its tuft
   const heads: V3[] = [tip];
+
   for (let i = 0; i < 1 + Math.floor(r() * 2); i++) {
     const a = a0 + (r() - 0.5) * 3;
     const from = lerp([0, 0.3, 0], tip, 0.55 + r() * 0.3);
     heads.push(limb(b, W.pandanBark, from, [Math.sin(a), 0.9, Math.cos(a)], (1 + r() * 0.8) * size, 0.06 * size, 0.045 * size, r, 0.15));
   }
+
   for (const head of heads) {
     const n = 18 + Math.floor(r() * 8);
+
     for (let k = 0; k < n; k++) {
       const yaw = k * 2.4 + r() * 0.3;
       const age = k / n;
@@ -409,6 +447,7 @@ export function screwpine(b: Builder, r: () => number, size: number) {
       const rise = 1.6 - age * 2.2;
       strap(b, age > 0.9 ? W.pandanDry : W.pandan, head, yaw, rise, L, 0.6 + age * 0.6, 0.05 * size);
     }
+
     if (r() < 0.5) b.blob(W.pandanFruit, add(head, [0, -0.25, 0]), [0.13 * size, 0.17 * size, 0.13 * size], 7, 5, 0.15);
   }
 }
@@ -418,10 +457,13 @@ function strap(b: Builder, mat: Mat, base: V3, yaw: number, rise: number, length
   const at = (u: number): V3 => {
     const x = u * length;
     const y = u * length * rise * 0.5 - droop * u * u * length;
+
     return [base[0] + Math.sin(yaw) * x, base[1] + y, base[2] + Math.cos(yaw) * x];
   };
+
   const side: V3 = [Math.cos(yaw) * width, 0, -Math.sin(yaw) * width];
   const K = 4;
+
   for (let k = 0; k < K; k++) {
     const u0 = k / K;
     const u1 = (k + 1) / K;

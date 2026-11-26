@@ -10,6 +10,7 @@ import { BRIDGE } from '../../world/trail/bridge.ts';
 import VEGETATION from '../../content/vegetation.json';
 
 const colors: Record<string, string> = { trees: '#8bd88c', far: '#4f8f71', plants: '#e4ba6e', grass: '#99a967' };
+
 type Point = { at: readonly number[]; name: string; group: string };
 
 export const title = 'Forest distribution';
@@ -73,27 +74,36 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   const grass = root.querySelector<HTMLInputElement>('[name=grass]')!;
   const settings = root.querySelector<HTMLTextAreaElement>('[name=settings]')!;
   const share = root.querySelector<HTMLElement>('.forest-share')!;
+
   if (params.get('region') === 'bridge') region.value = 'bridge';
+
   if (params.get('grass') === '0') grass.checked = false;
+
   if (['trees', 'far', 'plants', 'grass'].includes(params.get('group') ?? '')) group.value = params.get('group')!;
+
   // Geometry inputs do not change with the seed; build them once per mount.
   const grounds = buildGrounds(),
     village = buildVillage(),
     land = landMap();
+
   const canvas = root.querySelector<HTMLCanvasElement>('canvas')!;
   const ctx = canvas.getContext('2d')!;
   const tbody = root.querySelector<HTMLTableSectionElement>('tbody')!;
   const total = root.querySelector<HTMLElement>('.forest-total')!;
   const parsedSeed = Number(params.get('seed'));
+
   if (params.has('seed') && Number.isSafeInteger(parsedSeed)) seed.value = String(parsedSeed);
   const parsedDensity = Number(params.get('density'));
+
   if (params.has('density') && Number.isFinite(parsedDensity)) density.value = String(Math.max(0, Math.min(100, parsedDensity)));
   let points: Point[] = [];
+
   const draw = () => {
     const fraction = Number(density.value) / 100;
     root.querySelector('output')!.textContent = `${density.value}%`;
     const span = region.value === 'bridge' ? 120 : 900;
     const centre = region.value === 'bridge' ? [BRIDGE.x, BRIDGE.z] : [0, 0];
+
     const selected = points.filter(
       (p) =>
         (grass.checked || p.group !== 'grass') &&
@@ -102,20 +112,25 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
         Math.abs(p.at[2]! - centre[1]!) <= span / 2 &&
         inPlantingDensity(p.at, fraction),
     );
+
     ctx.fillStyle = '#26382d';
     ctx.fillRect(0, 0, 800, 800);
     const xy = (x: number, z: number) => [((x - centre[0]!) / span) * 800 + 400, ((z - centre[1]!) / span) * 800 + 400] as const;
     ctx.strokeStyle = '#f4e5c3';
     ctx.lineWidth = 2;
     ctx.beginPath();
+
     for (let d = 0; d <= TRAIL_LENGTH; d += 3) {
       const p = trailAt(d);
       const [x, y] = xy(p.x, p.z);
+
       if (d === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
+
     ctx.stroke();
     const counts = new Map<string, number>();
+
     for (const p of selected) {
       const [x, y] = xy(p.at[0]!, p.at[2]!);
       ctx.fillStyle = colors[p.group]!;
@@ -123,6 +138,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       const label = `${p.name} · ${p.group}`;
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
+
     total.textContent = `${selected.length.toLocaleString()} shown of ${points.length.toLocaleString()} total placements. Map spans ${span} × ${span} m; north is up (−z).`;
     tbody.replaceChildren(
       ...[...counts]
@@ -134,19 +150,25 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
           a.textContent = name;
           b.textContent = count.toLocaleString();
           tr.append(a, b);
+
           return tr;
         }),
     );
   };
+
   const rebuild = async () => {
     const value = Number(seed.value);
+
     if (!Number.isSafeInteger(value)) {
       status.textContent = 'Enter a whole-number seed.';
+
       return;
     }
+
     delete root.dataset.error;
     status.textContent = 'Building production layout…';
     await new Promise<void>((resolve) => setTimeout(resolve, 20));
+
     try {
       const p = plantAll(village.homes, grounds.gaps, village.tulsi, { seed: value, density: 1 });
       points = [
@@ -166,6 +188,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       status.textContent = `Could not build layout: ${error instanceof Error ? error.message : String(error)}`;
     }
   };
+
   root.querySelector('[name=rebuild]')!.addEventListener('click', () => void rebuild());
   density.addEventListener('input', draw);
   group.addEventListener('change', draw);
@@ -179,8 +202,10 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       grass: grass.checked,
       group: group.value,
     };
+
     settings.value = JSON.stringify(data, null, 2);
     const url = new URL(location.href);
+
     for (const [key, value] of Object.entries(data))
       url.searchParams.set(key, key === 'grass' ? (value ? '1' : '0') : String(value));
     share.textContent = `Share URL: ${url.href}`;
@@ -192,8 +217,10 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   root.querySelector('[name=apply]')!.addEventListener('click', () => {
     try {
       const data: unknown = JSON.parse(settings.value);
+
       if (!data || typeof data !== 'object') throw new Error('Expected a settings object');
       const d = data as Record<string, unknown>;
+
       if (
         !Number.isSafeInteger(d.seed) ||
         typeof d.density !== 'number' ||

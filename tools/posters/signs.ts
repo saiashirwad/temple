@@ -9,8 +9,11 @@ import { writeFileSync } from 'node:fs';
 
 const A = new URL('./assets/', import.meta.url).pathname;
 const OUT = new URL('../../public/tex/', import.meta.url).pathname;
+
 GlobalFonts.registerFromPath(A + 'NotoSansMalayalam.ttf', 'Mal');
+
 GlobalFonts.registerFromPath(A + 'Anton.ttf', 'Anton');
+
 GlobalFonts.registerFromPath(A + 'Oswald.ttf', 'Oswald');
 
 const S = 1024;
@@ -28,18 +31,21 @@ const text = (x: SKRSContext2D, t: string, y: number, font: string, fill: string
   x.fillStyle = fill;
   x.fillText(t, C / 2, y, max);
 };
+
 /** Weathered paint: grime, streaks and flecks of it gone. */
 const weather = (x: SKRSContext2D, k: number) => {
   for (let i = 0; i < 18; i++) {
     x.fillStyle = `rgba(30,24,16,${0.05 + r() * 0.08 * k})`;
     x.fillRect(r() * C, r() * C * 0.3, 1 + r() * 2, 30 + r() * 120);
   }
+
   for (let i = 0; i < 40 * k; i++) {
     x.fillStyle = `rgba(60,50,40,${0.2 + r() * 0.4})`;
     x.beginPath();
     x.arc(r() * C, r() * C, 0.5 + r() * 2.5, 0, Math.PI * 2);
     x.fill();
   }
+
   const moss = x.createLinearGradient(0, C, 0, C * 0.6);
   moss.addColorStop(0, `rgba(40,60,20,${0.35 * k})`);
   moss.addColorStop(1, 'rgba(40,60,20,0)');
@@ -105,10 +111,12 @@ const SIGNS: ((x: SKRSContext2D) => void)[] = [
     stone.addColorStop(1, '#5a564e');
     x.fillStyle = stone;
     x.fillRect(0, 0, C, C);
+
     for (let i = 0; i < 900; i++) {
       x.fillStyle = `rgba(${r() < 0.5 ? '30,28,24' : '200,195,180'},${0.05 + r() * 0.1})`;
       x.fillRect(r() * C, r() * C, 1 + r() * 2, 1 + r() * 2);
     }
+
     // Relief: draw the shape lit from the top left, a shadow under it to the bottom right
     const cobra = (dx: number, dy: number, fill: string) => {
       x.save();
@@ -130,17 +138,20 @@ const SIGNS: ((x: SKRSContext2D) => void)[] = [
       x.stroke();
       x.restore();
     };
+
     cobra(5, 6, 'rgba(20,18,14,0.55)');
     cobra(-3, -3, 'rgba(210,205,190,0.35)');
     cobra(0, 0, '#6e6a60');
     // The hood's spectacle mark, cut in, and the head on top
     x.strokeStyle = 'rgba(25,22,18,0.55)';
     x.lineWidth = 3;
+
     for (const u of [-1, 1]) {
       x.beginPath();
       x.arc(C / 2 + u * 13, 88, 10, 0, Math.PI * 2);
       x.stroke();
     }
+
     x.fillStyle = '#6e6a60';
     x.beginPath();
     x.ellipse(C / 2, 26, 16, 12, 0, 0, Math.PI * 2);
@@ -165,12 +176,18 @@ for (const [i, sign] of SIGNS.entries()) {
 }
 
 const raw = '/tmp/signs_raw.rgba';
+
 writeFileSync(raw, canvas.data());
+
 const ff = (args: string[]) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args]);
+
 for (const size of [1024, 512]) {
   const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
   ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', raw, ...scale, '-c:v', 'libwebp', '-quality', '88', '-pix_fmt', 'yuva420p', `${OUT}signs_${size}_c.webp`]);
 }
+
 ff(['-f', 'lavfi', '-i', 'color=c=0x8080a0:s=512x512', '-frames:v', '1', '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}signs_512_d.jpg`]);
+
 ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', raw, '-frames:v', '1', '/tmp/signs_atlas.png']);
+
 console.log('signs', SIGNS.length);

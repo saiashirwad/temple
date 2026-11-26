@@ -6,6 +6,7 @@ export function createBungalowStory(sit: () => void) {
   let noteAt = -1;
   let noteRead = false;
   let sitting = false;
+
   return {
     get noteRead() { return noteRead; },
     get sitting() { return sitting; },
@@ -15,8 +16,10 @@ export function createBungalowStory(sit: () => void) {
     },
     examine(id: BungalowInteraction, seconds: number): boolean {
       if (id !== this.interaction) return false;
+
       if (id === 'bungalow.note') noteAt = seconds;
       else { sitting = true; sit(); }
+
       return true;
     },
   };

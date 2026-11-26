@@ -6,6 +6,7 @@ import { add, bananaLeaf, crown, frond, lerp, nrm, sc, uneven, unit, type Clump 
 
 const leafy = (h: number): Mat => ({ color: hex(h), roughness: 0.7, pattern: P.LEAVES, doubleSided: true });
 const flower = (h: number): Mat => ({ color: hex(h), roughness: 0.6, pattern: P.FLOWER, doubleSided: true });
+
 export const PL = {
   grass: [0x3a5a1c, 0x4a6224, 0x56602a].map((h) => ({ color: hex(h), roughness: 0.8, pattern: P.GRASS, doubleSided: true }) as Mat),
   fern: { color: hex(0x2e5a1a), roughness: 0.7, pattern: P.FROND, doubleSided: true } as Mat,
@@ -34,6 +35,7 @@ export const PL = {
 
 export function grassTuft(b: Builder, r: () => number, height = 0.4) {
   const blades = 14 + Math.floor(r() * 10);
+
   for (let i = 0; i < blades; i++) {
     const a = r() * Math.PI * 2;
     const o = r() * 0.12;
@@ -53,6 +55,7 @@ export function grassTuft(b: Builder, r: () => number, height = 0.4) {
 
 export function fern(b: Builder, r: () => number) {
   const n = 9 + Math.floor(r() * 5);
+
   for (let i = 0; i < n; i++) {
     frond(b, PL.fern, PL.stem, [0, 0.02, 0], (i / n) * Math.PI * 2 + r() * 0.4, 0.9 + r() * 0.4, 0.7 + r() * 0.4, 0.9, { leaflets: 16, reach: 0.18, width: 0.03 });
   }
@@ -66,23 +69,28 @@ export function fern(b: Builder, r: () => number) {
 export function floweringShrub(b: Builder, r: () => number, size: number, bloom: Mat, heads: number, headSize: number) {
   const clumps: Clump[] = [];
   const k = 3 + Math.floor(r() * 3);
+
   for (let i = 0; i < k; i++) {
     const a = r() * 6.3;
     const o = (0.1 + r() * 0.4) * size;
     clumps.push({ c: [Math.sin(a) * o, (0.5 + r() * 0.45) * size, Math.cos(a) * o], r: (0.26 + r() * 0.2) * size });
   }
+
   for (const c of clumps) {
     // A stem that kinks once on its way up, and forks under its leaves
     const kink: V3 = [c.c[0] * 0.35 + (r() - 0.5) * 0.12 * size, c.c[1] * 0.45, c.c[2] * 0.35 + (r() - 0.5) * 0.12 * size];
     b.sweep(PL.stem, [[0, 0, 0], kink, c.c], [0.03, 0.02, 0.01], 4);
   }
+
   const shaped = uneven(clumps, r, { base: [0, 0, 0], yaw: r() * Math.PI * 2, lean: 0.4, drop: 0.12, jitter: 0.25, s: [1.15, 0.72, 1.15], sj: 0.4 });
   crown(b, r, PL.shrub, PL.core, [0, 0.55 * size, 0], shaped, 0.3, [0.2, 0.09], 0.2, true, { lump: 0.35, holes: 1, twigs: 2, twig: PL.stem });
+
   // Flower heads on the skin of the bush, each a dome of tiny florets
   for (let i = 0; i < heads; i++) {
     const c = shaped[Math.floor(r() * shaped.length)]!;
     const s = c.s ?? [1, 0.82, 1];
     const dir = unit(r);
+
     if (dir[1] < -0.2) dir[1] = -dir[1];
     const at = add(c.c, [dir[0] * s[0] * c.r * 0.95, dir[1] * s[1] * c.r * 0.95, dir[2] * s[2] * c.r * 0.95]);
     b.blob(bloom, at, [headSize, headSize * 0.7, headSize], 6, 4, 0.25);
@@ -96,22 +104,28 @@ export function floweringShrub(b: Builder, r: () => number, size: number, bloom:
 export function lantana(b: Builder, r: () => number, size: number) {
   const clumps: Clump[] = [];
   const stems = 6 + Math.floor(r() * 4);
+
   for (let i = 0; i < stems; i++) {
     const a = r() * Math.PI * 2;
     const reach = (0.5 + r() * 0.9) * size;
     const h = (0.6 + r() * 0.7) * size;
     const pts: V3[] = [];
+
     for (let k = 0; k <= 4; k++) {
       const t = k / 4;
       const w = (r() - 0.5) * 0.12 * size * t;
       pts.push([Math.sin(a) * reach * t + w, h * (2 * t - 1.25 * t * t), Math.cos(a) * reach * t - w]);
     }
+
     b.sweep(PL.stem, pts, [0.018, 0.015, 0.012, 0.009, 0.006].map((v) => v * size), 3);
     clumps.push({ c: pts[4]!, r: (0.2 + r() * 0.14) * size });
+
     if (r() < 0.6) clumps.push({ c: lerp(pts[2]!, pts[3]!, r()), r: (0.18 + r() * 0.12) * size });
   }
+
   const shaped = uneven(clumps, r, { base: [0, 0, 0], yaw: r() * Math.PI * 2, lean: 0.3, drop: 0.15, s: [1.35, 0.6, 1.35], sj: 0.4 });
   crown(b, r, PL.lantana, PL.core, [0, 0.55 * size, 0], shaped, 0.42, [0.12, 0.075], 0.25, false, { lump: 0.35, holes: 1, twigs: 1, twig: PL.stem });
+
   for (const c of shaped) {
     for (let i = 0; i < 1 + Math.floor(r() * 3); i++) {
       const s = c.s ?? [1, 0.82, 1];
@@ -129,6 +143,7 @@ export function lantana(b: Builder, r: () => number, size: number) {
  */
 export function chromolaena(b: Builder, r: () => number, size: number) {
   const stems = 8 + Math.floor(r() * 6);
+
   for (let i = 0; i < stems; i++) {
     const a = r() * Math.PI * 2;
     const tilt = 0.1 + r() * 0.35;
@@ -138,9 +153,11 @@ export function chromolaena(b: Builder, r: () => number, size: number) {
     const mid = add(lerp(o, top, 0.5), [-Math.sin(a) * tilt * h * 0.12, 0, -Math.cos(a) * tilt * h * 0.12]);
     b.sweep(PL.stem, [o, mid, top], [0.012, 0.009, 0.005], 3);
     let phi = r() * Math.PI;
+
     for (let t = 0.3; t < 0.92; t += 0.13 + r() * 0.05) {
       const p = t < 0.5 ? lerp(o, mid, t * 2) : lerp(mid, top, t * 2 - 1);
       phi += Math.PI / 2;
+
       for (const s of [-1, 1]) {
         const along = nrm([Math.cos(phi) * s, -0.2 - r() * 0.3, Math.sin(phi) * s]);
         const n = nrm([-along[0] * 0.3, 1, -along[2] * 0.3]);
@@ -148,6 +165,7 @@ export function chromolaena(b: Builder, r: () => number, size: number) {
         b.blade(PL.chromolaena[Math.floor(r() * 3)]!, p, along, n, l, l * 0.7, 0.2, 0.15);
       }
     }
+
     // The flower heads, clustered at the top
     for (let k = 0; k < 4 + Math.floor(r() * 5); k++) {
       const u = unit(r);
@@ -162,10 +180,12 @@ export function chromolaena(b: Builder, r: () => number, size: number) {
  */
 export function ginger(b: Builder, r: () => number, size: number, broad = false) {
   const shoots = broad ? 5 + Math.floor(r() * 4) : 6 + Math.floor(r() * 6);
+
   for (let i = 0; i < shoots; i++) {
     const a = r() * Math.PI * 2;
     const o: V3 = [Math.sin(a) * r() * 0.25 * size, 0, Math.cos(a) * r() * 0.25 * size];
     const out: V3 = [Math.sin(a), 0, Math.cos(a)];
+
     if (broad) {
       const h = (0.3 + r() * 0.25) * size;
       const end = add(o, [out[0] * h * 0.3, h, out[2] * h * 0.3]);
@@ -174,6 +194,7 @@ export function ginger(b: Builder, r: () => number, size: number, broad = false)
       b.blade(PL.turmeric[i & 1]!, end, along, nrm([-along[0] * 0.5, 1, -along[2] * 0.5]), (0.4 + r() * 0.18) * size, (0.14 + r() * 0.05) * size, 0.25, 0.25);
       continue;
     }
+
     const h = (0.7 + r() * 0.6) * size;
     const lean = 0.1 + r() * 0.2;
     const top = add(o, [out[0] * lean * h, h, out[2] * lean * h]);
@@ -181,6 +202,7 @@ export function ginger(b: Builder, r: () => number, size: number, broad = false)
     // Two ranks of leaves, across the lean
     const side: V3 = [out[2], 0, -out[0]];
     let s = 1;
+
     for (let t = 0.35; t <= 1.001; t += 0.1 + r() * 0.04) {
       s = -s;
       const p = lerp(o, top, t);
@@ -193,16 +215,20 @@ export function ginger(b: Builder, r: () => number, size: number, broad = false)
 /** Cane (rattan): a few thin spiny stems arching up out of the undergrowth, feathery fronds along them, whip tips trailing. */
 export function rattan(b: Builder, r: () => number, size: number) {
   const stems = 3 + Math.floor(r() * 3);
+
   for (let i = 0; i < stems; i++) {
     const a = r() * Math.PI * 2;
     const L = (2.6 + r() * 2) * size;
     const pts: V3[] = [];
+
     for (let k = 0; k <= 6; k++) {
       const t = k / 6;
       const out = L * 0.55 * t * t;
       pts.push([Math.sin(a) * out, L * (0.85 * t - 0.35 * t * t * t), Math.cos(a) * out]);
     }
+
     b.sweep(PL.rattan, pts, [0.03, 0.028, 0.025, 0.022, 0.016, 0.01, 0.004], 4);
+
     for (let k = 2; k <= 5; k++) {
       frond(b, PL.rattanLeaf, PL.stem, pts[k]!, a + (k & 1 ? 1 : -1) * (0.6 + r() * 0.8), 0.25 + r() * 0.3, (0.8 + r() * 0.5) * size, 0.5, { leaflets: 14, reach: 0.32, width: 0.035 });
     }
@@ -221,6 +247,7 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
   // The pseudostem: layered leaf sheaths, green blotched with brown, slightly leaning
   const lean = 0.08 + r() * 0.12;
   b.tube(PL.bananaStem, [0, -0.1, 0], 0.17, 0.11, h + 0.1, 12, { rings: 4, lean: (v) => [v * lean, 0], radius: (v) => 0.17 - v * 0.06 + Math.sin(v * 31) * 0.004 });
+
   // Old sheaths drying brown and peeling away from the stem in flat flaps
   for (let k = 0; k < 4; k++) {
     const a = r() * Math.PI * 2;
@@ -233,8 +260,10 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
     const bot: V3 = [tx * (rr + 0.06), y0, tz * (rr + 0.06)];
     b.card(PL.bananaDry, add(top0, side), add(top0, sc(side, -1)), add(bot, sc(side, -1.3)), add(bot, sc(side, 1.3)), [tx, 0.1, tz], [0.85, 0, 1, 1]);
   }
+
   const top: V3 = [lean, h, 0];
   const leaves = 8 + Math.floor(r() * 3);
+
   for (let i = 0; i < leaves; i++) {
     const yaw = i * 2.4 + r() * 0.3;
     const age = i / leaves;
@@ -246,11 +275,13 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
     const sz = -Math.sin(yaw) * stalk * 0.55;
     const end: V3 = [top[0] + sx, top[1] + stalk * rise * 0.9, top[2] + sz];
     b.sweep(dead ? PL.bananaDry : PL.bananaStem, [top, [top[0] + sx * 0.5, top[1] + stalk * rise * 0.55, top[2] + sz * 0.5], end], [0.04, 0.032, 0.022], 4);
+
     if (dead) {
       // A dead leaf, snapped at its stalk, hanging down the stem like a brown skirt
       // A dead leaf snapped at its stalk: its blade hangs folded down against the stem in a
       // ragged skirt of dry shreds, each curling out a little at the bottom
       const shreds = 7;
+
       for (let k = 0; k < shreds; k++) {
         const a = yaw + (k / shreds - 0.5) * 1.3;
         const rr = 0.13 + r() * 0.03;
@@ -260,17 +291,21 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
         const tx = Math.cos(a), tz = -Math.sin(a);
         const at = (u: number): V3 => [top[0] + Math.sin(a + Math.PI / 2) * 0 + tx * (rr + u * u * 0.25 + u * 0.05), top[1] - 0.05 - u * L, top[2] + tz * (rr + u * u * 0.25 + u * 0.05)];
         const side: V3 = [-tz * w * 0.5, 0, tx * w * 0.5];
+
         for (let j = 0; j < seg; j++) {
           const p0 = at(j / seg), p1 = at((j + 1) / seg);
           const n: V3 = [tx, 0.2, tz];
           b.card(PL.bananaDry, add(p0, side), add(p0, sc(side, -1)), add(p1, sc(side, -0.8)), add(p1, sc(side, 0.8)), nrm(n), [0.85, j / seg, 1, (j + 1) / seg]);
         }
       }
+
       continue;
     }
+
     const young = i === leaves - 1;
     bananaLeaf(b, PL.banana, end, yaw, young ? 1.4 : 0.55 + (1 - age) * 0.7, 1.7 + r() * 0.6 - (young ? 0.5 : 0), r, { tatter: 0.25 + age * 0.55, width: 0.28 + r() * 0.06, hang: young ? 0.6 : 0.8 + age * 0.4 });
   }
+
   if (bunch) {
     // The bunch: a stalk arching out and down, hands of fingers curving up toward it, the
     // dark purple bud hanging at the end on its bare stalk
@@ -280,9 +315,11 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
     const s3: V3 = [top[0] + 0.74, top[1] - 1.35, 0];
     b.sweep(PL.stem, [s0, s1, s2, s3, [top[0] + 0.75, top[1] - 1.75, 0]], [0.045, 0.04, 0.035, 0.025, 0.02], 6);
     const hands = 7;
+
     for (let t = 0; t < hands; t++) {
       const y = top[1] - 0.3 - t * 0.12;
       const fingers = 12 - Math.floor(t / 2);
+
       for (let k = 0; k < fingers; k++) {
         const a = (k / fingers) * Math.PI * 1.6 - 0.8 + (t % 2) * 0.2;
         const ox = Math.sin(a) * 0.07;
@@ -293,7 +330,9 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
         b.sweep(PL.bananaFruit, [[cx, y, cz], [cx + ox * 0.9, y + L * 0.35, cz + oz * 0.9], [cx + ox * 1.25, y + L * 0.8, cz + oz * 1.25]], [0.016, 0.019, 0.01], 5);
       }
     }
+
     b.blob(PL.bananaBloom, [top[0] + 0.75, top[1] - 1.95, 0], [0.08, 0.2, 0.08], 8, 6, 0.2);
+
     for (let k = 0; k < 3; k++) {
       const a = k * 2.1;
       b.tri(PL.bananaBloom, [top[0] + 0.75 + Math.sin(a) * 0.07, top[1] - 1.85, Math.cos(a) * 0.07], [top[0] + 0.75 + Math.sin(a + 0.5) * 0.12, top[1] - 1.75, Math.cos(a + 0.5) * 0.12], [top[0] + 0.75 + Math.sin(a + 1) * 0.07, top[1] - 1.85, Math.cos(a + 1) * 0.07], [Math.sin(a), 0, Math.cos(a)]);
@@ -303,10 +342,12 @@ export function banana(b: Builder, r: () => number, bunch: boolean) {
 
 export function tulsi(b: Builder, r: () => number) {
   const clumps: Clump[] = [];
+
   for (let i = 0; i < 5; i++) {
     const a = r() * 6.3;
     clumps.push({ c: [Math.sin(a) * 0.15, 0.3 + r() * 0.4, Math.cos(a) * 0.15], r: 0.16 + r() * 0.08 });
   }
+
   for (const c of clumps) b.sweep(PL.stem, [[0, 0, 0], c.c], [0.015, 0.006], 3);
   crown(b, r, PL.tulsi, null, [0, 0.45, 0], clumps, 0.6, [0.07, 0.04], 0.1);
 }

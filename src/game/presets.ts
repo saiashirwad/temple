@@ -2,7 +2,9 @@ import type { createScene } from './scene.ts';
 import { SPOTS, type Spot } from '../content/viewpoints.ts';
 
 export type Scene = Awaited<ReturnType<typeof createScene>>;
+
 type State = ReturnType<Scene['inspect']>;
+
 export type Run = {
   name: string;
   /** Starts it; may return a promise that waits for the world. */
@@ -19,6 +21,7 @@ const standAt = async (s: Scene, spot: Spot) => {
   s.view.jump();
   s.walker.touched();
 };
+
 const pass = (ok: boolean, why: string) => (ok ? 'PASS' : `FAIL: ${why}`);
 
 export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: boolean; wildlife?: 'herd' | 'dholes' }> = {
@@ -42,6 +45,7 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     name: 'red dogs',
     async start(s) {
       await s.test.requireWildlife('dholes');
+
       if (s.walker.mode === 'held' || Math.hypot(...s.walker.at) < 150) await standAt(s, SPOTS['2']!.at);
       else await s.test.requirePhysics();
       s.journey.danger.summon();
@@ -76,15 +80,19 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     async start(s) {
       await standAt(s, SPOTS['8']!.at);
       s.test.timeScale = 16;
+
       // Exercise the same interactions as the player: read, put down, then sit.
       const until = async (id: string) => {
         const deadline = performance.now() + 5000;
+
         while (s.journey.state.near?.id !== id) {
           if (performance.now() > deadline) throw new Error(`interaction ${id} unavailable`);
           await new Promise((done) => setTimeout(done, 50));
         }
+
         s.journey.examine(s.journey.state.near!);
       };
+
       await until('bungalow.note');
       await until('bungalow.chair');
     },
@@ -103,6 +111,7 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     name: 'going down',
     async start(s) {
       await s.test.requirePhysics();
+
       if (s.walker.mode !== 'walk') s.walker.touched();
       const [x, z] = s.walker.at;
       const yaw = s.view.pose.yaw;

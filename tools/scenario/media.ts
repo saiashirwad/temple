@@ -17,6 +17,7 @@ export async function writeSheet(path: string, panels: Panel[]) {
   ctx.fillStyle = '#161c19';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.font = '16px sans-serif';
+
   for (const [i, panel] of panels.entries()) {
     const img = await loadImage(panel.path);
     const scale = Math.min(width / img.width, height / img.height);
@@ -25,6 +26,7 @@ export async function writeSheet(path: string, panels: Panel[]) {
     ctx.fillStyle = '#edf1e8';
     ctx.fillText(panel.label, x + 10, y + height + 23, width - 20);
   }
+
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, canvas.toBuffer('image/png'));
 }
@@ -32,10 +34,13 @@ export async function writeSheet(path: string, panels: Panel[]) {
 /** Start at the checkpoint and let gameplay continue while recording this page. */
 export async function startClip(page: Page, path: string, seconds: number) {
   await page.screencast.start({ path, size: page.viewportSize()!, fps: 25 });
+
   const done = new Promise<void>((resolve, reject) => {
     setTimeout(() => page.screencast.stop().then(resolve, reject), seconds * 1000);
   });
+
   // The runner also awaits this promise during finalization.
   void done.catch(() => {});
+
   return { done };
 }

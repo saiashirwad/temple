@@ -11,14 +11,18 @@ import { trailNear } from '../src/world/trail/trail.ts';
 const g = buildGrounds();
 const v = buildVillage();
 const p = plantAll(v.homes, g.gaps, v.tulsi);
+
 const count = (list: { specimen?: Specimen }[]) => {
   const out: Record<string, number> = {};
+
   for (const t of list) {
     const name = t.specimen?.species ?? 'card';
     out[name] = (out[name] ?? 0) + 1;
   }
+
   return out;
 };
+
 const NOT_BROAD = new Set(['coconut', 'areca', 'rubber', 'bamboo', 'papaya', 'banyan', 'card']);
 const meshTrees = [...p.trees, ...p.far.filter((f) => f.specimen)];
 
@@ -33,9 +37,11 @@ test('a real mix: many tree species, the wild ones in the forest, shrubs and wat
   const c = count(meshTrees);
   const kinds = Object.keys(c).filter((k) => !NOT_BROAD.has(k));
   assert.ok(kinds.length >= 12, `broadleaf species: ${kinds.join(', ')}`);
+
   for (const k of ['teak', 'laurel', 'irul', 'fig', 'silk-cotton', 'alstonia']) assert.ok((c[k] ?? 0) > 10, `${k} in the forest`);
   const pl = count(p.plants);
   console.log('plants by species', JSON.stringify(pl));
+
   for (const k of ['lantana', 'chromolaena', 'ginger', 'rattan', 'screwpine', 'papaya', 'hibiscus']) assert.ok((pl[k] ?? 0) > 3, `${k} planted`);
 });
 
@@ -43,6 +49,7 @@ test('every model named, and the tree pool stays well under its 256 meshes', () 
   const used = new Set([...p.trees.map(t => t.specimen), ...p.far.map(t => t.specimen ?? farSpecimens[t.kind]), ...Object.values(farSpecimens), ...p.plants.map(t => t.specimen)]);
   const catalog = Object.values(specimens).flat();
   assert.equal(new Set(catalog.map(s => s.id)).size, catalog.length);
+
   for (const specimen of used) assert.ok(catalog.includes(specimen), specimen.id);
   const models = [...used].map(s => s.build());
   const meshes = models.reduce((n, m) => n + m.meshes.length, 0);
@@ -54,8 +61,10 @@ test('every model named, and the tree pool stays well under its 256 meshes', () 
 
 test('no tree on the path, and every one a shade of its own near white', () => {
   for (const t of meshTrees) assert.ok(trailNear(t.at[0], t.at[2], 4).distance > 2.5, `tree on the path at ${t.at.map((x) => x.toFixed(1))}`);
+
   for (const t of [...p.trees, ...p.far, ...p.plants]) {
     assert.ok(t.tint, 'tinted');
+
     for (const c of t.tint!) assert.ok(c > 0.7 && c < 1.3);
   }
 });

@@ -23,6 +23,7 @@ const reflectionOf = (view: d.Infer<typeof Camera>) => {
   'use gpu';
   const flip = d.vec4f(-1, 1, 1, 1);
   const m = view.viewProjection;
+
   return Camera({
     viewProjection: d.mat4x4f(m.columns[0] * flip, m.columns[1] * flip * -1, m.columns[2] * flip, m.columns[3] * flip),
     position: view.position * d.vec3f(1, -1, 1),
@@ -48,36 +49,47 @@ const quad = tgpu.const(
 
 const ripplesAt = (p: d.v2f, t: number) => {
   'use gpu';
+
   return perlin2d.sample(p * 0.9 + d.vec2f(t * 0.05, t * 0.03)) * 0.015 + perlin2d.sample(p * 3.1 - d.vec2f(t * 0.11, -t * 0.07)) * 0.006;
 };
 
 export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lighting; size: SizeSource; time: TgpuUniform<d.F32>; shared: passes.Options['shared'] }) {
   const { view, light, size, time } = opts;
+
   const mirror = targets.create(root, size, {
     hdr: { format: 'rgba16float', sampled: true, scale: MIRROR_SCALE },
     depth: { format: 'depth24plus', scale: MIRROR_SCALE },
   });
+
   const reflectedView = () => {
     'use gpu';
+
     return reflectionOf(view.uniform.$);
   };
+
   const reflected: Inject = (cfg) => cfg.with(cameras.current, reflectedView).with(mirrored, true);
   const eye: [number, number, number] = [0, 0, 0];
   const bounds = POND.r * 1.5;
   let visible = false;
+
   function inView(x: number, y: number, z: number, yaw: number, pitch: number) {
     const dx = POND.x - x, dy = -y, dz = POND.z - z;
     const distance = Math.hypot(dx, dy, dz);
+
     if (distance <= bounds) return true;
     const aspect = size.width / Math.max(1, size.height);
     const halfAngle = Math.atan(Math.tan(view.pose.fov / 2) * Math.hypot(1, aspect));
     const forward = -(dx * Math.sin(yaw) + dz * Math.cos(yaw)) * Math.cos(pitch) - dy * Math.sin(pitch);
+
     return forward > distance * Math.cos(Math.min(Math.PI, halfAngle + Math.asin(bounds / distance) + 0.05));
   }
+
   let approached = false;
+
   function updateVisibility(afterFirstFrame = false) {
     cameras.eyeOf(view.pose, eye);
     visible = inView(eye[0], eye[1], eye[2], view.pose.yaw, view.pose.pitch);
+
     // Approaching the bank, warm before a turn can expose the water. Distant forest
     // views can stay there indefinitely without compiling or culling a mirror.
     if (afterFirstFrame && !visible && !approached && Math.hypot(POND.x - eye[0], POND.z - eye[2]) < 5 * POND.r) {
@@ -85,7 +97,9 @@ export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lig
       void prepare().catch(error => console.warn('Pond reflection', error));
     }
   }
+
   updateVisibility();
+
   const reflection = passes
     .create(root, mirror, { hdr: passes.color, depth: passes.depth }, { label: 'mirror', shared: opts.shared, enabled: () => visible })
     .pipe(reflected)
@@ -93,6 +107,7 @@ export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lig
 
   let warm: Promise<void> | undefined;
   let warming = false;
+
   function prepare() {
     if (!warm) {
       warming = true;
@@ -101,6 +116,7 @@ export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lig
         throw error;
       }).finally(() => { warming = false; });
     }
+
     return warm;
   }
 
@@ -119,13 +135,16 @@ export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lig
       const q = quad.$[vertexIndex];
       const world = d.vec3f(std.mix(lo.x, hi.x, q.x), 0, std.mix(lo.y, hi.y, q.y));
       const clip = cameras.toClip(world);
+
       return Corner({ position: clip, world, clip });
     },
     pixelOf: (corner) => {
       'use gpu';
+
       if (pondQGpu(corner.world.xz) > 1.12) {
         std.discard();
       }
+
       const toEye = cameras.current.$.position - corner.world;
       const distance = std.length(toEye);
       const toward = toEye / distance;
@@ -142,6 +161,7 @@ export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lig
       const fresnel = 0.02 + 0.98 * std.pow(1 - cosine, 5);
       const tint = d.vec3f(0.85, 0.95, 0.9);
       const color = DEEP + above * tint * std.mix(0.25, 1.0, fresnel);
+
       return Seen({ color: d.vec4f(color, 1) });
     },
     color: passes.shaded,
