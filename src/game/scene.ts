@@ -28,7 +28,7 @@ import { d, std, type TgpuRoot } from 'typegpu';
 import { defineBuilt, defineFlame, now } from '../render/surfaces.ts';
 import { lampAt, type Lamp } from '../render/flicker.ts';
 import { loadTextures } from '../render/tex.ts';
-import { CLOISTER, COMPOUND, GROUND, POND } from '../content/world.ts';
+import { CLOISTER, COMPOUND, GROUND } from '../content/world.ts';
 import { RIDERS, rideAt, wheelModel } from '../world/town/traffic.ts';
 import { createGround } from '../render/ground.ts';
 import { sky, MOON_ARRAY } from '../render/sky.ts';
@@ -291,7 +291,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     const inShadow = walking.map((w) => light.shadow.add(w));
     const drawings = [...inScene, ...inPond, ...inShadow];
     try {
-      await pipelines.compile(drawings);
+      await pipelines.compile(pond.prepareActors ? drawings : [...inScene, ...inShadow]);
       if (disposed) {
         for (const drawing of drawings) drawing.destroy();
         return;
@@ -481,7 +481,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     await Promise.all(near);
   }
   async function prepareView(spot: { shot: string; at: readonly number[] }) {
+    const [x, z, yaw, pitch, height] = spot.at;
     await Promise.all([
+      pond.inView(x, heightAt(x, z) + height, z, yaw, pitch) && pond.prepare(),
       propsReady(spot.shot === 'town' ? undefined : spot.at),
       spot.shot === 'town' && residentsReady(),
       spot.shot.startsWith('herd-') && requireWildlife('herd'),
@@ -566,7 +568,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       const inScene = scene.add(made.renderer); added.push(inScene);
       const inPond = pond.reflection.add(made.renderer); added.push(inPond);
       const inShadow = light.shadow.add(made.renderer); added.push(inShadow);
-      await pipelines.compile([inScene, inPond, inShadow]);
+      await pipelines.compile(pond.prepareActors ? [inScene, inPond, inShadow] : [inScene, inShadow]);
       if (disposed) { for (const drawing of added) drawing.destroy(); made.destroy(); return; }
       drawn.splice(3, 0, inScene);
       drawnNames.splice(3, 0, name);
@@ -690,24 +692,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   };
   const profile = boot.has('profile');
 
-
-  // The mirror is drawn only when the pond might be on screen
-  const POND_AT: V3 = [POND.x, 0, POND.z];
-  const POND_REACH = POND.r * 1.5;
-  const pondInView = (t: Tick) => {
-    const [fx, fy, fz] = t.fwd;
-    const [ex, ey, ez] = t.eye;
-    const fov = view.pose.fov;
-    const vx = POND_AT[0] - ex;
-    const vy = POND_AT[1] - ey;
-    const vz = POND_AT[2] - ez;
-    const len = Math.hypot(vx, vy, vz);
-    if (len < POND_REACH) return true;
-    const aspect = surface.width / Math.max(1, surface.height);
-    const half = Math.atan(Math.tan(fov / 2) * Math.hypot(1, aspect));
-    const angle = Math.acos(Math.max(-1, Math.min(1, (vx * fx + vy * fy + vz * fz) / len)));
-    return angle < half + Math.asin(Math.min(1, POND_REACH / len)) + 0.05;
-  };
 
   stage('compiled');
   await people.ready.catch((e) => console.warn('people textures', e));
@@ -862,6 +846,13 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       // mouse; in the air above it glides
       view.update(walker.mode === 'walk' ? Math.min(frame.dt * 4, 0.2) : frame.dt);
       mark('camera');
+      pond.updateVisibility(framesShown > 0);
+      // A camera turn can reach the pond while an explicit viewpoint jump is still warming it.
+      // Present the last finished picture until those pipelines can draw the complete reflection.
+      if (framesShown && pond.waitingForPicture) {
+        final.record(frame, surface.view(frame));
+        return;
+      }
       time.write(seconds);
       farLantern.write(d.vec4f(...farLanternAt(story.sitting)));
       for (let i = 0; i < all.length; i++) {
@@ -979,7 +970,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       mark('r.moon');
       light.pointShadow.record(frame, keep(lampCast), { timestampWrites: lampTime.writes() });
       mark('r.lamps');
-      if (pondInView(tick)) pond.record(frame, keep(mirrored));
+      pond.record(frame, keep(mirrored));
       scene.record(frame, test.skip >= 0 ? drawn.filter((_, i) => i !== test.skip) : look.props ? drawn : drawn.filter((x) => x !== thingsDrawn), { timestampWrites: sceneTime.writes() });
       mark('r.scene');
       chooseHalos();

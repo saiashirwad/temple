@@ -1,7 +1,7 @@
 // The temple pond: laterite steps going down to still black water that mirrors the lamps, the
 // palms and the moon. The mirror is a second pass through the camera reflected about y = 0.
 
-import { cameras, Camera, passes, targets, type CameraBase, type Frame, type Lighting, type SizeSource } from '@typegpu/kit';
+import { cameras, Camera, passes, targets, type OrbitCamera, type Frame, type Lighting, type SizeSource } from '@typegpu/kit';
 import type { Inject } from '@typegpu/kit/inject';
 import { memo } from '@typegpu/kit/memo';
 import { perlin2d } from '@typegpu/noise';
@@ -51,7 +51,7 @@ const ripplesAt = (p: d.v2f, t: number) => {
   return perlin2d.sample(p * 0.9 + d.vec2f(t * 0.05, t * 0.03)) * 0.015 + perlin2d.sample(p * 3.1 - d.vec2f(t * 0.11, -t * 0.07)) * 0.006;
 };
 
-export function createPond(root: TgpuRoot, opts: { view: CameraBase & { uniform: TgpuUniform<typeof Camera> }; light: Lighting; size: SizeSource; time: TgpuUniform<d.F32>; shared: passes.Options['shared'] }) {
+export function createPond(root: TgpuRoot, opts: { view: OrbitCamera; light: Lighting; size: SizeSource; time: TgpuUniform<d.F32>; shared: passes.Options['shared'] }) {
   const { view, light, size, time } = opts;
   const mirror = targets.create(root, size, {
     hdr: { format: 'rgba16float', sampled: true, scale: MIRROR_SCALE },
@@ -62,10 +62,47 @@ export function createPond(root: TgpuRoot, opts: { view: CameraBase & { uniform:
     return reflectionOf(view.uniform.$);
   };
   const reflected: Inject = (cfg) => cfg.with(cameras.current, reflectedView).with(mirrored, true);
+  const eye: [number, number, number] = [0, 0, 0];
+  const bounds = POND.r * 1.5;
+  let visible = false;
+  function inView(x: number, y: number, z: number, yaw: number, pitch: number) {
+    const dx = POND.x - x, dy = -y, dz = POND.z - z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance <= bounds) return true;
+    const aspect = size.width / Math.max(1, size.height);
+    const halfAngle = Math.atan(Math.tan(view.pose.fov / 2) * Math.hypot(1, aspect));
+    const forward = -(dx * Math.sin(yaw) + dz * Math.cos(yaw)) * Math.cos(pitch) - dy * Math.sin(pitch);
+    return forward > distance * Math.cos(Math.min(Math.PI, halfAngle + Math.asin(bounds / distance) + 0.05));
+  }
+  let approached = false;
+  function updateVisibility(afterFirstFrame = false) {
+    cameras.eyeOf(view.pose, eye);
+    visible = inView(eye[0], eye[1], eye[2], view.pose.yaw, view.pose.pitch);
+    // Approaching the bank, warm before a turn can expose the water. Distant forest
+    // views can stay there indefinitely without compiling or culling a mirror.
+    if (afterFirstFrame && !visible && !approached && Math.hypot(POND.x - eye[0], POND.z - eye[2]) < 5 * POND.r) {
+      approached = true;
+      void prepare().catch(error => console.warn('Pond reflection', error));
+    }
+  }
+  updateVisibility();
   const reflection = passes
-    .create(root, mirror, { hdr: passes.color, depth: passes.depth }, { label: 'mirror', shared: opts.shared })
+    .create(root, mirror, { hdr: passes.color, depth: passes.depth }, { label: 'mirror', shared: opts.shared, enabled: () => visible })
     .pipe(reflected)
     .beneath(light.inject());
+
+  let warm: Promise<void> | undefined;
+  let warming = false;
+  function prepare() {
+    if (!warm) {
+      warming = true;
+      warm = reflection.initAsync().catch(error => {
+        warm = undefined;
+        throw error;
+      }).finally(() => { warming = false; });
+    }
+    return warm;
+  }
 
   const smooth = root.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   const groupOf = memo((picture: TgpuTexture & { usableAsSampled: true }) => root.createBindGroup(Picture, { picture, smooth }));
@@ -117,11 +154,15 @@ export function createPond(root: TgpuRoot, opts: { view: CameraBase & { uniform:
   return {
     reflection,
     water,
+    updateVisibility, inView, prepare,
+    get prepareActors() { return visible || warm !== undefined; },
+    get waitingForPicture() { return visible && warming; },
     record(frame: Frame, drawn: readonly passes.Drawn[]) {
+      if (!visible) return;
       mirror.fit();
       reflection.record(frame, drawn);
     },
-    initAsync: () => reflection.initAsync(),
+    initAsync: () => visible ? prepare() : Promise.resolve(),
     destroy() {
       mirror.destroy();
     },
