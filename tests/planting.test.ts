@@ -55,3 +55,13 @@ test('no tree on the path, and every one a shade of its own near white', () => {
     for (const c of t.tint!) assert.ok(c > 0.7 && c < 1.3);
   }
 });
+
+test('specimens are reused, default placement repeats, and a new seed changes the forest', () => {
+  const repeat = plantAll(v.homes, g.gaps, v.tulsi);
+  assert.deepEqual(repeat.far.map(t => t.at), p.far.map(t => t.at));
+  assert.equal(repeat.trees[0]!.model, p.trees[0]!.model);
+  const changed = plantAll(v.homes, g.gaps, v.tulsi, { seed: 6 });
+  const forest = (a: typeof p.far) => a.filter(t => Math.hypot(t.at[0], t.at[2]) > 170 && t.model).map(t => t.at);
+  assert.notDeepEqual(forest(changed.far), forest(p.far));
+  assert.equal(changed.trees[0]!.model, p.trees[0]!.model);
+});

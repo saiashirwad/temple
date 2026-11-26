@@ -1,3 +1,5 @@
+import { inPlantingDensity } from './planting.ts';
+import VEGETATION from './vegetation.json';
 // Grass, everywhere grass would grow in Kerala: over every verge and bank and under the palms,
 // thick and soft, the red earth showing only on paths, in the swept yards and the temple sand.
 // Patches of a metre and a half, each a few dozen curved blades, set out over the whole
@@ -107,9 +109,9 @@ export function meadowModels() {
 }
 
 /** Where grass grows, and how long it is let grow: 0 kept short, 1 long. */
-export function meadowPlaces(land: Uint8Array, walked: (x: number, z: number) => number) {
+export function meadowPlaces(land: Uint8Array, walked: (x: number, z: number) => number, options: { seed?: number; density?: number } = {}) {
   const out: { at: V3; yaw: number; scale: number; length: 'short' | 'mid' | 'tall' }[] = [];
-  const r = seeded(17);
+  const r = seeded(options.seed ?? 17);
   const m = LAND_N / (2 * LAND);
   const at = (x: number, z: number, ch: number) => {
     const i = Math.floor((x + LAND) * m);
@@ -152,7 +154,8 @@ export function meadowPlaces(land: Uint8Array, walked: (x: number, z: number) =>
       out.push({ at: [x, h - 0.01, z], yaw: r() * Math.PI * 2, scale: 0.85 + r() * 0.35, length });
     }
   }
-  return out;
+  const density = options.density ?? VEGETATION.density;
+  return density < 1 ? out.filter(p => inPlantingDensity(p.at, density)) : out;
 }
 
 /** The grass's own kind: tinted per vertex, bent from the root by rolling waves of wind. */

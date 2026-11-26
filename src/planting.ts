@@ -24,6 +24,7 @@ import { bambooClump, BROOKS, plantFree, treeFree } from './jungle.ts';
 import { BALIKKAL, BANYAN, CLOISTER, COMPOUND, GANAPATHI, GATE, GROUND, KOOTH, POND, ROAD, TOUR } from './world.ts';
 import { OUTER, SERPENT_GROVE, TULSI } from './grounds.ts';
 import { CLEARING, trailAt as trailAtLocal, trailNear } from './trail.ts';
+import VEGETATION from './vegetation.json';
 import { GROVES, groveAt, groveTrees, inPaddy, inYard, onLane, PADDY, PLOTS, plotPoint } from './town.ts';
 
 /** The kinds of tree that go on as cards in the distance, each with its own atlas. */
@@ -116,42 +117,71 @@ const tourDistance = (x: number, z: number) => {
 const inCompound = (x: number, z: number, m: number) => x > -COMPOUND.x - m && x < COMPOUND.x + m && z > COMPOUND.z0 - m && z < COMPOUND.z1 + m;
 const inShops = (x: number, z: number) => x > -20 && x < 12 && z > ROAD.z + ROAD.half && z < ROAD.z + ROAD.half + 11;
 
-export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = []) {
-  const r = rng(5);
-  const palms = make(6, (b, i) => coconutPalm(b, r, 9 + i * 1.3, 0), false);
-  const arecas = make(3, (b, i) => arecaPalm(b, r, 9 + i * 1.8));
-  const mangos = make(2, (b, i) => broadleaf(b, r, 1.05 + i * 0.3, 'mango'), false);
-  const jacks = make(2, (b, i) => broadleaf(b, r, 0.95 + i * 0.25, 'jack'));
-  const big = make(1, (b) => banyan(b, r))[0]!;
-  const rubbers = make(2, (b, i) => rubberTree(b, r, 1 + i * 0.15));
-  const tufts = make(4, (b, i) => grassTuft(b, r, 0.3 + i * 0.12));
-  const ferns = make(2, (b) => fern(b, r));
-  const chethi = make(2, (b, i) => floweringShrub(b, r, 0.9 + i * 0.4, PL.ixora, 26, 0.06));
-  const hibiscus = make(1, (b) => floweringShrub(b, r, 1.9, PL.hibiscus, 18, 0.07));
-  const jasmine = make(1, (b) => floweringShrub(b, r, 1.2, PL.jasmine, 40, 0.04));
-  const crotons = make(2, (b) => croton(b, r));
-  const bananas = make(3, (b, i) => banana(b, r, i === 0));
-  const tulsiPlant = make(1, (b) => tulsi(b, r))[0]!;
+/** Deterministic thinning used by production placement and its distribution workbench. */
+export function inPlantingDensity(at: readonly number[], density: number) {
+  const n = Math.sin(at[0]! * 12.9898 + at[2]! * 78.233) * 43758.5453;
+  return n - Math.floor(n) < Math.max(0, Math.min(1, density));
+}
+
+// Specimen geometry is independent of layout seed. Cache it across distribution rebuilds.
+const specimens: { model: Model; draws: number }[] = [];
+export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = [], options: { seed?: number; density?: number; distributionOnly?: boolean } = {}) {
+  const seed = options.seed ?? VEGETATION.seed;
+  const r = rng(seed);
+  const source = rng(5);
+  let draws = 0, specimenIndex = 0;
+  const specimenRandom = () => { draws++; return source(); };
+  const specimen = (n: number, fn: (b: Builder, i: number) => void, merged = true) => Array.from({ length: n }, (_, i) => {
+    const index = specimenIndex++;
+    let cached = specimens[index];
+    if (!cached) {
+      const before = draws;
+      const b = new Builder(merged);
+      fn(b, i);
+      cached = { model: b.model(), draws: draws - before };
+      specimens[index] = cached;
+    } else {
+      // Keep the specimen stream aligned if a later entry has not yet been built.
+      for (let j = 0; j < cached.draws; j++) specimenRandom();
+    }
+    // The original shared RNG had consumed these draws before placement began.
+    for (let j = 0; j < cached.draws; j++) r();
+    return cached.model;
+  });
+  const palms = specimen(6, (b, i) => coconutPalm(b, specimenRandom, 9 + i * 1.3, 0), false);
+  const arecas = specimen(3, (b, i) => arecaPalm(b, specimenRandom, 9 + i * 1.8));
+  const mangos = specimen(2, (b, i) => broadleaf(b, specimenRandom, 1.05 + i * 0.3, 'mango'), false);
+  const jacks = specimen(2, (b, i) => broadleaf(b, specimenRandom, 0.95 + i * 0.25, 'jack'));
+  const big = specimen(1, (b) => banyan(b, specimenRandom))[0]!;
+  const rubbers = specimen(2, (b, i) => rubberTree(b, specimenRandom, 1 + i * 0.15));
+  const tufts = specimen(4, (b, i) => grassTuft(b, specimenRandom, 0.3 + i * 0.12));
+  const ferns = specimen(2, (b) => fern(b, specimenRandom));
+  const chethi = specimen(2, (b, i) => floweringShrub(b, specimenRandom, 0.9 + i * 0.4, PL.ixora, 26, 0.06));
+  const hibiscus = specimen(1, (b) => floweringShrub(b, specimenRandom, 1.9, PL.hibiscus, 18, 0.07));
+  const jasmine = specimen(1, (b) => floweringShrub(b, specimenRandom, 1.2, PL.jasmine, 40, 0.04));
+  const crotons = specimen(2, (b) => croton(b, specimenRandom));
+  const bananas = specimen(3, (b, i) => banana(b, specimenRandom, i === 0));
+  const tulsiPlant = specimen(1, (b) => tulsi(b, specimenRandom))[0]!;
   const pick = <T,>(list: T[]) => list[Math.floor(r() * list.length)]!;
   // The other trees and shrubs, each from a seed of its own so adding one never reshapes the rest
   const sp = (seed: number) => rng(seed);
-  const teaks = make(2, (b, i) => teak(b, sp(31 + i), 0.95 + i * 0.2));
-  const laurels = make(2, (b, i) => laurel(b, sp(33 + i), 0.95 + i * 0.15));
-  const iruls = make(2, (b, i) => irul(b, sp(35 + i), 0.95 + i * 0.2));
-  const figs = make(1, (b) => fig(b, sp(37), 1));
-  const peepals = make(1, (b) => fig(b, sp(38), 1, true));
-  const silks = make(1, (b) => silkCotton(b, sp(39), 1));
-  const alstonias = make(1, (b) => alstonia(b, sp(40), 1));
-  const cashews = make(1, (b) => cashew(b, sp(41), 1));
-  const tamarinds = make(1, (b) => tamarind(b, sp(42), 1));
-  const gulmohars = make(1, (b) => gulmohar(b, sp(43), 1));
-  const drumsticks = make(1, (b) => drumstick(b, sp(44), 1));
-  const papayas = make(2, (b, i) => papaya(b, sp(45 + i), 0.9 + i * 0.2));
-  const screwpines = make(2, (b, i) => screwpine(b, sp(47 + i), 0.9 + i * 0.25));
-  const lantanas = make(2, (b, i) => lantana(b, sp(49 + i), 0.9 + i * 0.4));
-  const chromolaenas = make(1, (b) => chromolaena(b, sp(51), 1));
-  const gingers = make(2, (b, i) => ginger(b, sp(52 + i), 1, i === 1));
-  const rattans = make(1, (b) => rattan(b, sp(54), 1));
+  const teaks = specimen(2, (b, i) => teak(b, sp(31 + i), 0.95 + i * 0.2));
+  const laurels = specimen(2, (b, i) => laurel(b, sp(33 + i), 0.95 + i * 0.15));
+  const iruls = specimen(2, (b, i) => irul(b, sp(35 + i), 0.95 + i * 0.2));
+  const figs = specimen(1, (b) => fig(b, sp(37), 1));
+  const peepals = specimen(1, (b) => fig(b, sp(38), 1, true));
+  const silks = specimen(1, (b) => silkCotton(b, sp(39), 1));
+  const alstonias = specimen(1, (b) => alstonia(b, sp(40), 1));
+  const cashews = specimen(1, (b) => cashew(b, sp(41), 1));
+  const tamarinds = specimen(1, (b) => tamarind(b, sp(42), 1));
+  const gulmohars = specimen(1, (b) => gulmohar(b, sp(43), 1));
+  const drumsticks = specimen(1, (b) => drumstick(b, sp(44), 1));
+  const papayas = specimen(2, (b, i) => papaya(b, sp(45 + i), 0.9 + i * 0.2));
+  const screwpines = specimen(2, (b, i) => screwpine(b, sp(47 + i), 0.9 + i * 0.25));
+  const lantanas = specimen(2, (b, i) => lantana(b, sp(49 + i), 0.9 + i * 0.4));
+  const chromolaenas = specimen(1, (b) => chromolaena(b, sp(51), 1));
+  const gingers = specimen(2, (b, i) => ginger(b, sp(52 + i), 1, i === 1));
+  const rattans = specimen(1, (b) => rattan(b, sp(54), 1));
   /** Which species each model is, for counts and checks (tests/planting.test.ts). */
   const species = new Map<Model, string>();
   const named = (lists: Record<string, Model[]>) => {
@@ -429,7 +459,7 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = []) {
   // crowns meeting over the path further in; ferns and shrubs crowding its edges. A seed of its
   // own, so the town's planting stays as it was.
   {
-    const f = rng(77);
+    const f = rng(77 + seed - 5);
     const pickF = <T,>(list: T[]) => list[Math.floor(f() * list.length)]!;
     // Lower down, moist deciduous forest: teak, irul, silk cotton, an old rubber estate gone
     // wild, cashew at its edge; higher up, evergreen: maruthu, wild fig, ezhilampala, wild mango
@@ -454,7 +484,7 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = []) {
       return list[0]!;
     };
     const forestSpacing = new Spacing(8);
-    const bamboos = make(3, (b, i) => bambooClump(b, rng(61 + i), 1));
+    const bamboos = specimen(3, (b, i) => bambooClump(b, rng(61 + i), 1));
     named({ bamboo: bamboos });
     /** A fixed share of the tree spots by the lower path go to bamboo, without a draw from `f`. */
     const bambooHere = (x: number, z: number, along: number) => ((((Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1) + 1) % 1) < (along < 480 ? 0.22 : 0.07);
@@ -516,7 +546,7 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = []) {
   // ---- by the water: screwpine leaning out over the river and the brooks, wild plantain and
   // cane in the wet ground beside them. A seed of their own, so nothing else moves.
   {
-    const w = rng(91);
+    const w = rng(91 + seed - 5);
     const pickW = <T,>(list: T[]) => list[Math.floor(w() * list.length)]!;
     const wetEdge = (x: number, z: number) => {
       const k = w();
@@ -568,11 +598,13 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = []) {
   const farModels: Record<FarKind, Model> = {
     palm: palms[3]!,
     broad: mangos[1]!,
-    areca: make(1, (b) => arecaPalm(b, r, 11), false)[0]!,
-    rubber: make(1, (b) => rubberTree(b, r, 1.05), false)[0]!,
+    areca: options.distributionOnly ? arecas[0]! : make(1, (b) => arecaPalm(b, r, 11), false)[0]!,
+    rubber: options.distributionOnly ? rubbers[0]! : make(1, (b) => rubberTree(b, r, 1.05), false)[0]!,
   };
   // A shade of its own for every tree and plant, from a seed of its own
   const t = rng(13);
   for (const list of [trees, plants, far]) for (const p of list) p.tint = tintOf(t, list === plants ? 0.7 : 1);
+  const density = options.density ?? VEGETATION.density;
+  if (density < 1) return { trees: trees.filter(p => inPlantingDensity(p.at, density)), plants: plants.filter(p => inPlantingDensity(p.at, density)), far: far.filter(p => inPlantingDensity(p.at, density)), farModels, species, gate: GATE, walked: tourDistance };
   return { trees, plants, far, farModels, species, gate: GATE, walked: tourDistance };
 }
