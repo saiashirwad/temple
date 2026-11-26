@@ -1,6 +1,6 @@
 // Build the immutable town once. Keep merged vertex arrays and the gameplay data used on the main thread.
 import { mergeModels, P } from '../../render/geo.ts';
-import { buildPond } from '../../render/pond.ts';
+import { buildPond } from './pond.ts';
 import { footprints } from '../../sim/routes.ts';
 import { buildGrounds } from './grounds.ts';
 import { buildStreet } from './street.ts';
