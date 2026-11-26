@@ -66,13 +66,6 @@
         border: 1px solid rgba(232, 190, 120, 0.35); background: rgba(10, 12, 20, 0.55); color: #e8cf9c;
         font: 14px/1 Georgia, serif; letter-spacing: 0.03em; cursor: pointer; backdrop-filter: blur(6px);
       }
-      #code {
-        position: fixed; top: 10px; right: 10px; z-index: 5; padding: 6px 12px; border-radius: 999px;
-        border: 1px solid rgba(232, 190, 120, 0.25); background: rgba(10, 12, 20, 0.45); color: #e8cf9c;
-        font: 12px/1 Georgia, serif; letter-spacing: 0.03em; text-decoration: none; opacity: 0.6;
-        backdrop-filter: blur(6px); transition: opacity 0.3s;
-      }
-      #code:hover, #code:focus-visible { opacity: 1; }
       #mode:hover { background: rgba(30, 26, 24, 0.7); }
       /* Soft backing behind dense lines over the moving scene */
       #hint, #caption, #alert { background: radial-gradient(rgba(0, 0, 0, 0.45), transparent 70%); padding: 6px 18px; }
@@ -161,7 +154,6 @@
     <canvas></canvas>
     <div id="note">Lighting the lamps…</div>
     <pre id="state" hidden></pre>
-    <a id="code" href="/code.zip" target="_blank" rel="noopener" download title="Download the latest code as a zip">Code ↓</a>
     <div id="hud">
       <div id="g">
         <div class="r-tl">
