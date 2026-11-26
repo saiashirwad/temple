@@ -30,8 +30,8 @@ type V3 = [number, number, number];
 function bindPositions(skin: ReturnType<ReturnType<import('@gltf-transform/core').Document['getRoot']>['listSkins']>[number]) {
   const ibm = skin.getInverseBindMatrices()!;
 
-  return skin.listJoints().map((_, j) => {
-    const m = ibm.getElement(j, []) as number[];
+  return skin.listJoints().map((_, j): V3 => {
+    const m = ibm.getElement<number[]>(j, []);
     // m = [R|t]^-1 with R orthonormal times scale: position = -R^T t / s^2
     const r = [m[0]!, m[1]!, m[2]!, m[4]!, m[5]!, m[6]!, m[8]!, m[9]!, m[10]!];
     const t = [m[12]!, m[13]!, m[14]!];
@@ -41,7 +41,7 @@ function bindPositions(skin: ReturnType<ReturnType<import('@gltf-transform/core'
       -(r[0]! * t[0]! + r[1]! * t[1]! + r[2]! * t[2]!) / s2,
       -(r[3]! * t[0]! + r[4]! * t[1]! + r[5]! * t[2]!) / s2,
       -(r[6]! * t[0]! + r[7]! * t[1]! + r[8]! * t[2]!) / s2,
-    ] as V3;
+    ];
   });
 }
 
@@ -116,7 +116,7 @@ function tushes(prim: Primitive, isIvory: (u: number, v: number) => boolean) {
   }
 
   // Each side's sheath: the tusk's rearmost point
-  const root = { [-1]: [0, 0, 99], [1]: [0, 0, 99] } as Record<number, number[]>;
+  const root = { [-1]: [0, 0, 99], [1]: [0, 0, 99] };
 
   for (let i = 0; i < n; i++) {
     if (!grow[i]) continue;

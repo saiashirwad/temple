@@ -235,7 +235,7 @@ out.push(raw.at(-1)!);
 // Worn paths don't follow a grid: averaged over about 30 m, then wandering a little either side,
 // held fixed at both ends
 for (let pass = 0; pass < 2; pass++) {
-  const prev = out.map((p) => [p[0], p[1]] as [number, number]);
+  const prev = out.map(([x, z]): [number, number] => [x, z]);
   const R = 3;
 
   for (let i = 1; i < out.length - 1; i++) {

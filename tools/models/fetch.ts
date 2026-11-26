@@ -2,10 +2,10 @@
 // them into public/models: textures resized and re-encoded as WebP, meshes
 // simplified to a triangle budget, unused data dropped.
 //   npx tsx tools/models/fetch.ts [names]
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, readFileSync, writeFileSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join as joinPath } from 'node:path';
+import { z } from 'zod';
+import sharp from 'sharp';
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync, statSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, join, flatten } from '@gltf-transform/functions';
@@ -18,10 +18,6 @@ const CACHE = '/tmp/phm/';
 
 mkdirSync(OUT, { recursive: true });
 
-const temp = mkdtempSync(joinPath(tmpdir(), 'temple-model-'));
-
-process.on('exit', () => rmSync(temp, { recursive: true, force: true }));
-
 const get = async (url: string, file: string) => {
   if (existsSync(file)) return;
   mkdirSync(dirname(file), { recursive: true });
@@ -33,13 +29,12 @@ const get = async (url: string, file: string) => {
   renameSync(pending, file);
 };
 
-const resize = (bytes: Uint8Array, size: number, quality: number) => {
-  writeFileSync(joinPath(temp, 'source'), bytes);
-  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', joinPath(temp, 'source'), '-vf', `scale=${size}:${size}:flags=lanczos`, '-c:v', 'libwebp', '-quality', `${quality}`, '-f', 'webp', joinPath(temp, 'result.webp')]);
+const modelFile = z.object({
+  url: z.httpUrl(),
+  include: z.record(z.string(), z.object({ url: z.httpUrl() })),
+});
 
-  return new Uint8Array(readFileSync(joinPath(temp, 'result.webp')));
-};
-
+const downloadManifest = z.object({ gltf: z.object({ '1k': z.object({ gltf: modelFile }) }) });
 const only = process.argv.slice(2);
 
 await MeshoptSimplifier.ready;
@@ -50,11 +45,11 @@ for (const m of MODELS) {
   if (only.length && !only.includes(m.name)) continue;
   const t0 = Date.now();
 
-  const files = (await (await fetch(`https://api.polyhaven.com/files/${m.id}`)).json()) as {
-    gltf: Record<string, { gltf: { url: string; include: Record<string, { url: string }> } }>;
-  };
+  const response = await fetch(`https://api.polyhaven.com/files/${m.id}`);
 
-  const g = files.gltf['1k']!.gltf;
+  if (!response.ok) throw new Error(`${m.id}: Poly Haven returned ${response.status}`);
+  const files = downloadManifest.parse(await response.json());
+  const g = files.gltf['1k'].gltf;
   const dir = `${CACHE}${m.id}/`;
   const main = `${dir}${m.id}.gltf`;
   await get(g.url, main);
@@ -83,7 +78,13 @@ for (const m of MODELS) {
 
   for (const t of doc.getRoot().listTextures()) {
     const isColour = doc.getRoot().listMaterials().some((mat) => mat.getBaseColorTexture() === t);
-    t.setImage(resize(t.getImage()!, m.size, isColour ? 82 : 88)).setMimeType('image/webp').setURI('');
+
+    const image = await sharp(t.getImage()!)
+      .resize(m.size, m.size, { fit: 'fill', kernel: 'lanczos3' })
+      .webp({ quality: isColour ? 82 : 88 })
+      .toBuffer();
+
+    t.setImage(image).setMimeType('image/webp').setURI('');
   }
 
   await doc.transform(prune());

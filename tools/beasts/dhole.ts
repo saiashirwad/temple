@@ -46,7 +46,12 @@ const index = new Map(BONES.map((b, i) => [b[0], i]));
 const at = (name: string) => BONES[index.get(name)!]![2];
 
 // ---- colours, linear
-const lin = (hex: number): V3 => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255].map((c) => c ** 2.2) as V3;
+const lin = (hex: number): V3 => {
+  const channel = (shift: number) => (((hex >> shift) & 255) / 255) ** 2.2;
+
+  return [channel(16), channel(8), channel(0)];
+};
+
 const RUST = lin(0x7a3a1c);
 const RUST_DARK = lin(0x4e2412);
 const CREAM = lin(0xa89272);
@@ -108,8 +113,9 @@ function refine(list: Section[], k: number): Section[] {
 
       for (const [n, v] of b.bones) w.set(n, (w.get(n) ?? 0) + v * t);
       const bones = [...w].sort((x, y) => y[1] - x[1]).slice(0, 4);
+      const axis = (d: number) => cr(a0[d]!, a.c[d]!, b.c[d]!, b1[d]!, t);
       out.push({
-        c: [0, 1, 2].map((d) => cr(a0[d]!, a.c[d]!, b.c[d]!, b1[d]!, t)) as V3,
+        c: [axis(0), axis(1), axis(2)],
         w: a.w + (b.w - a.w) * t,
         h: a.h + (b.h - a.h) * t,
         lift: (a.lift ?? 0) + ((b.lift ?? 0) - (a.lift ?? 0)) * t,
@@ -122,6 +128,18 @@ function refine(list: Section[], k: number): Section[] {
   out.push(list.at(-1)!);
 
   return out;
+}
+
+function skinVertex(bones: Section['bones']) {
+  const slots = bones.slice(0, 4);
+
+  while (slots.length < 4) slots.push(['root', 0]);
+  const total = slots.reduce((n, pair) => n + pair[1], 0) || 1;
+
+  for (const [name, weight] of slots) {
+    jnt.push(index.get(name)!);
+    wgt.push(weight / total);
+  }
 }
 
 /** A tube through sections; `around` vertices a ring; capped at both ends. */
@@ -156,10 +174,7 @@ function tube(raw: Section[], around = 14, cap = true, k = 3) {
       const c = s.color(a);
       const v = 0.88 + rnd() * 0.24;
       col.push(c[0] * v, c[1] * v, c[2] * v, 1);
-      const b = [...s.bones, ['root', 0], ['root', 0], ['root', 0]].slice(0, 4) as [string, number][];
-      const total = b.reduce((n, x) => n + x[1], 0) || 1;
-      jnt.push(...b.map((x) => index.get(x[0])!));
-      wgt.push(...b.map((x) => x[1] / total));
+      skinVertex(s.bones);
     }
   }
 
@@ -178,13 +193,10 @@ function tube(raw: Section[], around = 14, cap = true, k = 3) {
       const centre = pos.length / 3;
       pos.push(...s.c);
       const dir = norm(sub(sections[i === 0 ? 0 : i]!.c, sections[i === 0 ? 1 : i - 1]!.c));
-      nor.push(...(i === 0 ? ([-dir[0], -dir[1], -dir[2]] as V3) : norm(sub(s.c, sections[i - 1]!.c))));
+      nor.push(...(i === 0 ? [-dir[0], -dir[1], -dir[2]] : norm(sub(s.c, sections[i - 1]!.c))));
       const c = s.color(0);
       col.push(...c, 1);
-      const b = [...s.bones, ['root', 0], ['root', 0], ['root', 0]].slice(0, 4) as [string, number][];
-      const total = b.reduce((n, x) => n + x[1], 0) || 1;
-      jnt.push(...b.map((x) => index.get(x[0])!));
-      wgt.push(...b.map((x) => x[1] / total));
+      skinVertex(s.bones);
 
       for (let k = 0; k < around; k++) {
         const a = base + i * around + k;
@@ -246,7 +258,7 @@ const HEAD: [z: number, y: number, w: number, h: number, bone: [string, number][
 ];
 
 tube(
-  HEAD.map(([z, y, w, h, bones, cream]) => ({ c: [0, y, z] as V3, w, h, bones, color: coat(z > 0.5 ? mix3(RUST, RUST_DARK, 0.45) : RUST, CREAM, cream) })),
+  HEAD.map(([z, y, w, h, bones, cream]): Section => ({ c: [0, y, z], w, h, bones, color: coat(z > 0.5 ? mix3(RUST, RUST_DARK, 0.45) : RUST, CREAM, cream) })),
   16,
 );
 
@@ -471,7 +483,7 @@ const acc = (type: 'SCALAR' | 'VEC3' | 'VEC4' | 'MAT4', array: Float32Array | Ui
 
 const nodes: GNode[] = BONES.map(([name, parent, p]) => {
   const n = doc.createNode(name);
-  const pp = parent ? at(parent) : ([0, 0, 0] as V3);
+  const pp: V3 = parent ? at(parent) : [0, 0, 0];
   n.setTranslation(sub(p, pp));
 
   return n;

@@ -157,7 +157,7 @@ const CALL: Find = { under: 22, join: 0.35, min: 0.25, max: 3.5, pre: 0.08, tail
 const STEP: Find = { under: 20, join: 0.06, min: 0.04, max: 0.35, pre: 0.012, tail: 0.12, count: 8 };
 
 /** One-shot calls, by the name the game plays them by. */
-const CALLS: Record<string, Item[]> = {
+const CALLS = {
   // An Asian-elephant zoo recording (the trumpet), and African rumbles and roars, which carry the
   // same infrasonic purr and the same blare; no wild Asian recording has an open licence
   trumpet: [{ file: 'wild/ele/fs819668_zoo.ogg', filter: `${HP(60)},${NR(-38)}`, find: { ...CALL, under: 14, max: 4.5, tail: 0.9, count: 2 }, rms: -16 }],
@@ -191,10 +191,10 @@ const CALLS: Record<string, Item[]> = {
   // Things in the dark close by
   rustle: [{ file: 'foley/rustle_kyles_brush.ogg', filter: HP(150), find: { ...CALL, under: 20, min: 0.3, max: 1.8, join: 0.2, tail: 0.2, count: 6 }, rms: -20 }],
   creak: [{ file: 'foley/creak_patrick_wood.ogg', filter: HP(80), find: { ...CALL, under: 18, min: 0.15, max: 1.6, join: 0.15, tail: 0.2, count: 5 }, rms: -20 }],
-};
+} satisfies Record<string, Item[]>;
 
 /** Footsteps per surface. Sandals where a sandal recording exists. */
-const STEPS: Record<string, Item> = {
+const STEPS = {
   dirt: { file: 'foley/step_dirt_kyles_sandals.ogg', filter: HP(70), find: STEP, rms: -20 },
   leaves: { file: 'foley/step_leaves_joelmcdaniel.ogg', filter: HP(90), find: { ...STEP, max: 0.45 }, rms: -20 },
   gravel: { file: 'foley/step_gravel_alexmol.ogg', filter: HP(90), find: STEP, rms: -20 },
@@ -202,10 +202,10 @@ const STEPS: Record<string, Item> = {
   wood: { file: 'foley/step_wood_bridge_audioninja.ogg', filter: HP(60), find: { ...STEP, tail: 0.18 }, rms: -19 },
   stone: { file: 'foley/step_stone_sandals_ftpalad.ogg', filter: `${HP(90)},${NR(-60)}`, find: STEP, rms: -21 },
   wet: { file: 'foley/step_wet_aglinder.ogg', filter: `${HP(80)},${NR(-56)}`, find: { ...STEP, max: 0.45 }, rms: -21 },
-};
+} satisfies Record<string, Item>;
 
 /** Looping beds: a stretch of each, its end crossfaded into its start so it loops unseen. */
-const BEDS: Record<string, { file: string; from: number; length: number; filter: string; lufs: number }> = {
+const BEDS = {
   // Insects of an Indian (Goa) night: crickets and katydids, steady, no birds
   forest: { file: 'wild/insects/fs803556_goa_alley.ogg', from: 20, length: 70, filter: HP(200), lufs: -24 },
   river: { file: 'foley/river_hargis_burbling.ogg', from: 10, length: 60, filter: HP(50), lufs: -24 },

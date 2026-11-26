@@ -68,7 +68,7 @@ async function shrinkClip(doc: Document) {
 }
 
 /** What src/render/actors/people.ts and the kit rely on; must match between backup and output. */
-function shape(doc: Document) {
+function modelSignature(doc: Document) {
   const r = doc.getRoot();
 
   return JSON.stringify({
@@ -130,7 +130,7 @@ for (const { rel, clip } of files) {
 
   if (a.join() !== b.join()) throw new Error(`${rel}: nodes/skins/animations/meshes ${a} became ${b}`);
 
-  if (shape(ref) !== shape(back)) throw new Error(`${rel}: structure changed`);
+  if (modelSignature(ref) !== modelSignature(back)) throw new Error(`${rel}: structure changed`);
 
   writeFileSync(src, bytes);
   const was = statSync(orig).size;

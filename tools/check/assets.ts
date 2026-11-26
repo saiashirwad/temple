@@ -1,6 +1,7 @@
 // Every file the game loads exists, and nothing ships that the game never loads. No GPU needed.
 //   npx tsx tools/check/assets.ts        (exit 1 on a missing or unused file)
 // Uses production asset catalogs and the prop names emitted by the world builders.
+import { z } from 'zod';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { AVATARS, CLIP_NAMES, SOUND_FILES, BEAST_FILES } from '../../src/content/assets.ts';
@@ -12,6 +13,8 @@ import { TEX_LAYERS } from '../../src/generated/textures.gen.ts';
 const ROOT = new URL('../../', import.meta.url).pathname;
 const PUB = join(ROOT, 'public');
 const want = new Set<string>();
+const resources = z.array(z.object({ uri: z.string().optional() })).optional();
+const modelFiles = z.object({ buffers: resources, images: resources });
 
 for (const build of [buildStreet, buildGrounds, buildVillage]) {
   for (const prop of build().props) {
@@ -25,7 +28,7 @@ for (const build of [buildStreet, buildGrounds, buildVillage]) {
     }
 
     want.add(gltf);
-    const model = JSON.parse(readFileSync(join(PUB, gltf), 'utf8')) as { buffers?: { uri?: string }[]; images?: { uri?: string }[] };
+    const model = modelFiles.parse(JSON.parse(readFileSync(join(PUB, gltf), 'utf8')));
 
     for (const resource of [...model.buffers ?? [], ...model.images ?? []]) {
       if (resource.uri && !resource.uri.startsWith('data:')) want.add(join(dirname(gltf), resource.uri));

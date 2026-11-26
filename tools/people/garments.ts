@@ -709,7 +709,7 @@ export type Label = 0 | 1 | 2 | 3 | 4 | 5;
 export const L = { none: 0, leg: 1, foot: 2, torso: 3, arm: 4, scalp: 5 } as const;
 
 /** Paints each texel with the part of the body its triangle covers. */
-export function labelMap(size: number, pos: Float32Array, uv: Float32Array, idx: Uint32Array | Uint16Array, label: (centroid: V3) => number) {
+export function labelMap(size: number, pos: Float32Array, uv: Float32Array, idx: Uint8Array | Uint16Array | Uint32Array, label: (centroid: V3) => number) {
   const map = new Uint8Array(size * size);
 
   for (let t = 0; t < idx.length; t += 3) {

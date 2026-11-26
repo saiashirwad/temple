@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { z } from 'zod';
 import { NodeIO } from '@gltf-transform/core';
 import { prune, dedup } from '@gltf-transform/functions';
 import { ATLAS, attach, blackenHair, buildCarry, buildGarments, L, labelMap, paintAtlas, repaintBody, type Outfit } from './garments.ts';
@@ -59,7 +60,8 @@ mkdirSync(CACHE, { recursive: true });
 
 mkdirSync(`${OUT}/clips`, { recursive: true });
 
-const tree = JSON.parse(readFileSync('/tmp/rb.json', 'utf8')).tree as { path: string }[];
+const repoTree = z.object({ tree: z.array(z.object({ path: z.string() })) });
+const { tree } = repoTree.parse(JSON.parse(readFileSync('/tmp/rb.json', 'utf8')));
 const find = (test: (p: string) => boolean) => tree.find((t) => test(t.path))?.path;
 
 const fetchTo = (path: string, file: string) => {
@@ -137,7 +139,33 @@ for (const a of AVATARS) {
   const bodyP = primOf('_body')!;
   const headP = primOf('_head')!;
   const hairP = primOf('_opacity');
-  const arr = (p: typeof bodyP, k: string) => p.getAttribute(k)!.getArray() as Float32Array;
+
+  const attributeValues = (primitive: typeof bodyP, semantic: 'POSITION' | 'TEXCOORD_0') => {
+    const attribute = primitive.getAttribute(semantic);
+    const values = attribute?.getArray();
+
+    if (!attribute || !values) throw new Error(`${a.name}: missing ${semantic}`);
+
+    if (values instanceof Float32Array) return values;
+    // Integer UV accessors can encode normalized coordinates. getElement decodes those values.
+    const result = new Float32Array(values.length);
+    const vector: number[] = [];
+
+    for (let i = 0; i < attribute.getCount(); i++)
+      result.set(attribute.getElement(i, vector), i * attribute.getElementSize());
+
+    return result;
+  };
+
+  const indices = (primitive: typeof bodyP) => {
+    const values = primitive.getIndices()?.getArray();
+
+    if (!(values instanceof Uint8Array || values instanceof Uint16Array || values instanceof Uint32Array))
+      throw new Error(`${a.name}: expected unsigned triangle indices`);
+
+    return values;
+  };
+
   const skin = root.listSkins()[0]!;
   const joints = skin.listJoints();
 
@@ -158,7 +186,7 @@ for (const a of AVATARS) {
     return o;
   };
 
-  const headPts = hairP ? cat(arr(headP, 'POSITION'), arr(hairP, 'POSITION')) : arr(headP, 'POSITION');
+  const headPts = hairP ? cat(attributeValues(headP, 'POSITION'), attributeValues(hairP, 'POSITION')) : attributeValues(headP, 'POSITION');
   const female = a.base.startsWith('Female');
   const o = a.outfit;
   const pelvis = joint('Bip01 Pelvis');
@@ -186,7 +214,7 @@ for (const a of AVATARS) {
     return z > pelvis[2] + 0.08 && z < pelvis[2] + 0.17;
   };
 
-  const labels = labelMap(SIZE, arr(bodyP, 'POSITION'), arr(bodyP, 'TEXCOORD_0'), bodyP.getIndices()!.getArray() as Uint32Array, ([x, y, z]) =>
+  const labels = labelMap(SIZE, attributeValues(bodyP, 'POSITION'), attributeValues(bodyP, 'TEXCOORD_0'), indices(bodyP), ([x, y, z]) =>
     z < 0.13 ? L.foot : z < pelvis[2] + (o.skirt.kind === 'nightie' ? 0.15 : 0.06) ? L.leg : Math.abs(x) > sleeve || blouseBare(x, y, z) ? L.arm : L.torso,
   );
 
@@ -198,7 +226,7 @@ for (const a of AVATARS) {
   const headPx = raw(`${dir}/head_color.tga`, HS, false);
   const headMask = recolour(headPx, a.skin);
 
-  const scalp = labelMap(HS, arr(headP, 'POSITION'), arr(headP, 'TEXCOORD_0'), headP.getIndices()!.getArray() as Uint32Array, ([, y, z]) =>
+  const scalp = labelMap(HS, attributeValues(headP, 'POSITION'), attributeValues(headP, 'TEXCOORD_0'), indices(headP), ([, y, z]) =>
     z > headJ[2] + 0.1 || (y > headJ[1] + 0.03 && z > headJ[2] - 0.03) ? L.scalp : L.none,
   );
 
@@ -218,12 +246,12 @@ for (const a of AVATARS) {
   }
 
   // The clothes themselves
-  const g = buildGarments({ points: cat(arr(bodyP, 'POSITION'), headPts), torso: arr(bodyP, 'POSITION'), head: headPts, joint, jointIndex }, o, female);
+  const g = buildGarments({ points: cat(attributeValues(bodyP, 'POSITION'), headPts), torso: attributeValues(bodyP, 'POSITION'), head: headPts, joint, jointIndex }, o, female);
   const cloth = image(encode(paintAtlas(o), ATLAS, false, `${dir}/cloth-${a.name}.jpg`), 'image/jpeg', 'cloth');
   const clothMat = doc.createMaterial('garment').setBaseColorTexture(cloth).setMetallicFactor(0).setRoughnessFactor(0.9).setDoubleSided(true);
   mesh.addPrimitive(attach(doc, bodyP, g, clothMat));
 
-  for (const part of buildCarry({ points: cat(arr(bodyP, 'POSITION'), headPts), torso: arr(bodyP, 'POSITION'), head: headPts, joint, jointIndex }, o)) {
+  for (const part of buildCarry({ points: cat(attributeValues(bodyP, 'POSITION'), headPts), torso: attributeValues(bodyP, 'POSITION'), head: headPts, joint, jointIndex }, o)) {
     const c = part.color;
     const lin = (v: number) => Math.pow(v / 255, 2.2);
     const mat = doc.createMaterial('carried').setBaseColorFactor([lin((c >> 16) & 255), lin((c >> 8) & 255), lin(c & 255), 1]).setMetallicFactor(part.metal).setRoughnessFactor(part.rough);
