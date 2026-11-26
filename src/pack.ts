@@ -1,6 +1,7 @@
 // The dholes, drawn from one skinned body (tools/beasts/dhole.ts) playing their gaits and moods:
 // standing and listening, trotting, galloping, stalking low while they search for you, and
 // crouched with lips back when they have you and you face them down.
+import { BEAST_FILES } from './content/assets.ts';
 import { gltf, instances, meshPool, poses, shading, type Frame } from '@typegpu/kit';
 import type { TgpuRoot } from 'typegpu';
 import * as d from 'typegpu/data';
@@ -22,7 +23,7 @@ export interface Dog {
 const TROT_PACE = 2.2;
 const GALLOP_PACE = 7;
 
-export const loadPack = (base = import.meta.env.BASE_URL) => gltf.load(`${base}beasts/dhole.glb`);
+export const loadPack = (base = import.meta.env.BASE_URL) => gltf.load(`${base}${BEAST_FILES.pack}`);
 
 export function createPack(root: TgpuRoot, model: ModelData, count: number) {
   const pool = meshPool.create(root, { ...meshPool.roomFor([model]), extra: { color: d.vec4f } });
@@ -88,5 +89,10 @@ export function createPack(root: TgpuRoot, model: ModelData, count: number) {
     animate: (pass: Parameters<poses.Poses<string>['animate']>[0], time: number) => figures.animate(pass, time),
     initAsync: () => figures.initAsync(),
     ready: body.ready,
+    destroy() {
+      figures.destroy();
+      set.destroy();
+      pool.destroy();
+    },
   };
 }

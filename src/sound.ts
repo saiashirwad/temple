@@ -12,7 +12,7 @@ import { surfaceAt } from './surface.ts';
 import { onRoad } from './terrain.ts';
 
 type V3 = [number, number, number];
-const FILES = ['bed', 'forest', 'river', 'town', 'fire', 'calls', 'steps'] as const;
+import { SOUND_FILES as FILES } from './content/assets.ts';
 type Sheet = keyof typeof SPRITES;
 export type Call = keyof typeof SPRITES.calls;
 /** The whole mix, kept low: a quiet night. */

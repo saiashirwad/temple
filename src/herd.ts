@@ -1,6 +1,7 @@
 // The herd, drawn from a real rigged elephant (AnimalAnimator's bull, CC BY 4.0, made Asian and
 // tuskless for a cow herd by tools/beasts/elephant.ts) playing its own animations: grazing and
 // standing when at ease, walking and running by speed, the threat display when she charges.
+import { BEAST_FILES } from './content/assets.ts';
 import { gltf, instances, meshPool, poses, shading, type Frame } from '@typegpu/kit';
 import type { TgpuRoot } from 'typegpu';
 import * as d from 'typegpu/data';
@@ -27,7 +28,7 @@ const SCALE = 0.78;
 const WALK_PACE = 1.3;
 const RUN_PACE = 4.2;
 
-export const loadHerd = (base = import.meta.env.BASE_URL) => gltf.load(`${base}beasts/cow.glb`);
+export const loadHerd = (base = import.meta.env.BASE_URL) => gltf.load(`${base}${BEAST_FILES.herd}`);
 
 // Night dust: wild elephants here wear the red laterite they throw over their backs
 const Elephant = instances.define('Elephant', {

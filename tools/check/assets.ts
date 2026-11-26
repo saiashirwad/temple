@@ -1,31 +1,29 @@
 // Every file the game loads exists, and nothing ships that the game never loads. No GPU needed.
 //   npx tsx tools/check/assets.ts        (exit 1 on a missing or unused file)
-// It reads the names straight out of src/ with patterns, so it doesn't run any browser code.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// Uses production asset catalogs and the prop names emitted by the world builders.
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { AVATARS, CLIP_NAMES, SOUND_FILES, BEAST_FILES } from '../../src/content/assets.ts';
+import { buildStreet } from '../../src/street.ts';
+import { buildGrounds } from '../../src/grounds.ts';
+import { buildVillage } from '../../src/village.ts';
 import { TEX_LAYERS } from '../../src/textures.gen.ts';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const PUB = join(ROOT, 'public');
-const src = (f: string) => readFileSync(join(ROOT, 'src', f), 'utf8');
-const all = readdirSync(join(ROOT, 'src')).filter((f) => f.endsWith('.ts')).map(src).join('\n');
-
 const want = new Set<string>();
-// Props: b.prop('name', ...) anywhere in src
-for (const m of all.matchAll(/prop\('([a-z0-9_]+)'/g)) want.add(`models/${m[1]}.glb`);
+for (const build of [buildStreet, buildGrounds, buildVillage]) {
+  for (const prop of build().props) want.add(`models/${prop.name}.glb`);
+}
 // Textures: every layer at both colour sizes, and its 512 data map
 for (const name of [...TEX_LAYERS.map((l) => l.name), 'posters', 'signs'])
   for (const f of [`${name}_512_c.webp`, `${name}_1024_c.webp`, `${name}_512_d.jpg`]) want.add(`tex/${f}`);
 want.add('tex/trail.png');
 // People: avatar files and the clip names for both bodies
-const people = src('people.ts');
-for (const m of people.matchAll(/file: '([a-z0-9_]+)'/g)) want.add(`people/${m[1]}.glb`);
-const clips = /CLIP_NAMES = \[([^\]]+)\]/.exec(people)![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
-for (const s of ['m', 'f']) for (const c of clips) want.add(`people/clips/${s}_${c}.glb`);
-for (const m of (src('herd.ts') + src('pack.ts')).matchAll(/beasts\/([a-z0-9_]+\.glb)/g)) want.add(`beasts/${m[1]}`);
-// Sound files
-const files = /const FILES = \[([^\]]*)\]/.exec(src('sound.ts'))![1]!.match(/'([^']+)'/g) ?? [];
-for (const f of files) want.add(`sound/${f.slice(1, -1)}.mp3`);
+for (const { file } of Object.values(AVATARS)) want.add(`people/${file}.glb`);
+for (const sex of ['m', 'f']) for (const clip of CLIP_NAMES) want.add(`people/clips/${sex}_${clip}.glb`);
+for (const path of Object.values(BEAST_FILES)) want.add(path);
+for (const name of SOUND_FILES) want.add(`sound/${name}.mp3`);
 
 const have: string[] = [];
 const walk = (dir: string) => {
