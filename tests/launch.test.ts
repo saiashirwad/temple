@@ -1,6 +1,7 @@
+import { SPOTS } from '../src/content/viewpoints.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveLaunch, SPOTS } from '../src/game/launch.ts';
+import { resolveLaunch } from '../src/game/launch.ts';
 
 import { verifyFirstFrame } from '../tools/scenario/first-frame.ts';
 
@@ -40,4 +41,10 @@ test('the frame verifier rejects a camera still easing toward the correct bridge
   verifyFirstFrame(params, frame);
   assert.throws(() => verifyFirstFrame(params, { ...frame, at: [x + 1, z] }));
   assert.throws(() => verifyFirstFrame(params, { ...frame, pitch: 0 }));
+});
+
+test('named encounters use the same entry camera and resources as their keyboard shortcuts', () => {
+  assert.deepEqual(open('encounter=herd-charge'), open('preset=h'));
+  assert.throws(() => open('encounter=missing'), /Unknown encounter/);
+  assert.throws(() => open('encounter=herd-charge&preset=2'), /Choose one/);
 });

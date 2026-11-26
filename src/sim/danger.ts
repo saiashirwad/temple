@@ -146,7 +146,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
   let charge: { from: [number, number]; mock: boolean; t: number } | null = null;
   let thudIn = 0;
 
-  const hurt = (amount: number, from: [number, number], p: Player, push: number) => {
+  const hurt = (amount: number, from: [number, number], p: Pick<Player, 'x' | 'z'>, push: number) => {
     health = Math.max(0, health - amount);
     hurtAt = clock;
     const [ux, uz] = toward(from[0], from[1], p.x, p.z);
@@ -540,7 +540,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
       startled = level;
     },
     /** Hurts you as a bite would, from just ahead. */
-    hurt(amount: number, p: Player) {
+    hurt(amount: number, p: Pick<Player, 'x' | 'z' | 'fx' | 'fz'>) {
       hurt(amount, [p.x + p.fx, p.z + p.fz], p, 0);
     },
     get debug() {

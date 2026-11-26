@@ -25,6 +25,7 @@ Install Chromium once with `npx playwright install chromium`. Run `npm run scena
 | --- | --- |
 | Discover the available checkpoints | `npm run scenario -- story.bungalow-ending --game --list-shots` |
 | Photograph the bridge from the game camera | `npm run scenario -- world.walk --game --shot bridge --seed 42 --out /tmp/bridge` |
+| Capture the elephant herd as the charge begins | `npm run scenario -- world.walk --game --param encounter=herd-charge --shot encounter --seed 42` |
 | Compare several viewpoints in one loaded world | `npm run scenario -- world.walk --game --spread --shot bridge --shot herd-glade --shot town --seed 42 --out /tmp/walk` |
 | Record the action starting when the note opens | `npm run scenario -- story.bungalow-ending --game --shot reading-note --clip 3 --seed 42 --out /tmp/note` |
 | Capture only the lanes channel of the soil inspector | `npm run scenario -- terrain.soil --param channel=lanes --param laneShoulder=2.4 --target canvas --out /tmp/soil` |
@@ -44,6 +45,8 @@ For load measurements, run `npm run build` and add `--built` to the scenario com
 ## Add a scenario
 
 Add `src/workbench/scenarios/<id>.ts` exporting a `title` and a `mount(root, params)` function. Both the URL router and CLI discover the filename automatically. Import the production builder or transition under test. Read scenario options from `URLSearchParams` so another developer or agent can reopen the same case. For a replay, follow the verdict and trace conventions in `src/workbench/scenarios/story.bungalow-ending.ts`.
+
+To add a full-game encounter, define its ID, camera spot, resource requirements, setup and verdict together in `src/game/presets.ts`. The workbench lists it automatically. Named camera positions live in `src/content/viewpoints.ts`.
 
 Inventory, equipment and the departure quest each own a transition function. One command advances a tick. For example, acquiring the torch emits an inventory fact, equipping it emits an equipment fact, and the quest observes both equipment and note state to decide whether departure is possible. Their fixed delivery order gives the rehearsal a readable trace. Keep these low-frequency narrative decisions separate from the loops that place and render thousands of plants. XState actors become an option if story branches need independent lifetimes or asynchronous mailboxes. [XState actors](https://stately.ai/docs/xstate/v5/actors)
 

@@ -1,4 +1,5 @@
-import { resolveLaunch, SPOTS } from '../../src/game/launch.ts';
+import { SPOTS } from '../../src/content/viewpoints.ts';
+import { resolveLaunch } from '../../src/game/launch.ts';
 
 export interface FirstFrame {
   ms: number;

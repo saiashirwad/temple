@@ -1,5 +1,5 @@
 import type { createScene } from './scene.ts';
-import { SPOTS, type Spot } from './launch.ts';
+import { SPOTS, type Spot } from '../content/viewpoints.ts';
 
 export type Scene = Awaited<ReturnType<typeof createScene>>;
 type State = ReturnType<Scene['inspect']>;
@@ -36,9 +36,10 @@ const standAt = async (s: Scene, spot: Spot) => {
 };
 const pass = (ok: boolean, why: string) => (ok ? 'PASS' : `FAIL: ${why}`);
 
-export const RUNS: Record<string, Run> = {
+export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: boolean; wildlife?: boolean }> = {
   // The pack in view, held still, without physics: one standing, one stalking, one trotting, one at a gallop
   D: {
+    id: 'dholes-up-close', spot: '2', wildlife: true,
     name: 'dholes up close',
     async start(s) {
       await wildlifeReady(s);
@@ -52,6 +53,7 @@ export const RUNS: Record<string, Run> = {
     },
   },
   w: {
+    id: 'dhole-pack', spot: '2', physics: true, wildlife: true,
     name: 'red dogs',
     async start(s) {
       await wildlifeReady(s);
@@ -62,6 +64,7 @@ export const RUNS: Record<string, Run> = {
     judge: (st, t) => (['coming', 'searching', 'attack'].includes(st.danger.pack) ? 'PASS' : t > 6 ? 'FAIL: no pack' : null),
   },
   W: {
+    id: 'stand-your-ground', spot: '2', physics: true, wildlife: true,
     name: 'stand your ground',
     async start(s) {
       await wildlifeReady(s);
@@ -73,6 +76,7 @@ export const RUNS: Record<string, Run> = {
     judge: (st, t) => (st.danger.pack === 'leaving' || st.danger.pack === 'away' && t > 4 ? 'PASS' : t > 14 ? `FAIL: still ${st.danger.pack}, nerve ${st.danger.nerve}` : null),
   },
   h: {
+    id: 'herd-charge', spot: '6', physics: true, wildlife: true,
     name: 'herd charge',
     async start(s) {
       await wildlifeReady(s);
@@ -82,6 +86,7 @@ export const RUNS: Record<string, Run> = {
     judge: (st, t) => (st.danger.charge ? 'PASS' : t > 5 ? 'FAIL: no charge' : null),
   },
   f: {
+    id: 'bungalow-finale', spot: '8', physics: true,
     name: 'the ending at 16x',
     async start(s) {
       await standAt(s, SPOTS['8']!.at);
@@ -101,24 +106,27 @@ export const RUNS: Record<string, Run> = {
     judge: (st, t) => (st.ended && st.guardGone ? 'PASS' : t > 12 ? pass(false, `finale line ${st.story.finale}, guard gone ${st.guardGone}`) : null),
   },
   n: {
+    id: 'bungalow-note', spot: '8', physics: true,
     name: 'the note',
     async start(s) {
       await standAt(s, SPOTS['8']!.at);
     },
-    judge: (st, t) => (st.near === 'Read the note' ? 'PASS' : t > 4 ? `FAIL: near ${st.near}` : null),
+    judge: (st, t) => (st.interactionId === 'bungalow.note' ? 'PASS' : t > 4 ? `FAIL: near ${st.near}` : null),
   },
   d: {
+    id: 'knockdown', physics: true,
     name: 'going down',
     async start(s) {
       await solid(s);
       if (s.walker.mode !== 'walk') s.walker.touched();
       const [x, z] = s.walker.at;
       const yaw = s.view.pose.yaw;
-      s.journey.danger.hurt(2, { x, z, fx: -Math.sin(yaw), fz: -Math.cos(yaw) } as never);
+      s.journey.danger.hurt(2, { x, z, fx: -Math.sin(yaw), fz: -Math.cos(yaw) });
     },
     judge: (st, t) => (st.downs > 0 && st.danger.health > 0.5 ? 'PASS' : t > 3 ? 'FAIL: not down' : null),
   },
   g: {
+    id: 'walk-forward', physics: true,
     name: 'walk forward 3 s',
     async start(s) {
       await solid(s);

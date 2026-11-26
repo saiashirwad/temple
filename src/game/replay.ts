@@ -1,5 +1,6 @@
+import { SPOTS } from '../content/viewpoints.ts';
 import { checkpoint, wantsCheckpoint } from '../scenario/checkpoint.ts';
-import { SPOTS, type Launch } from './launch.ts';
+import type { Launch } from './launch.ts';
 import { RUNS, solid, wildlifeReady, type Scene } from './presets.ts';
 
 /** Drive browser replays through the production simulation and input handlers. */

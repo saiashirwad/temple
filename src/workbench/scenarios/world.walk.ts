@@ -1,3 +1,6 @@
+import { SPOTS } from '../../content/viewpoints.ts';
+import { RUNS } from '../../game/presets.ts';
+
 export const title = 'Explore the world';
 
 /** Links open the actual game, with the existing scenario chords selected at startup. */
@@ -51,12 +54,9 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   }
   const list = document.createElement('ul');
   const entries: [string, string][] = [
-    ['1', 'Town view'], ['2', 'Path before the bridge'], ['3', 'Bridge'],
-    ['4', 'Dung by the path'], ['5', 'Machan stair'], ['6', 'Herd glade'],
-    ['7', 'Herd glade, close'], ['8', 'Veranda and note'], ['9', 'Chair'],
-    ['w', 'Red dogs'], ['W', 'Stand your ground'], ['D', 'Dholes up close'],
-    ['h', 'Herd charge'], ['f', 'Bungalow ending'], ['n', 'The note'],
-    ['d', 'Going down'], ['g', 'Walk forward'], ['t', 'Change clock speed'],
+    ...Object.entries(SPOTS).map(([key, spot]): [string, string] => [key, spot.name]),
+    ...Object.entries(RUNS).map(([key, run]): [string, string] => [key, run.name]),
+    ['t', 'Change clock speed'],
     ['j', 'Toggle state readout'], ['b', 'Benchmark'], ['x', 'Hide drawing group'],
     ['X', 'Hide five drawing groups'], ['p', 'Stage timings'], ['m', 'GPU timings'],
     ['c', 'Phone layout'], ['0', 'Clean game'],
@@ -64,7 +64,11 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   for (const [key, label] of entries) {
     const item = document.createElement('li');
     const link = document.createElement('a');
-    link.href = './?preset=' + encodeURIComponent(key);
+    const url = new URL('./', location.href);
+    if (RUNS[key]) url.searchParams.set('encounter', RUNS[key].id);
+    else url.searchParams.set('preset', key);
+    if (params.has('seed')) url.searchParams.set('seed', params.get('seed')!);
+    link.href = url.href;
     link.textContent = `${label} (${key})`;
     if (/^[1-9]$/.test(key)) link.onclick = e => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

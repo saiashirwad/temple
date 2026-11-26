@@ -1,3 +1,4 @@
+import { SPOTS } from '../content/viewpoints.ts';
 // Test scenarios, run by a key chord so a test browser that can only open the bare address,
 // press keys and take screenshots can still set up any situation: press ` (backquote), then a
 // key. Keys pressed while the scene is still loading are kept and run once it's ready.
@@ -21,7 +22,7 @@
 //   c    reload with the phone layout;  0  reload clean
 
 import { boot, RELOAD_PRESETS } from './boot.ts';
-import { SPOTS, type Launch } from './launch.ts';
+import type { Launch } from './launch.ts';
 import { RUNS, wildlifeReady, type Run, type Scene } from './presets.ts';
 import { gameReplay } from './replay.ts';
 
