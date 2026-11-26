@@ -19,18 +19,27 @@ A scenario URL can go directly in a task or bug report, for example `/workbench.
 
 ## Reproduce a change
 
-Install the browser once with `npx playwright install chromium`. The CLI starts its own local Vite instance. Use the same scenario, seed and parameters when comparing two revisions.
+Install Chromium once with `npx playwright install chromium`. Run `npm run scenario -- --help` for capture options. The runner uses headless Chromium on every platform, including for WebGPU screenshots and clips. It advances the scenario in a private browser session. A visible window requires the explicit `--headed` flag.
 
-```sh
-npm run scenario -- --list
-npm run scenario -- asset.inspect --param asset=tree/teak --seed 42 --out /tmp/temple-teak
-npm run scenario -- story.village-departure
-npm run scenario -- story.bungalow-ending --game --seed 42 --out /tmp/temple-ending
-npm run check
-npm run build
-```
+| What you want | Command |
+| --- | --- |
+| Discover the available checkpoints | `npm run scenario -- story.bungalow-ending --game --list-shots` |
+| Photograph the bridge from the game camera | `npm run scenario -- world.walk --game --shot bridge --seed 42 --out /tmp/bridge` |
+| Compare several viewpoints in one loaded world | `npm run scenario -- world.walk --game --spread --shot bridge --shot herd-glade --shot town --seed 42 --out /tmp/walk` |
+| Record the action starting when the note opens | `npm run scenario -- story.bungalow-ending --game --shot reading-note --clip 3 --seed 42 --out /tmp/note` |
+| Capture only the lanes channel of the soil inspector | `npm run scenario -- terrain.soil --param channel=lanes --param laneShoulder=2.4 --target canvas --out /tmp/soil` |
+| Inspect the departure quest before and after equipping the torch | `npm run scenario -- story.village-departure --shot tick-4 --shot tick-5 --spread --out /tmp/quest` |
+| Compare frames from different runs or revisions | `npm run scenario -- --sheet /tmp/comparison.png /tmp/soil /tmp/walk` |
 
-With `--out`, the runner saves a JSON result, a browser recording and a screenshot when capture succeeds. An inspector returns `ready` after mounting. Story replays also check the outcome and report a verdict and event trace. The full-game ending replay drives the note and chair interactions through gameplay input. Seeds control random choices. Render timing and recorded event times depend on the machine.
+Each capture directory contains `result.json` with the entry URL, verdict, errors and the filenames from that run. Named checkpoints include their simulation state when supplied. `--out` alone saves the final viewport as `frame.png`. `--target` crops stills to one matching element. `--clip` records just the browser viewport for the requested interval starting at the first selected checkpoint. `--spread` produces a labeled PNG and keeps the originals. Without an output path, an explicit capture prints its temporary directory. Use a different directory per revision to keep both sets. [Playwright page screencasts](https://playwright.dev/docs/api/class-screencast)
+
+### Direct entry and load timing
+
+In `world.walk`, select a viewpoint to open it in the workbench. Subsequent viewpoints reuse the same renderer and assets. A link such as `/workbench.html?scenario=world.walk&view=3&seed=42` opens straight into the bridge viewer. To put a camera anywhere, pass `--game --param at=x,z,yaw,pitch,height` to `world.walk`. Positions and heights are in metres and angles are in radians.
+
+A game launch resolves the camera and the resources it needs before presenting the world. Forest launches prepare the watcher first and stream the village residents afterward. Herd views wait for wildlife. For the bungalow, selecting a later beat initializes the story through its own transitions. Omitting `--shot` runs the full note-to-chair input sequence. Use the full replay to check progression and a named checkpoint to work on its appearance.
+
+For load measurements, run `npm run build` and add `--built` to the scenario command. This serves that build from `dist/`. The default mode serves current source. The result includes `firstFrame.ms` from page navigation, the camera pose, and the visible story state. The runner checks the first location and relevant story conditions, in addition to the final verdict. Browser startup, Vite startup and artifact encoding are outside this timing. Seeded random choices are repeatable. Frame times and pixels can vary by device.
 
 ## Add a scenario
 
