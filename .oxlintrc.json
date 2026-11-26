@@ -4,9 +4,17 @@
     "dist/**",
     "src/generated/**",
     "tools/oxlint/anti-slop/**",
+    ".agent/**",
     ".agents/**",
+    ".claude/**",
     ".codex/**",
-    ".claude/**"
+    ".continue/**",
+    ".cursor/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**"
   ],
   "jsPlugins": [
     {

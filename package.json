@@ -8,7 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tools",
     "test": "tsx --test tests/*.test.ts",
-    "lint": "node tools/lint-leftovers.mjs",
+    "lint": "npm run -s lint:anti-slop && node tools/lint-leftovers.mjs",
     "check": "npm run -s lint && npm run -s test && npm run -s assets && npm run -s typecheck && echo CHECK OK",
     "assets": "tsx tools/check/assets.ts",
     "gen:trail": "tsx tools/trail/make.ts && tsx tools/river/make.ts && tsx tools/trail/map.ts",
