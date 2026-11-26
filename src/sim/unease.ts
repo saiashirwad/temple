@@ -35,10 +35,10 @@ export interface UneaseWalk {
   torch: number;
 }
 
-export function createUnease({ sound, eyes, later }: UneaseHooks) {
+export function createUnease({ sound, eyes, later }: UneaseHooks, random = Math.random) {
   type Pair = { x: number; y: number; z: number; px: number; pz: number; glow: number; lit: number; life: number; wait: number; blink: number };
   const pairs: Pair[] = [];
-  let uneaseIn = 35 + Math.random() * 25;
+  let uneaseIn = 35 + random() * 25;
   let flicker = 0;
   let quietAtCrossing = false;
   /** The frame's tick: the scene fills the same object in place each frame, so callbacks run later read the current eye. */
@@ -46,8 +46,8 @@ export function createUnease({ sound, eyes, later }: UneaseHooks) {
   const around = (from: number, to: number, near: number, far: number): V3 => {
     const eye = tk!.eye;
     // A spot at a bearing from the way you face (0 ahead, 180 behind), between two distances
-    const a = tk!.yaw + Math.PI + ((from + Math.random() * (to - from)) * Math.PI) / 180 * (Math.random() < 0.5 ? -1 : 1);
-    const dist = near + Math.random() * (far - near);
+    const a = tk!.yaw + Math.PI + ((from + random() * (to - from)) * Math.PI) / 180 * (random() < 0.5 ? -1 : 1);
+    const dist = near + random() * (far - near);
     const px = eye[0] - Math.sin(a + Math.PI) * dist;
     const pz = eye[2] - Math.cos(a + Math.PI) * dist;
     return [px, heightAt(px, pz), pz];
@@ -59,13 +59,13 @@ export function createUnease({ sound, eyes, later }: UneaseHooks) {
     for (let k = 0; k < 12 && (Math.abs(c[1] - (eye[1] - EYE_H)) > 2.2 || inRiver(c[0], c[2], 3)); k++) c = around(from, to, 10, 18);
     if (Math.abs(c[1] - (eye[1] - EYE_H)) > 2.2) return;
     for (let k = 0; k < count && pairs.length < eyes.chance / 2; k++) {
-      const x = c[0] + (Math.random() - 0.5) * 3;
-      const z = c[2] + (Math.random() - 0.5) * 3;
+      const x = c[0] + (random() - 0.5) * 3;
+      const z = c[2] + (random() - 0.5) * 3;
       const dx = x - eye[0];
       const dz = z - eye[2];
       const len = Math.hypot(dx, dz) || 1;
-      const half = 0.07 + Math.random() * 0.03;
-      pairs.push({ x, y: heightAt(x, z) + 1.0 + Math.random() * 0.6, z, px: (-dz / len) * half, pz: (dx / len) * half, glow: 0, lit: 0, life: 1.2 + Math.random() * 2.5, wait: 30, blink: 0.5 + Math.random() * 1.5 });
+      const half = 0.07 + random() * 0.03;
+      pairs.push({ x, y: heightAt(x, z) + 1.0 + random() * 0.6, z, px: (-dz / len) * half, pz: (dx / len) * half, glow: 0, lit: 0, life: 1.2 + random() * 2.5, wait: 30, blink: 0.5 + random() * 1.5 });
     }
   };
   return {
@@ -83,22 +83,22 @@ export function createUnease({ sound, eyes, later }: UneaseHooks) {
       if (inTrees) {
         uneaseIn -= dt;
         if (uneaseIn < 0) {
-          uneaseIn = 30 + Math.random() * 45;
-          const k = Math.random();
+          uneaseIn = 30 + random() * 45;
+          const k = random();
           if (k < 0.3) {
             // The insects stop; a few seconds on, eyes, somewhere off to the side or behind
-            sound.hush(11 + Math.random() * 5);
-            later(2.5 + Math.random() * 2.5, () => spawnEyes(Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 1, 70, 180));
+            sound.hush(11 + random() * 5);
+            later(2.5 + random() * 2.5, () => spawnEyes(random() < 0.3 ? 2 + Math.floor(random() * 2) : 1, 70, 180));
           } else if (k < 0.55) {
             // A stick breaks behind you; then quiet; sometimes another, further off
             sound.snap(around(110, 180, 9, 16));
             later(0.4, () => sound.hush(7));
-            if (Math.random() < 0.5) later(3.5 + Math.random() * 3, () => sound.snap(around(120, 180, 18, 26)));
+            if (random() < 0.5) later(3.5 + random() * 3, () => sound.snap(around(120, 180, 18, 26)));
           } else if (k < 0.75) {
             // Something heavy moving off through the undergrowth, parallel to the path
             const a = around(40, 120, 10, 15);
             const b = around(100, 170, 16, 22);
-            sound.rustle(a, [b[0], b[1] + 0.3, b[2]], 2 + Math.random() * 1.5);
+            sound.rustle(a, [b[0], b[1] + 0.3, b[2]], 2 + random() * 1.5);
           } else if (k < 0.92) {
             // A sambar's alarm far off: something has frightened it
             const a = around(0, 180, 160, 320);
@@ -129,7 +129,7 @@ export function createUnease({ sound, eyes, later }: UneaseHooks) {
         if (dist > 45) p.wait = -1;
         if ((p.lit > p.life + 0.6 || p.wait < 0) && p.glow < 0.01) {
           // When it goes, sometimes you hear it go
-          if (p.lit > 0 && Math.random() < 0.5) sound.rustle([p.x, p.y - 0.5, p.z], [p.x + p.px * 60, p.y - 0.5, p.z + p.pz * 60], 1.4);
+          if (p.lit > 0 && random() < 0.5) sound.rustle([p.x, p.y - 0.5, p.z], [p.x + p.px * 60, p.y - 0.5, p.z + p.pz * 60], 1.4);
           pairs.splice(i, 1);
         }
       }
@@ -145,7 +145,7 @@ export function createUnease({ sound, eyes, later }: UneaseHooks) {
       }
       if (flicker > 0) {
         flicker -= dt;
-        return Math.random() < 0.35 ? 0.15 : 0.55 + Math.random() * 0.4;
+        return random() < 0.35 ? 0.15 : 0.55 + random() * 0.4;
       }
       return 1;
     },

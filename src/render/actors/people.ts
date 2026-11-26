@@ -20,7 +20,6 @@ import { AVATARS, CLIP_NAMES, type ClipName, type Sex } from '../../content/asse
 export { AVATARS } from '../../content/assets.ts';
 import { makeWalker, stepWalker } from '../../sim/walker.ts';
 
-type XZ = [number, number];
 type V3 = [number, number, number];
 type ModelData = Awaited<ReturnType<typeof gltf.load>>;
 
@@ -91,7 +90,7 @@ const Person = instances.define('Person', {
 
 const yawQ = (y: number): [number, number, number, number] => [0, Math.sin(y / 2), 0, Math.cos(y / 2)];
 
-export function createPeople(root: TgpuRoot, files: PeopleFiles, tulsi: V3[], seats: Seat[] = [], solids: readonly Solid[] = []) {
+export function createPeople(root: TgpuRoot, files: PeopleFiles, tulsi: V3[], seats: Seat[] = [], solids: readonly Solid[] = [], random = Math.random) {
   const feet = footprints(solids);
   const list = solids.length ? plansClear(tulsi, seats, solids, feet) : rawPlans(tulsi, seats);
   /** Where you are, so people stop for you and step round you instead of through you. */
@@ -183,7 +182,7 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, tulsi: V3[], se
         if (swap && (p.next -= dt) < 0) {
           p.talking = !p.talking;
           figures.play(p.pose, p.talking ? p.plan.clip : swap, time, { fade: 0.8 });
-          p.next = 7 + Math.random() * 9;
+          p.next = 7 + random() * 9;
         }
         return;
       }

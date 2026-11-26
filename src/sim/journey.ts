@@ -35,6 +35,7 @@ export interface Tick {
 }
 
 export interface JourneyDeps {
+  random: { danger: () => number; ambience: () => number; unease: () => number };
   walker: ReturnType<typeof createWalker>;
   people: { guard: { gone: boolean; at: V3 } };
   sound: ReturnType<typeof createSound>;
@@ -83,24 +84,24 @@ export const farLanternAt = (sat: number): [number, number, number, number] => {
 
 type Say = ((text: string, seconds: number) => void) | null;
 
-export function createJourney({ walker, people, sound, eyes, cover, view, later, fog, torchLamp, beasts }: JourneyDeps) {
-  const state = { furthest: 0, deep: 0, torch: 0, torchOff: false, hidden: false, arrived: false, near: null as Interest | null, wind: [0, 1] as [number, number], noteRead: false, reading: false, arrivedAt: -99, metHerd: false, darkFor: 0, ended: false, downs: 0, alertUntil: 0 };
+export function createJourney({ random, walker, people, sound, eyes, cover, view, later, fog, torchLamp, beasts }: JourneyDeps) {
+  const state = { furthest: 0, deep: 0, torch: 0, torchOff: false, hidden: false, arrived: false, near: null as Interest | null, wind: [0, 1] as [number, number], reading: false, arrivedAt: -99, metHerd: false, darkFor: 0, ended: false, downs: 0, alertUntil: 0 };
   /** What the page shows: index.ts sets these. */
   const hud = { onArrive: null as (() => void) | null, onSay: null as Say, onDown: null as (() => void) | null, onTell: null as Say, onEnd: null as (() => void) | null };
   /** The last frame's tick; before the first, a still one at the origin. */
   let tk: Tick = { seconds: 0, dt: 0, eye: [0, 0, 0], fwd: [0, 0, -1], yaw: 0, x: 0, z: 0 };
   /** Seconds to the next howl, once you're in among the trees. */
-  let howlIn = 30 + Math.random() * 40;
+  let howlIn = 30 + random.ambience() * 40;
   let replyIn = -1;
   let fogNow = fog.base;
   const farOff = (): V3 => {
-    const a = Math.random() * Math.PI * 2;
-    const d = 380 + Math.random() * 300;
+    const a = random.ambience() * Math.PI * 2;
+    const d = 380 + random.ambience() * 300;
     const hx = tk.eye[0] + Math.sin(a) * d;
     const hz = tk.eye[2] + Math.cos(a) * d;
     return [hx, heightAt(hx, hz) + 25, hz];
   };
-  const unease = createUnease({ sound, eyes, later });
+  const unease = createUnease({ sound, eyes, later }, random.unease);
   const aloft = (x: number, z: number) => cover.aloft(x, z, tk.eye[1] - 0.8);
 
   // ---- the story of the walk, told as you go
@@ -146,7 +147,7 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
       later(1.4, () => walker.moveTo(p.x, p.z, p.heading + Math.PI, true));
       later(3.4, () => story.tellNow(DOWN_TEXT, 8));
     },
-  });
+  }, random.danger);
 
   let guardTalks = 0;
   let guardLine: { at: number; text: string } | null = null;
@@ -186,8 +187,8 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
     // The bridge creaking under you as you cross
     if (onBridge(x, z) && walker.pace > 0.4) {
       if ((creakIn -= dt * walker.pace) < 0) {
-        sound.creak([x, t.eye[1] - 1.5, z], 0.12 + Math.random() * 0.12);
-        creakIn = 1.2 + Math.random() * 2.4;
+        sound.creak([x, t.eye[1] - 1.5, z], 0.12 + random.ambience() * 0.12);
+        creakIn = 1.2 + random.ambience() * 2.4;
       }
     }
     // The river, heard from its nearest stretch
@@ -201,14 +202,14 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
     if (state.deep > 0.35 && !state.arrived) {
       howlIn -= dt;
       if (howlIn < 0) {
-        sound.howl(farOff(), 0.55 + Math.random() * 0.25);
+        sound.howl(farOff(), 0.55 + random.ambience() * 0.25);
         storyMark('howl');
-        howlIn = 55 + Math.random() * 95;
-        if (Math.random() < 0.35) replyIn = 4 + Math.random() * 5;
+        howlIn = 55 + random.ambience() * 95;
+        if (random.ambience() < 0.35) replyIn = 4 + random.ambience() * 5;
       }
       if (replyIn > 0) {
         replyIn -= dt;
-        if (replyIn <= 0) sound.howl(farOff(), 0.4 + Math.random() * 0.2);
+        if (replyIn <= 0) sound.howl(farOff(), 0.4 + random.ambience() * 0.2);
       }
     }
     // The air clears a little up in the forest, so the views carry
@@ -241,10 +242,9 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
     if (up) spot = { x, z, r: 3, low: false, sit: true, label: 'Sit and rest', text: REST_TEXT };
     // Once you've read the note, and put it down or stepped back: his chair
     bungalow.update(seconds, state.reading);
-    state.noteRead = bungalow.noteRead;
     if (Math.hypot(x - NOTE_AT.x, z - NOTE_AT.z) < NOTE_R) {
-      if (!state.noteRead) spot = { id: 'bungalow.note', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, label: 'Read the note', text: COOK_NOTE };
-      else if (!story.ended) spot = { id: 'bungalow.chair', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, sit: true, label: 'Sit in his chair', text: ' ' };
+      if (bungalow.interaction === 'bungalow.note') spot = { id: 'bungalow.note', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, label: 'Read the note', text: COOK_NOTE };
+      else if (bungalow.interaction === 'bungalow.chair') spot = { id: 'bungalow.chair', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, sit: true, label: 'Sit in his chair', text: ' ' };
     }
     state.near = spot;
   };

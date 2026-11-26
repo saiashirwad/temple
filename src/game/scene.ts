@@ -64,6 +64,7 @@ import { qmul, qrot, yawQ } from '../math/quat.ts';
 import { createFarLights } from '../render/farlights.ts';
 import { loadProps, placeProps, Prop, rowsFor } from '../render/props.ts';
 import { boot } from './boot.ts';
+import { randomStreams } from '../math/random.ts';
 import { Q } from '../render/quality.ts';
 
 type V3 = [number, number, number];
@@ -124,6 +125,7 @@ const occludedLamp = (point: shading.Point, toLight: d.v3f, distance: number, ra
 const PROBE_STAGES = boot.has('probe');
 
 export async function createScene(root: TgpuRoot, surface: Surface) {
+  const random = randomStreams(boot.get('seed'));
   // GPU time decides how many pixels to draw: below the budget, full size; over it, fewer,
   // which TAA builds back up to the canvas
   // The bench (`b chord): leaves out each drawing group in turn and keeps its scene-pass samples
@@ -489,7 +491,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const grass = meadow.renderer({ cull: true, to: Q.grassTo, fade: Q.grassFade, eye: view }).pipe(withTime);
   const things = props.renderer({ cull: true });
   const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
-  const people = createPeople(root, folk, village.tulsi, village.seats, solidShape.solids);
+  const people = createPeople(root, folk, village.tulsi, village.seats, solidShape.solids, random.people);
   // The townspeople have a pipeline each, three times over; they compile after the first picture
   let herd: ReturnType<typeof createHerd> | null = null;
   let dholes: ReturnType<typeof createPack> | null = null;
@@ -747,7 +749,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const walls: V3[] = [];
   for (let z = COMPOUND.z0; z <= COMPOUND.z1; z += 5) for (const x of [-COMPOUND.x, COMPOUND.x, -CLOISTER.x, CLOISTER.x]) walls.push([x, GROUND, z]);
   for (let x = -COMPOUND.x; x <= COMPOUND.x; x += 5) for (const z of [COMPOUND.z0, COMPOUND.z1]) walls.push([x, GROUND, z]);
-  const sound = createSound({ homes: village.homes, walls, fires: wicksOf(all).map((w) => [w[0], w[1], w[2]] as V3) });
+  const sound = createSound({ homes: village.homes, walls, fires: wicksOf(all).map((w) => [w[0], w[1], w[2]] as V3) }, random.audio);
   // Your sandals, on whatever is underfoot (only on foot, not while held or flying)
   walker.onStep = (x, z, pace, foot) => walker.mode === 'walk' && sound.step(x, z, pace, foot, walker.sneaking || walker.crouching);
   // No footstep sounds: the night is crickets and the odd vehicle
@@ -786,6 +788,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     return ran;
   };
   const journey = createJourney({
+    random,
     walker,
     people,
     sound,

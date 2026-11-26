@@ -46,9 +46,8 @@ export interface SoundWorld {
   fires: V3[];
 }
 
-const rand = (a: number, b: number) => a + Math.random() * (b - a);
-
-export function createSound(world: SoundWorld) {
+export function createSound(world: SoundWorld, random = Math.random) {
+  const rand = (a: number, b: number) => a + random() * (b - a);
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
   const buffers = new Map<Name, AudioBuffer>();
@@ -117,7 +116,7 @@ export function createSound(world: SoundWorld) {
     master.connect(squeeze).connect(ctx.destination);
     noise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
     const n = noise.getChannelData(0);
-    for (let i = 0; i < n.length; i++) n[i] = Math.random() * 2 - 1;
+    for (let i = 0; i < n.length; i++) n[i] = random() * 2 - 1;
     icon();
     void load();
   }
@@ -150,7 +149,7 @@ export function createSound(world: SoundWorld) {
     const fade = c.sampleRate * 0.08;
     for (let ch = 0; ch < 2; ch++) {
       const data = buf.getChannelData(ch);
-      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2) * (i < fade ? i / fade : 1);
+      for (let i = 0; i < len; i++) data[i] = (random() * 2 - 1) * Math.pow(1 - i / len, 3.2) * (i < fade ? i / fade : 1);
     }
     const e = c.createConvolver();
     e.buffer = buf;
@@ -250,7 +249,7 @@ export function createSound(world: SoundWorld) {
           pending--;
           end();
         };
-        if (src instanceof AudioBufferSourceNode) src.start(t, offset ?? Math.random() * 3, length ?? stop - t);
+        if (src instanceof AudioBufferSourceNode) src.start(t, offset ?? random() * 3, length ?? stop - t);
         else {
           src.start(t);
           src.stop(stop);
@@ -288,8 +287,8 @@ export function createSound(world: SoundWorld) {
     const list = (SPRITES[sheet] as Record<string, number[][]>)[item];
     if (!ready() || !buf || !list?.length) return null;
     const key = sheet + item;
-    let k = Math.floor(Math.random() * list.length);
-    if (list.length > 1 && k === lastOf.get(key)) k = (k + 1 + Math.floor(Math.random() * (list.length - 1))) % list.length;
+    let k = Math.floor(random() * list.length);
+    if (list.length > 1 && k === lastOf.get(key)) k = (k + 1 + Math.floor(random() * (list.length - 1))) % list.length;
     lastOf.set(key, k);
     const [from, len] = list[k] as [number, number];
     const v = voice(at, { ref: o.ref ?? 6, rolloff: o.rolloff ?? 1, max: o.max ?? 500, hrtf: o.hrtf });
@@ -321,7 +320,7 @@ export function createSound(world: SoundWorld) {
     src.connect(g);
     if (at) g.connect(at).connect(master);
     else g.connect(master);
-    src.start(ctx.currentTime, Math.random() * buf.duration);
+    src.start(ctx.currentTime, random() * buf.duration);
     return { src, g };
   };
 
@@ -502,9 +501,9 @@ export function createSound(world: SoundWorld) {
   };
 
   // ---- the night's birds, far off: a call now and then, somewhere around you
-  let birdIn = 6 + Math.random() * 8;
+  let birdIn = 6 + random() * 8;
   const around = (near: number, far: number, up: number): V3 => {
-    const a = Math.random() * Math.PI * 2;
+    const a = random() * Math.PI * 2;
     const d = rand(near, far);
     return [ear[0] + Math.sin(a) * d, ear[1] + up, ear[2] + Math.cos(a) * d];
   };
@@ -520,7 +519,7 @@ export function createSound(world: SoundWorld) {
       birdIn = 5;
       return;
     }
-    const r = Math.random();
+    const r = random();
     let item: Call;
     if (deep > 0.5) item = r < 0.32 ? 'nightjar' : r < 0.6 ? 'owl' : r < 0.78 ? 'scops' : r < 0.92 ? 'cuckoo' : 'deer';
     else if (streamAt && r < 0.35) item = 'lapwing';
@@ -529,8 +528,8 @@ export function createSound(world: SoundWorld) {
     const at: V3 = item === 'lapwing' && streamAt ? [streamAt[0] + rand(-25, 25), streamAt[1] + 1, streamAt[2] + rand(-25, 25)] : around(45, 150, rand(5, 15));
     far(item, at, item === 'deer' ? 0.35 : 0.42);
     // A nightjar keeps on, as they do, and an owl is often answered
-    if (item === 'nightjar' && Math.random() < 0.6) far(item, at, 0.42, rand(4, 8));
-    if (item === 'owl' && Math.random() < 0.4) far(item, around(80, 200, 10), 0.3, rand(3, 7));
+    if (item === 'nightjar' && random() < 0.6) far(item, at, 0.42, rand(4, 8));
+    if (item === 'owl' && random() < 0.4) far(item, around(80, 200, 10), 0.3, rand(3, 7));
   }
 
   /** What the last footstep fell on, for the test readout. */
@@ -563,13 +562,13 @@ export function createSound(world: SoundWorld) {
     },
     /** The jungle's warning: a barking deer, or the monkeys, shouting about something at x, z. */
     alarm(at: V3) {
-      if (!far(Math.random() < 0.75 ? 'deer' : 'monkey', at, 0.55)) this.bark(at);
+      if (!far(random() < 0.75 ? 'deer' : 'monkey', at, 0.55)) this.bark(at);
     },
     /** A dhole's growl at `at`: a low, rough, rising snarl. */
     growl(at: V3, gain = 0.5) {
       if (!ready() || !noise) return;
       const t = ctx!.currentTime + 0.02;
-      const dur = 0.9 + Math.random() * 0.9;
+      const dur = 0.9 + random() * 0.9;
       const v = voice(at, { ref: 3, rolloff: 1.2, max: 120, hrtf: true });
       const src = v.noise();
       const bp = v.filter('bandpass', 170, 3);
@@ -578,7 +577,7 @@ export function createSound(world: SoundWorld) {
       // The rasp: the noise chopped about 28 times a second
       const am = v.gain(0);
       const lfo = v.osc();
-      lfo.frequency.value = 24 + Math.random() * 10;
+      lfo.frequency.value = 24 + random() * 10;
       lfo.connect(v.gain(1)).connect(am.gain);
       const g = v.gain();
       g.gain.setValueAtTime(0, t);
@@ -597,11 +596,11 @@ export function createSound(world: SoundWorld) {
       if (!ready()) return;
       const c = ctx!;
       const v = voice(at, { ref: 8, rolloff: 1, max: 400, hrtf: true });
-      const n = Math.random() < 0.6 ? 2 : 1;
+      const n = random() < 0.6 ? 2 : 1;
       for (let k = 0; k < n; k++) {
-        const t = c.currentTime + 0.02 + k * (0.32 + Math.random() * 0.2);
-        const f = 1300 + Math.random() * 500;
-        const len = 0.18 + Math.random() * 0.14;
+        const t = c.currentTime + 0.02 + k * (0.32 + random() * 0.2);
+        const f = 1300 + random() * 500;
+        const len = 0.18 + random() * 0.14;
         const o = v.osc();
         o.frequency.setValueAtTime(f * 0.7, t);
         o.frequency.exponentialRampToValueAtTime(f * 1.25, t + len * 0.6);
@@ -628,7 +627,7 @@ export function createSound(world: SoundWorld) {
       const t = ctx!.currentTime + 0.01;
       const v = voice(at, { ref: 4, rolloff: 1.2, max: 200 });
       const o = v.osc('sawtooth');
-      const f = 520 + Math.random() * 220;
+      const f = 520 + random() * 220;
       o.frequency.setValueAtTime(f, t);
       o.frequency.exponentialRampToValueAtTime(f * 0.6, t + 0.09);
       const g = v.gain();
@@ -650,12 +649,12 @@ export function createSound(world: SoundWorld) {
     trumpet(at: V3, long = true) {
       // A real trumpet; the long one, close, is a roar after it
       if (sprite('calls', 'trumpet', at, { gain: long ? 1 : 0.75, ref: 20, max: 1500, hrtf: true, echo: 0.35, rate: long ? 1 : 1.04 })) {
-        if (long && Math.random() < 0.5) sprite('calls', 'roar', at, { gain: 0.7, ref: 15, max: 800, echo: 0.2, delay: rand(1.4, 2) });
+        if (long && random() < 0.5) sprite('calls', 'roar', at, { gain: 0.7, ref: 15, max: 800, echo: 0.2, delay: rand(1.4, 2) });
         return;
       }
       if (!ready()) return;
       const t = ctx!.currentTime + 0.03;
-      const dur = long ? 1.6 + Math.random() * 0.6 : 0.7;
+      const dur = long ? 1.6 + random() * 0.6 : 0.7;
       const v = voice(at, { ref: 20, rolloff: 1, max: 1200, hrtf: true });
       const out = v.out;
       out.gain.setValueAtTime(0, t);
@@ -719,11 +718,11 @@ export function createSound(world: SoundWorld) {
       const v = voice(at, { ref: 4, rolloff: 1, max: 60, hrtf: true });
       // Wood rubbing on wood: a rough buzz whose pitch wavers as the plank gives
       const o = v.osc('sawtooth');
-      const f0 = 180 + Math.random() * 160;
-      const len = 0.25 + Math.random() * 0.35;
+      const f0 = 180 + random() * 160;
+      const len = 0.25 + random() * 0.35;
       o.frequency.setValueAtTime(f0, t);
-      for (let k = 1; k <= 6; k++) o.frequency.linearRampToValueAtTime(f0 * (0.85 + Math.random() * 0.35), t + (len * k) / 6);
-      const bp = v.filter('bandpass', 900 + Math.random() * 600, 4);
+      for (let k = 1; k <= 6; k++) o.frequency.linearRampToValueAtTime(f0 * (0.85 + random() * 0.35), t + (len * k) / 6);
+      const bp = v.filter('bandpass', 900 + random() * 600, 4);
       const g = v.gain();
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(gain, t + 0.04);
@@ -732,9 +731,9 @@ export function createSound(world: SoundWorld) {
       o.connect(bp).connect(g).connect(v.out);
       v.play(o, t, t + len + 0.05);
       // Now and then the cable answers, low and slow
-      if (Math.random() < 0.4) {
+      if (random() < 0.4) {
         const w = v.osc();
-        w.frequency.setValueAtTime(62 + Math.random() * 20, t + 0.1);
+        w.frequency.setValueAtTime(62 + random() * 20, t + 0.1);
         w.frequency.linearRampToValueAtTime(55, t + 1.2);
         const wg = v.gain();
         wg.gain.setValueAtTime(0, t + 0.1);
@@ -797,9 +796,9 @@ export function createSound(world: SoundWorld) {
       if (!ready()) return;
       const t = ctx!.currentTime + 0.02;
       const v = voice(at, { ref: 4, rolloff: 1.2, max: 200 });
-      burst(v, t, 0.05, 2600 + Math.random() * 1500, 1.2, 0.9);
+      burst(v, t, 0.05, 2600 + random() * 1500, 1.2, 0.9);
       burst(v, t + 0.012, 0.12, 900, 0.9, 0.35);
-      if (Math.random() < 0.5) burst(v, t + 0.25 + Math.random() * 0.4, 0.04, 3200, 1.5, 0.5);
+      if (random() < 0.5) burst(v, t + 0.25 + random() * 0.4, 0.04, 3200, 1.5, 0.5);
     },
     /** Something moving through the undergrowth from `a` to `b`, then stopping. */
     rustle(a: V3, b: V3, seconds: number) {
@@ -824,9 +823,9 @@ export function createSound(world: SoundWorld) {
       }
       const n = Math.round(seconds * 9);
       for (let i = 0; i < n; i++) {
-        if (Math.random() < 0.3) continue;
+        if (random() < 0.3) continue;
         const f = i / n;
-        burst(v, t0 + f * seconds + Math.random() * 0.05, 0.07 + Math.random() * 0.12, 1800 + Math.random() * 2600, 0.7, 0.18 + Math.random() * 0.2);
+        burst(v, t0 + f * seconds + random() * 0.05, 0.07 + random() * 0.12, 1800 + random() * 2600, 0.7, 0.18 + random() * 0.2);
       }
     },
     /** A sambar deer's alarm call far off: a hoarse honk, two or three times. */
@@ -834,12 +833,12 @@ export function createSound(world: SoundWorld) {
       if (sprite('calls', 'deer', at, { gain: 0.6, ref: 30, max: 1500, hrtf: true, echo: 0.3 })) return;
       if (!ready()) return;
       const c = ctx!;
-      const times = 2 + Math.floor(Math.random() * 2);
+      const times = 2 + Math.floor(random() * 2);
       const v = voice(at, { ref: 30, rolloff: 1, max: 1500, hrtf: true });
       const lp = v.filter('lowpass', 1400);
       lp.connect(v.out);
       for (let k = 0; k < times; k++) {
-        const t = c.currentTime + 0.05 + k * (0.9 + Math.random() * 0.7);
+        const t = c.currentTime + 0.05 + k * (0.9 + random() * 0.7);
         const o = v.osc('sawtooth');
         o.frequency.setValueAtTime(330, t);
         o.frequency.exponentialRampToValueAtTime(230, t + 0.28);
@@ -859,16 +858,16 @@ export function createSound(world: SoundWorld) {
     howl(at: V3, gain = 0.5) {
       if (!ready()) return;
       const t = ctx!.currentTime + 0.05;
-      const base = 300 + Math.random() * 140;
-      const rise = 0.5 + Math.random() * 0.5;
-      const hold = 2.0 + Math.random() * 2.2;
-      const fall = 0.7 + Math.random() * 0.5;
+      const base = 300 + random() * 140;
+      const rise = 0.5 + random() * 0.5;
+      const hold = 2.0 + random() * 2.2;
+      const fall = 0.7 + random() * 0.5;
       const end = t + rise + hold + fall;
       const v = voice(at, { ref: 60, rolloff: 1, max: 2000, hrtf: true });
       const cry = v.osc();
       const over = v.osc('triangle');
       // The voice's pitch, and the overtone's an octave up, gliding together
-      const broken = Math.random() < 0.4;
+      const broken = random() < 0.4;
       const glide = (q: AudioParam, k: number) => {
         q.setValueAtTime(base * 0.72 * k, t);
         q.exponentialRampToValueAtTime(base * 1.22 * k, t + rise);
@@ -885,7 +884,7 @@ export function createSound(world: SoundWorld) {
       glide(over.frequency, 2);
       // A slow waver in the voice
       const lfo = v.osc();
-      lfo.frequency.value = 4.5 + Math.random() * 1.5;
+      lfo.frequency.value = 4.5 + random() * 1.5;
       lfo.connect(v.gain(base * 0.012)).connect(f);
       const env = v.gain();
       env.gain.setValueAtTime(0, t);
@@ -914,7 +913,7 @@ export function createSound(world: SoundWorld) {
         crackleIn -= dt;
         if (crackleIn < 0) {
           pop(0.5);
-          if (Math.random() < 0.3) pop(0.3);
+          if (random() < 0.3) pop(0.3);
           crackleIn = rand(0.05, 0.5);
         }
       }

@@ -316,11 +316,6 @@ export function scenarios(stateBox: HTMLPreElement) {
       scene = s;
       if (auto) setTimeout(() => void replay(s), 0);
       const preset = boot.get('preset');
-      if (preset && Object.hasOwn(reloads, preset)) {
-        const url = new URL(location.href);
-        url.searchParams.delete('preset');
-        history.replaceState(null, '', url);
-      }
       if (preset) queued.push(preset);
     },
   };
