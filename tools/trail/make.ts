@@ -5,7 +5,7 @@
 //
 //   npx tsx tools/trail/make.ts
 import { writeFileSync } from 'node:fs';
-import { heightAt, onRoad, pondQ, roadZ } from '../../src/world/terrain.ts';
+import { heightAt, landAt, onRoad, pondQ, roadZ } from '../../src/world/terrain.ts';
 import { inYard, PADDY } from '../../src/world/town/town.ts';
 import { COMPOUND, ROAD } from '../../src/content/world.ts';
 
@@ -30,7 +30,8 @@ for (let j = 0; j < NZ; j++) {
     const x = cx(i);
     const z = cz(j);
     const k = j * NX + i;
-    H[k] = heightAt(x, z);
+    // The river is carved around this path's crossing after the route is generated.
+    H[k] = landAt(x, z);
     let bad = 0;
     if (pondQ(x, z) < 1.25) bad = Infinity;
     if (Math.abs(x) < COMPOUND.x + 3 && z > COMPOUND.z0 - 3 && z < COMPOUND.z1 + 3) bad = Infinity;
