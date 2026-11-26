@@ -25,3 +25,5 @@ export const AVATARS = {
 
 export const SOUND_FILES = ['bed', 'forest', 'river', 'town', 'fire', 'calls', 'steps'] as const;
 export const BEAST_FILES = { herd: 'beasts/cow.glb', pack: 'beasts/dhole.glb' } as const;
+
+export const TREE_NAMES = ['coconut', 'areca', 'mango', 'jack', 'banyan', 'rubber', 'teak', 'laurel', 'irul', 'fig', 'peepal', 'silk cotton', 'alstonia', 'cashew', 'tamarind', 'gulmohar', 'drumstick', 'papaya', 'screwpine'] as const;

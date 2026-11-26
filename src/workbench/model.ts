@@ -16,7 +16,6 @@ import {
 } from '@typegpu/kit';
 import * as web from '@typegpu/kit/web';
 import { d, type TgpuRoot } from 'typegpu';
-import { treeSpecimen } from './specimens.ts';
 
 const Figure = instances.define('WorkbenchFigure', {
   host: { pose: d.u32 },
@@ -33,7 +32,7 @@ export async function inspectModel(
   options: Options = {},
 ) {
   const file = options.tree ? null : await gltf.load(url);
-  const model = options.tree ? treeSpecimen(options.tree.name, options.tree.seed) : file!;
+  const model = options.tree ? (await import('./specimens.ts')).treeSpecimen(options.tree.name, options.tree.seed) : file!;
   const clipFile = options.clipUrl ? await gltf.load(options.clipUrl) : file;
   const sourceClip = clipFile?.clips[0];
   // External people clips share joint names but carry their source body's bone lengths.

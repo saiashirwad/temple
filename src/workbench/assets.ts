@@ -1,7 +1,6 @@
 import './assets.css';
 import assets from 'virtual:temple-assets';
-import { inspectModel } from './model.ts';
-import { TREE_NAMES } from './specimens.ts';
+import { TREE_NAMES } from '../content/assets.ts';
 
 /** Mounts the asset browser. The returned function releases the active preview. */
 export function mount(root: HTMLElement, params: URLSearchParams) {
@@ -134,6 +133,8 @@ export function mount(root: HTMLElement, params: URLSearchParams) {
       preview.append(canvas);
       hint.append(' · Drag to orbit; scroll to zoom');
       try {
+        const { inspectModel } = await import('./model.ts');
+        if (disposed || generation !== token) return;
         const stop = await inspectModel(
           canvas,
           url,
