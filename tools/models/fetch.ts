@@ -3,8 +3,9 @@
 // simplified to a triangle budget, unused data dropped.
 //   npx tsx tools/models/fetch.ts [names]
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join as joinPath } from 'node:path';
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, join, flatten } from '@gltf-transform/functions';
@@ -15,18 +16,23 @@ const OUT = new URL('../../public/models/', import.meta.url).pathname;
 const CACHE = '/tmp/phm/';
 mkdirSync(OUT, { recursive: true });
 
+const temp = mkdtempSync(joinPath(tmpdir(), 'temple-model-'));
+process.on('exit', () => rmSync(temp, { recursive: true, force: true }));
+
 const get = async (url: string, file: string) => {
   if (existsSync(file)) return;
   mkdirSync(dirname(file), { recursive: true });
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${url}`);
-  writeFileSync(file, new Uint8Array(await res.arrayBuffer()));
+  const pending = file + '.' + process.pid;
+  writeFileSync(pending, new Uint8Array(await res.arrayBuffer()));
+  renameSync(pending, file);
 };
 
 const resize = (bytes: Uint8Array, size: number, quality: number) => {
-  writeFileSync('/tmp/mt_in', bytes);
-  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', '/tmp/mt_in', '-vf', `scale=${size}:${size}:flags=lanczos`, '-c:v', 'libwebp', '-quality', `${quality}`, '-f', 'webp', '/tmp/mt_out.webp']);
-  return new Uint8Array(readFileSync('/tmp/mt_out.webp'));
+  writeFileSync(joinPath(temp, 'source'), bytes);
+  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', joinPath(temp, 'source'), '-vf', `scale=${size}:${size}:flags=lanczos`, '-c:v', 'libwebp', '-quality', `${quality}`, '-f', 'webp', joinPath(temp, 'result.webp')]);
+  return new Uint8Array(readFileSync(joinPath(temp, 'result.webp')));
 };
 
 const only = process.argv.slice(2);
@@ -66,7 +72,13 @@ for (const m of MODELS) {
   }
   await doc.transform(prune());
   const out = `${OUT}${m.name}.glb`;
-  await io.write(out, doc);
+  const pending = `${OUT}.${m.name}.${process.pid}.glb`;
+  try {
+    await io.write(pending, doc);
+    renameSync(pending, out);
+  } finally {
+    rmSync(pending, { force: true });
+  }
   const b = getBounds(doc.getRoot().listScenes()[0]!);
   const dims = [0, 1, 2].map((k) => (b.max[k]! - b.min[k]!).toFixed(2)).join('×');
   console.log(`${m.name.padEnd(14)} ${dims} m, ${before} → ${tris(doc)} tris, ${(statSync(out).size / 1024).toFixed(0)} KB, ${((Date.now() - t0) / 1000).toFixed(1)}s`);

@@ -2,5 +2,5 @@
   "extends": "../tsconfig.json",
   "compilerOptions": { "types": ["node", "vite/client", "@webgpu/types"] },
   "include": [".", "../tests"],
-  "exclude": ["helpers/out"]
+  "exclude": ["helpers/free-model.ts", "helpers/out"]
 }

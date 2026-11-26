@@ -12,9 +12,9 @@ const rules = [
 ];
 let bad = 0;
 for (const dir of ['src', 'tests']) {
-  for (const f of readdirSync(dir)) {
+  for (const f of readdirSync(dir, { recursive: true })) {
     if (!f.endsWith('.ts') || f.endsWith('.gen.ts')) continue;
-    if (f.startsWith('_')) {
+    if (f.split('/').at(-1).startsWith('_')) {
       console.error(`${dir}/${f}: a scratch file (starts with _)`);
       bad++;
       continue;
