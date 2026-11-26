@@ -82,7 +82,7 @@ try {
   const address = server.httpServer!.address();
   if (!address || typeof address === 'string') throw new Error('No HTTP port available.');
   const asset = params.get('asset') ?? '';
-  const needsGpu = values.game || (id === 'world.walk' && params.has('view')) || (id === 'asset.inspect' && (asset.startsWith('tree/') || asset.endsWith('.glb')));
+  const needsGpu = values.game || (id === 'world.walk' && params.has('view')) || (id === 'asset.inspect' && (asset.startsWith('tree/') || asset.startsWith('plant/') || asset.endsWith('.glb')));
   browser = await chromium.launch({
     headless: !values.headed,
     channel: needsGpu ? 'chromium' : undefined,

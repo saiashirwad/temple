@@ -14,6 +14,7 @@ import {
   type Frame,
   type Surface,
 } from '@typegpu/kit';
+import type { Specimen } from '../world/vegetation/specimens.ts';
 import * as web from '@typegpu/kit/web';
 import { d, type TgpuRoot } from 'typegpu';
 
@@ -24,15 +25,16 @@ const Figure = instances.define('WorkbenchFigure', {
     return figure.pose;
   },
 });
-type Options = { night?: boolean; clipUrl?: string; tree?: { name: string; seed: number } };
+
+type Options = { night?: boolean; clipUrl?: string; specimen?: ReturnType<Specimen['build']> };
 export async function inspectModel(
   canvas: HTMLCanvasElement,
   url: string,
   report: (text: string) => void,
   options: Options = {},
 ) {
-  const file = options.tree ? null : await gltf.load(url);
-  const model = options.tree ? (await import('./specimens.ts')).treeSpecimen(options.tree.name, options.tree.seed) : file!;
+  const file = options.specimen ? null : await gltf.load(url);
+  const model = options.specimen ?? file!;
   const clipFile = options.clipUrl ? await gltf.load(options.clipUrl) : file;
   const sourceClip = clipFile?.clips[0];
   // External people clips share joint names but carry their source body's bone lengths.

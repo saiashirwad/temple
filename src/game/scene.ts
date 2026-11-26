@@ -49,6 +49,7 @@ import { createPack, loadPack } from '../render/actors/pack.ts';
 import { defineGrass, meadowModels, meadowPlaces } from '../world/vegetation/meadow.ts';
 import { createAtmosphere, HALOS } from '../render/atmosphere.ts';
 import { createSound, type Rider as Heard } from '../audio/sound.ts';
+import { farSpecimens } from '../world/vegetation/specimens.ts';
 import { FAR_KINDS, plantAll, type FarKind, type Planted } from '../world/vegetation/planting.ts';
 import { heightAt } from '../world/terrain.ts';
 import { createWalker } from '../sim/walk.ts';
@@ -240,9 +241,10 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   stage('built');
   const planted = plantAll(village.homes, grounds.gaps, village.tulsi);
   stage('planted');
-  const farModelOf = (f: (typeof planted.far)[number]) => f.model ?? planted.farModels[f.kind];
-  const treeModels = [...new Set([...planted.trees.map((t) => t.model), ...planted.far.map(farModelOf), ...Object.values(planted.farModels)])];
-  const plantModels = [...new Set(planted.plants.map((t) => t.model))];
+  const farSpecimen = (f: (typeof planted.far)[number]) => f.specimen ?? farSpecimens[f.kind];
+  const used = new Set([...planted.trees.map(t => t.specimen), ...planted.plants.map(t => t.specimen),
+    ...planted.far.map(farSpecimen), ...Object.values(farSpecimens)]);
+  const geometry = new Map([...used].map(specimen => [specimen, specimen.build()]));
   // Flames go to their own set, which stretches and bends them in the breeze
   type Model = typeof temple.model;
   const isFlame = (mesh: Model['meshes'][number]) => Math.floor((mesh.extra?.pat?.[0] ?? 0) + 0.5) === P.FLAME;
@@ -275,7 +277,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     trunks.set(m, r);
     return r;
   };
-  const trees = [...planted.trees.map((t) => ({ at: t.at, scale: t.scale, trunk: trunkOf(t.model) })), ...planted.far.map((f) => ({ at: f.at, scale: f.scale, trunk: f.model ? trunkOf(f.model) : 0.2 }))].filter((t) => t.trunk > 0.08);
+  const trees = [...planted.trees.map((t) => ({ at: t.at, scale: t.scale, trunk: trunkOf(geometry.get(t.specimen)!) })), ...planted.far.map((f) => ({ at: f.at, scale: f.scale, trunk: f.specimen ? trunkOf(geometry.get(f.specimen)!) : 0.2 }))].filter((t) => t.trunk > 0.08);
   const [propModels, folk] = await Promise.all([propFiles, peopleFiles]);
   // The solid world is set up just after the first picture, so it never holds up the load;
   // until it's ready the walker follows the land
@@ -338,7 +340,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const grassAt = meadowPlaces(land.pixels, planted.walked);
   stage('meadow');
   const treePool = meshPool.create(root, {
-    ...meshPool.roomFor([...treeModels, ...plantModels, ...grassModels.short, ...grassModels.mid, ...grassModels.tall, impostors.CARD]),
+    ...meshPool.roomFor([...geometry.values(), ...grassModels.short, ...grassModels.mid, ...grassModels.tall, impostors.CARD]),
     extra: { pat: d.f32, col: d.vec4f },
   });
   const tex = await textures;
@@ -362,7 +364,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const lanternId = moving.add(pool.add(lanternModel), { position: hidden });
 
   const added = new Map<object, ReturnType<typeof treePool.add>>();
-  const modelOf = (m: Planted['model']) => {
+  const modelOf = (m: Model) => {
     let got = added.get(m);
     if (!got) {
       got = treePool.add(m);
@@ -371,31 +373,33 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     return got;
   };
   const Tree = defineTree(treePool, tex);
-  const rowsOf = (list: Planted[]) => list.reduce((n, t) => n + modelOf(t.model).meshes.length, 0) + 8;
+  const rowsOf = (list: Planted[]) => list.reduce((n, t) => n + geometry.get(t.specimen)!.meshes.length, 0) + 8;
   const crowns = new Map<object, ReturnType<typeof crownOf>>();
-  const crownFor = (m: Planted['model']) => {
+  const crownFor = (m: Model) => {
     let c = crowns.get(m);
     if (!c) crowns.set(m, (c = crownOf(m)));
     return c;
   };
   const placeAll = (set: ReturnType<typeof instances.create<typeof Tree>>, list: Planted[]) => {
     for (const t of list) {
-      const place = { position: t.at, rotation: yawQ(t.yaw), scale: t.scale, stiff: t.stiff, ...crownFor(t.model) };
+      const model = geometry.get(t.specimen)!;
+      const place = { position: t.at, rotation: yawQ(t.yaw), scale: t.scale, stiff: t.stiff, ...crownFor(model) };
       const k = t.tint;
       // Each tree a shade of its own: some yellower, some darker, as no two trees of a kind match
-      if (k) set.add(modelOf(t.model), (mesh) => ({ ...place, color: [mesh.material.color[0]! * k[0], mesh.material.color[1]! * k[1], mesh.material.color[2]! * k[2]] }));
-      else set.add(modelOf(t.model), place);
+      if (k) set.add(modelOf(model), (mesh) => ({ ...place, color: [mesh.material.color[0]! * k[0], mesh.material.color[1]! * k[1], mesh.material.color[2]! * k[2]] }));
+      else set.add(modelOf(model), place);
     }
   };
   // The meadow: a sparse layer out to the fade, a dense fill near the eye
   const Grass = defineGrass(treePool);
-  const pickOf = <T,>(list: T[], i: number) => list[i % list.length]!;
-  const sparseOf = { short: grassModels.short, mid: grassModels.mid, tall: grassModels.tall };
-  const chosen = grassAt.map((g, i) => [pickOf(sparseOf[g.length], i)] as const);
-  const meadow = instances.create(root, treePool, { kind: Grass, capacity: chosen.reduce((n, c) => n + c[0].meshes.length, 0) + 8 });
+  const grassModel = (g: typeof grassAt[number], i: number) => {
+    const variants = grassModels[g.length];
+    return variants[i % variants.length]!;
+  };
+  const meadow = instances.create(root, treePool, { kind: Grass, capacity: grassAt.reduce((n, g, i) => n + grassModel(g, i).meshes.length, 0) + 8 });
   grassAt.forEach((g, i) => {
     const place = { position: g.at, rotation: yawQ(g.yaw), scale: g.scale };
-    meadow.add(modelOf(chosen[i]![0]), place);
+    meadow.add(modelOf(grassModel(g, i)), place);
   });
   const near = instances.create(root, treePool, { kind: Tree, capacity: rowsOf(planted.trees) });
   placeAll(near, planted.trees);
@@ -404,12 +408,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
 
   // The far woods: meshes close to the eye, cards beyond
   const STIFF: Record<FarKind, number> = { palm: 1, broad: 3, areca: 0.8, rubber: 2 };
-  const farTrees: Planted[] = planted.far.map((f) => ({ model: farModelOf(f), at: f.at, yaw: f.yaw, scale: f.scale, stiff: STIFF[f.kind], tint: f.tint }));
+  const farTrees: Planted[] = planted.far.map((f) => ({ specimen: farSpecimen(f), at: f.at, yaw: f.yaw, scale: f.scale, stiff: STIFF[f.kind], tint: f.tint }));
   const far = instances.create(root, treePool, { kind: Tree, capacity: rowsOf(farTrees) });
   placeAll(far, farTrees);
   const card = treePool.add(impostors.CARD).meshes[0]!;
   // Each kind of far tree is a card cut from its own atlas
-  const atlases = FAR_KINDS.map((k) => impostors.create(root, treePool, modelOf(planted.farModels[k]), { card, views: 8, size: 128 }));
+  const atlases = FAR_KINDS.map((k) => impostors.create(root, treePool, modelOf(geometry.get(farSpecimens[k])!), { card, views: 8, size: 128 }));
   const capturing = root.createCommandEncoder();
   for (const a of atlases) a.record(capturing);
   capturing.submit();

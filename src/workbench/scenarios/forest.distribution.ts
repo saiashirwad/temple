@@ -148,11 +148,11 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     status.textContent = 'Building production layout…';
     await new Promise<void>((resolve) => setTimeout(resolve, 20));
     try {
-      const p = plantAll(village.homes, grounds.gaps, village.tulsi, { seed: value, density: 1, distributionOnly: true });
+      const p = plantAll(village.homes, grounds.gaps, village.tulsi, { seed: value, density: 1 });
       points = [
-        ...p.trees.map((t) => ({ at: t.at, name: p.species.get(t.model) ?? 'unknown', group: 'trees' })),
-        ...p.far.map((t) => ({ at: t.at, name: t.model ? (p.species.get(t.model) ?? t.kind) : `${t.kind} card`, group: 'far' })),
-        ...p.plants.map((t) => ({ at: t.at, name: p.species.get(t.model) ?? 'unknown', group: 'plants' })),
+        ...p.trees.map((t) => ({ at: t.at, name: t.specimen.species, group: 'trees' })),
+        ...p.far.map((t) => ({ at: t.at, name: t.specimen ? t.specimen.species : `${t.kind} card`, group: 'far' })),
+        ...p.plants.map((t) => ({ at: t.at, name: t.specimen.species, group: 'plants' })),
         ...meadowPlaces(land.pixels, p.walked, { seed: value, density: 1 }).map((t) => ({
           at: t.at,
           name: t.length,

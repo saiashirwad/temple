@@ -1,8 +1,7 @@
 import '../assets.css';
 import assets from 'virtual:temple-assets';
-import { TREE_NAMES } from '../../content/assets.ts';
+import { specimens } from '../../world/vegetation/specimens.ts';
 
-/** Mounts the asset browser. The returned function releases the active preview. */
 export const title = 'Asset inspector';
 
 export async function mount(root: HTMLElement, params: URLSearchParams) {
@@ -14,7 +13,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       <option value="glb">Models</option>
       <option value="image">Textures</option>
       <option value="audio">Audio</option>
-      <option value="tree">Procedural trees</option>
+      <option value="specimen">Trees and undergrowth</option>
     </select>
     <div class="count"></div>
     <ul></ul>
@@ -36,16 +35,17 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   const preview = root.querySelector<HTMLElement>('.preview')!;
   const controls = root.querySelector<HTMLElement>('.controls')!;
   const hint = root.querySelector<HTMLElement>('.hint')!;
+  const variants = new Map(Object.values(specimens).flat().map(s => [s.id, s]));
   const supported = [
     ...assets.filter((p) => /\.(glb|png|jpe?g|webp|mp3|wav|ogg)$/i.test(p)),
-    ...TREE_NAMES.map((name) => `tree/${name}`),
+    ...variants.keys(),
   ].sort();
   const clips = assets.filter((p) => p.startsWith('people/clips/') && p.endsWith('.glb')).sort();
-  let seed = Number(params.get('seed') ?? 5) || 5;
+  let seed = params.has('seed') ? Number(params.get('seed')) : undefined;
   let night = params.get('light') === 'night';
   let clipPath = params.get('clip') ?? '';
   const kind = (p: string) =>
-    p.startsWith('tree/') ? 'tree' : /\.glb$/i.test(p) ? 'glb' : /\.(mp3|wav|ogg)$/i.test(p) ? 'audio' : 'image';
+    variants.has(p) ? 'specimen' : /\.glb$/i.test(p) ? 'glb' : /\.(mp3|wav|ogg)$/i.test(p) ? 'audio' : 'image';
   let selected = params.get('asset') ?? '';
   let cleanup = () => {};
   let generation = 0;
@@ -72,6 +72,15 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     delete root.dataset.ready;
     delete root.dataset.error;
     selected = path;
+    const address = new URL(location.href);
+    address.searchParams.set('asset', path);
+    if (seed === undefined) address.searchParams.delete('seed');
+    else address.searchParams.set('seed', String(seed));
+    if (clipPath) address.searchParams.set('clip', clipPath);
+    else address.searchParams.delete('clip');
+    if (night) address.searchParams.set('light', 'night');
+    else address.searchParams.delete('light');
+    history.replaceState(null, '', address);
     drawList();
     cleanup();
     cleanup = () => {};
@@ -82,7 +91,8 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     preview.replaceChildren();
     controls.replaceChildren();
     const url = urlOf(path);
-    if (kind(path) !== 'tree') {
+    const specimen = variants.get(path);
+    if (!specimen) {
       const link = document.createElement('a');
       link.href = url;
       link.textContent = 'Open asset';
@@ -90,7 +100,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       link.rel = 'noopener';
       hint.append(link);
     }
-    if (kind(path) === 'glb' || kind(path) === 'tree') {
+    if (kind(path) === 'glb' || specimen) {
       const lighting = document.createElement('select');
       lighting.setAttribute('aria-label', 'Lighting');
       lighting.innerHTML = '<option value="neutral">Neutral light</option><option value="night">Night light</option>';
@@ -100,13 +110,13 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
         void load(path);
       };
       controls.append(lighting);
-      if (kind(path) === 'tree') {
+      if (specimen) {
         const input = document.createElement('input');
         input.type = 'number';
-        input.value = String(seed);
-        input.setAttribute('aria-label', 'Tree seed');
+        input.value = String(seed ?? specimen.seed);
+        input.setAttribute('aria-label', 'Specimen seed');
         input.onchange = () => {
-          seed = Number(input.value) || 1;
+          seed = input.value === '' ? undefined : input.valueAsNumber;
           void load(path);
         };
         controls.append(input);
@@ -151,7 +161,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
           },
           {
             night,
-            ...(kind(path) === 'tree' ? { tree: { name: path.slice(5), seed } } : {}),
+            specimen: specimen?.build(seed),
             ...(path.startsWith('people/') && !path.startsWith('people/clips/') && clipPath ? { clipUrl: urlOf(clipPath) } : {}),
           },
         );

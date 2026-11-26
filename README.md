@@ -7,13 +7,15 @@ A walk from a Kerala town to a forest bungalow at night. Run `npm ci` and `npm r
 | To work on | Open in the workbench | Where changes belong |
 | --- | --- | --- |
 | Models, animations, textures, recordings and procedural trees | `asset.inspect` | Media in `public/`, game asset IDs in `src/content/assets.ts`, tree builders in `src/world/vegetation/` |
-| Tree, undergrowth and grass distribution | `forest.distribution` | Export the seed and density to `src/content/vegetation.json`. Species and placement rules live in `src/world/vegetation/planting.ts` and `meadow.ts`. |
+| Tree, undergrowth and grass distribution | `forest.distribution` | Export the seed and density to `src/content/vegetation.json`. Species geometry and seeds live in `src/world/vegetation/specimens.ts`. Placement rules live in `planting.ts` and `meadow.ts`. |
 | Building placement | `building.placement` | Move and rotate the bungalow against the trail end, then save the exported `bungalow-placement.json` in `src/content/`. Town plots are defined separately in `src/world/town/town.ts`. |
 | Soil | `terrain.soil` | Inspect or sample individual ground-cover channels, then save the exported `soil.json` in `src/content/`. |
 | NPC routes, pace and avoidance | `npc.route` | Click the map to put an obstacle in a walker's way. Edit `src/content/npc-plans.ts` for routes and `src/sim/walker.ts` for movement. The rehearsal uses production collision footprints. The game integrates Box3D WASM in `src/physics/physics.ts`. |
 | Bungalow story and interactions | `story.bungalow-ending` | Edit `src/content/narrative.ts` for text and `src/sim/bungalow-story.ts` for transitions. Replay the ending in the full game after changing either. |
 | Inventory, equipment and quest experiments | `story.village-departure` | Edit `src/sim/departure.ts`. This is a workbench rehearsal. The released walk still starts as before. |
 | Lighting, encounters and frame timings in context | `world.walk` | Jump into the game at the bridge, herd glade or veranda, or select a benchmark. Rendering lives in `src/render/` and scene assembly in `src/game/`. |
+
+The asset inspector lists each procedural variant alongside file assets. Open `/workbench.html?scenario=asset.inspect&asset=plant/fern/2` for the second fern exactly as built in-game. Changing its seed or lighting updates the shareable URL. The distribution map uses the same specimen IDs and placement rules without building plant meshes.
 
 A scenario URL can go directly in a task or bug report, for example `/workbench.html?scenario=forest.distribution&region=bridge&group=grass&seed=42`.
 
