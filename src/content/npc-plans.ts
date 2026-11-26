@@ -8,11 +8,12 @@ import type { Solid, V3 } from '../render/geo.ts';
 import { clear, footprints, pushOut, type XZ } from '../sim/routes.ts';
 import type { AVATARS, ClipName } from './assets.ts';
 
-type Who = keyof typeof AVATARS;
+export type Who = keyof typeof AVATARS;
+export const WATCHER = 'tea_m01';
 
 /** How a person spends the evening. */
 export type Plan =
-  | { kind: 'walk'; who: Who; route: XZ[]; loop?: boolean; speed: number; from?: number; pause?: number; side?: number; lift?: number }
+  | { kind: 'walk'; who: Who; watcher?: boolean; route: XZ[]; loop?: boolean; speed: number; from?: number; pause?: number; side?: number; lift?: number }
   | { kind: 'stay'; who: Who; at: XZ; yaw: number; clip: ClipName; lift?: number; swap?: ClipName };
 
 // ---- where everyone is
@@ -93,7 +94,7 @@ export function rawPlans(tulsi: V3[], seats: Seat[]): Plan[] {
     const p = trailAt(s);
     beat.push([p.x, p.z]);
   }
-  out.push({ kind: 'walk', who: 'tea_m01', route: beat, speed: 0.85, from: 120, pause: 14 });
+  out.push({ kind: 'walk', who: WATCHER, watcher: true, route: beat, speed: 0.85, from: 120, pause: 14 });
   if (LINEUP) {
     (['road_m08', 'home_m09', 'road_f11', 'dev_f15', 'gate_f02'] as Who[]).forEach((who, i) =>
       out.push({ kind: 'stay', who, at: [-1.6 + i * 0.8, 24.5], yaw: i % 2 ? 0.4 : -0.4, clip: i === 3 ? 'idle_neutral_02' : 'idle_neutral_01' }),

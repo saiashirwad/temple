@@ -216,6 +216,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
         if (preset && !SPOTS[preset]) throw new Error('Unknown view or encounter preset: ' + preset);
         const spots = launch.views;
         for (const spot of spots) {
+          if (spot.shot === 'town') await s.test.townReady();
           if (spot.shot.startsWith('herd-')) await wildlifeReady(s);
           s.walker.hold(...spot.at);
           s.view.jump();

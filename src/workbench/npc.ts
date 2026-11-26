@@ -128,7 +128,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
     ];
   });
   if (params.get('person') === 'watcher') {
-    const i = plans.findIndex((p) => p.who === 'tea_m01' && p.route.length > 40);
+    const i = plans.findIndex((p) => p.watcher);
     if (i >= 0) select.value = String(i);
   }
   reset();

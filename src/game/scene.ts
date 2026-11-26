@@ -43,7 +43,7 @@ import { createAir } from '../render/air.ts';
 import { buildGrounds } from '../world/town/grounds.ts';
 import { buildVillage } from '../world/town/village.ts';
 import { LAND, landMap, townSummary } from '../world/town/town.ts';
-import { createPeople, loadPeople } from '../render/actors/people.ts';
+import { createPeople, peopleLoader } from '../render/actors/people.ts';
 import { createHerd, loadHerd } from '../render/actors/herd.ts';
 import { createPack, loadPack } from '../render/actors/pack.ts';
 import { defineGrass, meadowModels, meadowPlaces } from '../world/vegetation/meadow.ts';
@@ -65,6 +65,9 @@ import { createFarLights } from '../render/farlights.ts';
 import { loadProps, placeProps, Prop, rowsFor } from '../render/props.ts';
 import type { Launch } from './launch.ts';
 import { boot } from './boot.ts';
+import { plansClear, WATCHER, type Who } from '../content/npc-plans.ts';
+import { AVATARS } from '../content/assets.ts';
+import { footprints } from '../sim/routes.ts';
 import { randomStreams } from '../math/random.ts';
 import { Q } from '../render/quality.ts';
 
@@ -219,7 +222,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     stages.push(`${name.split(' ')[0]}:${(performance.now() / 1000).toFixed(1)}`);
   };
   // Downloads first, so the files arrive while the town is being built
-  const peopleFiles = loadPeople();
+  const loadPeople = peopleLoader();
+  const peopleFiles = loadPeople(launch.forest ? [WATCHER] : Object.keys(AVATARS) as Who[]);
   const textures = loadTextures(root, Math.min(surface.width, surface.height) > 700);
   // The forest path's map, baked by tools/trail/map.ts
   const trailPicture = fetch(`${import.meta.env.BASE_URL}tex/trail.png`)
@@ -279,18 +283,28 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const solidShape = { solids: [...temple.solids, ...grounds.solids, ...street.solids, ...village.solids], props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
   let framesShown = 0;
   /** Adds the townspeople to the picture, its reflection and the moon's shadow once they compile. */
-  const addPeople = () => {
+  const addPeople = async (group: ReturnType<typeof createPeople>) => {
+    const walking = boot.has('nopeople') ? [] : group.renderers;
     const inScene = walking.map((w) => scene.add(w));
     const inPond = walking.map((w) => pond.reflection.add(w));
     const inShadow = walking.map((w) => light.shadow.add(w));
-    return pipelines.compile([...inScene, ...inPond, ...inShadow]).then(() => {
+    const drawings = [...inScene, ...inPond, ...inShadow];
+    try {
+      await pipelines.compile(drawings);
+      if (disposed) {
+        for (const drawing of drawings) drawing.destroy();
+        return;
+      }
       // Solid things first, before the water, flames and air drawn over them
       drawn.splice(3, 0, ...inScene);
       drawnNames.splice(3, 0, ...inScene.map((_, i) => 'actor:' + i));
       mirrored.splice(1, 0, ...inPond);
       moonCast.push(...inShadow);
       stage('people shown');
-    });
+    } catch (error) {
+      for (const drawing of drawings) drawing.destroy();
+      throw error;
+    }
   };
   const startPhysics = () => {
     const t0 = performance.now();
@@ -498,11 +512,32 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const grass = meadow.renderer({ cull: true, to: Q.grassTo, fade: Q.grassFade, eye: view }).pipe(withTime);
   const things = props.renderer({ cull: true });
   const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
-  const people = createPeople(root, folk, village.tulsi, village.seats, solidShape.solids, random.people);
+  const feet = footprints(solidShape.solids);
+  const plans = plansClear(village.tulsi, village.seats, solidShape.solids, feet);
+  const isWatcher = (p: typeof plans[number]) => p.kind === 'walk' && p.watcher;
+  const people = createPeople(root, folk, launch.forest ? plans.filter(isWatcher) : plans, feet, random.people);
+  const population = [people];
+  let residents: typeof people | undefined;
+  async function loadResidents() {
+    const town = plans.filter(p => !isWatcher(p));
+    const files = await loadPeople([...new Set(town.map(p => p.who))]);
+    if (disposed) return;
+    const group = createPeople(root, files, town, feet, random.people);
+    try {
+      await Promise.all([group.ready, group.initAsync()]);
+      if (!disposed) await addPeople(group);
+      if (disposed) group.destroy();
+      else { residents = group; population.push(group); }
+    } catch (error) {
+      group.destroy();
+      throw error;
+    }
+  }
+  let loadingResidents: Promise<void> | undefined;
+  const townReady = () => loadingResidents ??= launch.forest ? loadResidents() : Promise.resolve();
   // The townspeople have a pipeline each, three times over; they compile after the first picture
   let herd: ReturnType<typeof createHerd> | null = null;
   let dholes: ReturnType<typeof createPack> | null = null;
-  const walking = boot.has('nopeople') ? [] : people.renderers;
   let disposed = false;
   let wildlifeDone!: () => void;
   let wildlifeFailed!: (reason: unknown) => void;
@@ -654,7 +689,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
 
   stage('setup');
   if (launch.wildlife) startWildlife();
-  const actorSetup = launch.people ? addPeople() : undefined;
+  const actorSetup = (launch.people || launch.forest) ? addPeople(people) : undefined;
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
   const compileList = { pool, treePool, propPool, prepass, occlusion, light, cells, aa, scene, pond, air, glow, final, mist, eye };
@@ -844,7 +879,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     },
     danger,
     story,
-    wildlifeReady,
+    wildlifeReady, townReady,
     get guardGone() {
       return people.guard.gone;
     },
@@ -925,7 +960,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       // Half a second of pictures first, then the solid world
       if (++framesShown === (PROBE_STAGES ? 2 : 30) && !launch.physics) void startPhysics().catch(e => console.error('physics', e));
       if (framesShown === 2) {
-        if (!launch.people) void addPeople().catch(e => console.error('people', e));
+        if (launch.forest) void townReady().catch(e => console.error('village people', e));
+        else if (!launch.people) void addPeople(people).catch(e => console.error('people', e));
         if (!launch.wildlife) startWildlife();
       }
       ride(seconds);
@@ -948,15 +984,21 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       cellsLow.x = eyeAt[0] - 150;
       cellsLow.z = eyeAt[2] - 130;
       cells.move(cellsLow);
-      people.setPlayer(walker.at[0], walker.at[1]);
-      people.step(seconds, frame.dt);
       const ph = physics;
-      if (ph) people.where.forEach((w, i) => ph.place(personBodies[i] ?? (personBodies[i] = ph.person()), w, 0));
+      let body = 0;
+      for (const group of population) {
+        group.setPlayer(walker.at[0], walker.at[1]);
+        group.step(seconds, frame.dt);
+        if (ph) for (const position of group.where) {
+          ph.place(personBodies[body] ?? (personBodies[body] = ph.person()), position, 0);
+          body++;
+        }
+      }
       const lp = people.guard.lantern;
       moving.write(lanternId, { position: lp, rotation: yawQ(people.guard.yaw) });
       lamps.fields.position.set(guardLamp, lp[0], lp[1] + 0.05, lp[2]);
       lamps.fields.intensity.set(guardLamp, lp[1] > -40 && !people.guard.gone ? 2.2 * (0.92 + Math.sin(seconds * 13) * 0.03 + Math.sin(seconds * 7.3) * 0.05) : 0);
-      const tp = people.torch;
+      const tp = (residents ?? people).torch;
       lamps.fields.position.set(torchLamp, tp.position[0], tp.position[1], tp.position[2]);
       lamps.fields.aim.set(torchLamp, tp.aim[0], tp.aim[1], tp.aim[2]);
       lamps.fields.intensity.set(torchLamp, tp.on ? 16 : 0);
@@ -965,7 +1007,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       lamps.flush();
       for (const set of staticSets) set.flush();
       moving.flush(frame);
-      people.flush(frame);
+      for (const group of population) group.flush(frame);
       herd?.flush(frame);
       dholes?.flush(frame);
       mark('flush');
@@ -998,7 +1040,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       light.shadow.prepare({ redraw: (cascade) => cascade === 0 || shadowFrame % 3 === 0 });
       light.pointShadow.prepare({ redraw: () => false });
       for (const c of culled) c.cull(compute);
-      people.animate(compute, seconds);
+      for (const group of population) group.animate(compute, seconds);
       herd?.animate(compute, seconds);
       dholes?.animate(compute, seconds);
       air.spawn(compute);
@@ -1034,7 +1076,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       wildlifeFailed(new Error('Scene destroyed before wildlife was ready'));
       herd?.destroy();
       dholes?.destroy();
-      for (const made of [tex, gpu, screen, early, occlusion, lamps, cells, light, aa, built, props, flames, moving, near, far, undergrowth, meadow, landTex, trailTex, people, ...cardSets, ...atlases, pool, treePool, propPool, pond, air, glow, mist, eye]) made.destroy();
+      for (const made of [tex, gpu, screen, early, occlusion, lamps, cells, light, aa, built, props, flames, moving, near, far, undergrowth, meadow, landTex, trailTex, ...population, ...cardSets, ...atlases, pool, treePool, propPool, pond, air, glow, mist, eye]) made.destroy();
     },
   };
 }

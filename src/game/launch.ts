@@ -42,6 +42,7 @@ export function resolveLaunch(params: URLSearchParams) {
   }
   return {
     preset, bungalow, tour, views, camera, beat: start as BungalowBeat,
+    forest: !!first && first.shot !== 'town' && at === null,
     physics: bungalow || ['w', 'W', 'h', 'n', 'f', 'd', 'g'].includes(preset ?? ''),
     wildlife: ['w', 'W', 'D', 'h'].includes(preset ?? '') || first?.shot.startsWith('herd-') === true,
     people: bungalow || first?.shot === 'town' || first?.shot === 'veranda' || first?.shot === 'chair',

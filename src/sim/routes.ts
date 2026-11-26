@@ -6,7 +6,7 @@ import { heightAt } from '../world/terrain.ts';
 export type XZ = [number, number];
 
 /** A footprint on the ground: a turned rectangle, or a circle. Only what stands at body height. */
-type Foot = { kind: 'box'; x: number; z: number; hx: number; hz: number; c: number; s: number } | { kind: 'cyl'; x: number; z: number; r: number };
+export type Foot = { kind: 'box'; x: number; z: number; hx: number; hz: number; c: number; s: number } | { kind: 'cyl'; x: number; z: number; r: number };
 
 /** How high a person steps up without thinking: a stair, a kerb, a plinth's edge. */
 const STEP = 0.45;
