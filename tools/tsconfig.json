@@ -1,5 +1,6 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "types": ["node", "vite/client", "@webgpu/types"] },
+  "exclude": ["oxlint/anti-slop"],
   "include": [".", "../tests", "../src/**/*.d.ts"]
 }

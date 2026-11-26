@@ -1,0 +1,1 @@
+Vendored from the installer assets in [dmmulroy/anti-slop at 63dbb09](https://github.com/dmmulroy/anti-slop/tree/63dbb09f73438e550a6991dc6d778f979ffbf183/skills/install-anti-slop). The repository uses the generic plugin at `tools/oxlint/anti-slop/index.ts`. The copied rule sources are unmodified.

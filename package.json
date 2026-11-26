@@ -17,7 +17,8 @@
     "gen:beasts": "nice npx tsx tools/beasts/elephant.ts && nice npx tsx tools/beasts/dhole.ts",
     "gen:people": "tsx tools/people/build.ts && tsx tools/people/shrink.ts",
     "scenario": "tsx tools/scenario.ts",
-    "startup": "tsx tools/startup.ts"
+    "startup": "tsx tools/startup.ts",
+    "lint:anti-slop": "oxlint --deny-warnings ."
   },
   "dependencies": {
     "@typegpu/color": "0.12.2",
@@ -31,9 +32,11 @@
     "@gltf-transform/extensions": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
     "@napi-rs/canvas": "^1.2.0",
+    "@oxlint/plugins": "1.95.0",
     "@types/node": "^22.20.7",
     "@webgpu/types": "^0.1.74",
     "meshoptimizer": "^1.3.0",
+    "oxlint": "1.95.0",
     "playwright": "^1.65.1",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
