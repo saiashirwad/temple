@@ -226,6 +226,30 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     .then((r) => r.arrayBuffer())
     .then((b) => images.decode({ bytes: new Uint8Array(b), mimeType: 'image/png' }));
   const engine = loadPhysics();
+  const aa = taa.create(root, {
+    source: () => screen.textures.hdr,
+    region: screen.regions.hdr,
+    size: surface,
+    motion: () => screen.textures.motion,
+    depth: () => screen.textures.depth,
+    camera: view,
+  });
+  const glow = bloom.create(root, { source: () => aa.output, settings: { threshold: 1.1, knee: 0.5 } });
+  // The eye adapts: opening a little in a dark lane, closing before a blaze of lamps, held to a
+  // narrow range so the night always stays night
+  const eye = exposure.create(root, { source: aa, settings: { key: 0.035, lowest: 1.0, highest: 2.3, rise: 0.45, fall: 1.4 } });
+  const final = finish.create(root, {
+    format: surface.format,
+    source: () => aa.output,
+    tone: tone.aces,
+    glow,
+    grade,
+    exposure: eye,
+    settings: { exposure: 1.0, glowIntensity: 0.24, vignette: 0.4 },
+  });
+  // These passes depend only on the surface and camera. Compile while workers and downloads run.
+  const screenPasses = { occlusion, aa, glow, eye, final };
+  const screenReady = PROBE_STAGES ? undefined : pipelines.compile(Object.values(screenPasses));
   const { buildings, flames: flameModel, village, gaps, placed, solids, feet, lamps: all, streetLights } = await town;
   const propFiles = loadProps(placed);
   stage('built');
@@ -384,14 +408,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   });
   light.pointShadow.cast(ids.filter((_, i) => all[i]!.shadow));
 
-  const aa = taa.create(root, {
-    source: () => screen.textures.hdr,
-    region: screen.regions.hdr,
-    size: surface,
-    motion: () => screen.textures.motion,
-    depth: () => screen.textures.depth,
-    camera: view,
-  });
   const shared = bindings.share(root, { shadow: light.shadow.part, pointShadow: light.pointShadow.part, ao: occlusion.part });
   const scene = passes
     .create(root, screen, { hdr: passes.color, motion: taa.motion, depth: passes.depth }, { jitter: aa.jitter, shared })
@@ -537,19 +553,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   /** While comparing, `p` leaves the props out of every pass: each list starts with them. */
   const keep = <T,>(list: T[], first = 0) => (look.props ? list : list.filter((_, i) => i !== first));
 
-  const glow = bloom.create(root, { source: () => aa.output, settings: { threshold: 1.1, knee: 0.5 } });
-  // The eye adapts: opening a little in a dark lane, closing before a blaze of lamps, held to a
-  // narrow range so the night always stays night
-  const eye = exposure.create(root, { source: aa, settings: { key: 0.035, lowest: 1.0, highest: 2.3, rise: 0.45, fall: 1.4 } });
-  const final = finish.create(root, {
-    format: surface.format,
-    source: () => aa.output,
-    tone: tone.aces,
-    glow,
-    grade,
-    exposure: eye,
-    settings: { exposure: 1.0, glowIntensity: 0.24, vignette: 0.4 },
-  });
   const mist = createAtmosphere(root, view, light, 'rgba16float', shared as never);
   /** Each lamp's light this frame, for choosing the halos nearest the eye. */
   const lampNow = new Float32Array(all.length);
@@ -578,15 +581,15 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const actorSetup = (launch.people || launch.forest) ? addPeople(people) : undefined;
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
-  const compileList = { pool, treePool, propPool, prepass, occlusion, light, cells, aa, scene, pond, air, glow, final, mist, eye };
+  const compileList = { pool, treePool, propPool, prepass, light, cells, scene, pond, air, mist };
   if (PROBE_STAGES) {
     // One at a time, to see which take longest
-    for (const [name, item] of Object.entries(compileList)) {
+    for (const [name, item] of Object.entries({ ...screenPasses, ...compileList })) {
       await pipelines.compile([item]);
       stage(name);
     }
   } else await pipelines.compile(Object.values(compileList));
-  await Promise.all([peopleReady, physicsSetup, actorSetup, wildlifeSetup]);
+  await Promise.all([screenReady, peopleReady, physicsSetup, actorSetup, wildlifeSetup]);
 
   let seconds = 0;
   let frames = 0;
