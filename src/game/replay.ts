@@ -1,7 +1,7 @@
 import { SPOTS } from '../content/viewpoints.ts';
 import { checkpoint, wantsCheckpoint } from '../scenario/checkpoint.ts';
 import type { Launch } from './launch.ts';
-import { RUNS, solid, wildlifeReady, type Scene } from './presets.ts';
+import { RUNS, type Scene } from './presets.ts';
 
 /** Drive browser replays through the production simulation and input handlers. */
 export function gameReplay(launch: Launch) {
@@ -67,7 +67,7 @@ export function gameReplay(launch: Launch) {
         const spots = launch.views;
         for (const spot of spots) {
           if (spot.shot === 'town') await s.test.townReady();
-          if (spot.shot.startsWith('herd-')) await wildlifeReady(s);
+          if (spot.shot.startsWith('herd-')) await s.test.requireWildlife('herd');
           s.walker.hold(...spot.at);
           s.view.jump();
           prepared = true;
@@ -97,7 +97,7 @@ export function gameReplay(launch: Launch) {
     addEventListener('temple:examined', onExamined);
     addEventListener('temple:closed', onClosed);
     try {
-      await solid(s);
+      await s.test.requirePhysics();
       const [x, z, yaw] = SPOTS['8']!.at;
       s.walker.moveTo(x, z, yaw, true);
       s.walker.touched();

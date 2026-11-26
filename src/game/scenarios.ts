@@ -23,7 +23,7 @@ import { SPOTS } from '../content/viewpoints.ts';
 
 import { boot, RELOAD_PRESETS } from './boot.ts';
 import type { Launch } from './launch.ts';
-import { RUNS, wildlifeReady, type Run, type Scene } from './presets.ts';
+import { RUNS, type Run, type Scene } from './presets.ts';
 import { gameReplay } from './replay.ts';
 
 export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
@@ -107,7 +107,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     const request = ++selecting;
     try {
       if (key === '1') await scene.test.townReady();
-      if (spot.shot.startsWith('herd-')) await wildlifeReady(scene);
+      if (spot.shot.startsWith('herd-')) await scene.test.requireWildlife('herd');
       if (request !== selecting) return;
       await run(key, scene);
       const url = new URL(location.href);

@@ -308,8 +308,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       throw error;
     }
   };
-  const startPhysics = () => {
-    return engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
+  let physicsLoading: Promise<void> | undefined;
+  const requirePhysics = () =>
+    physicsLoading ??= engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
       stage('physics');
       physics = p;
       walker.physics = p;
@@ -323,11 +324,10 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
         setInterval(() => (tag.textContent = `${walker.mode} eye ${view.pose.target.map((v) => v.toFixed(1)).join(',')} yaw ${view.pose.yaw.toFixed(2)}`), 200);
       }
     });
-  };
   const VEHICLE: Record<string, V3> = { scooter: [0.36, 0.6, 0.95], auto: [0.72, 0.85, 1.4], bus: [1.25, 1.5, 5.3] };
   let vehicleBodies: number[] = [];
   let herdBodies: number[] = [];
-  const physicsSetup = launch.physics ? startPhysics() : undefined;
+  const physicsSetup = launch.physics ? requirePhysics() : undefined;
   stage('props');
 
   const pool = meshPool.create(root, {
@@ -542,12 +542,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   let herd: ReturnType<typeof createHerd> | null = null;
   let dholes: ReturnType<typeof createPack> | null = null;
   let disposed = false;
-  let wildlifeDone!: () => void;
-  let wildlifeFailed!: (reason: unknown) => void;
-  const wildlifeReady = new Promise<void>((resolve, reject) => { wildlifeDone = resolve; wildlifeFailed = reject; });
-  // The game continues if either download fails; test callers can still observe the rejection.
-  void wildlifeReady.catch(() => {});
-
   // The town's land map: yards, lanes, litter and paddy, sampled by the ground
   const landTex = images.create(root, land, { color: 'linear' });
   const landView = landTex.createView(d.texture2d(d.f32));
@@ -637,20 +631,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       throw error;
     }
   };
-  const startWildlife = () => {
-    const jobs = [
-      prepareWildlife('herd', loadHerd, (model) => createHerd(root, model, HERD_SIZES.length), (made) => { herd = made; }),
-      prepareWildlife('dholes', loadPack, (model) => createPack(root, model, 4), (made) => { dholes = made; }),
-    ];
-    void Promise.allSettled(jobs).then((results) => {
-      const errors = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
-      if (errors.length) {
-        const error = new AggregateError(errors.map((r) => r.reason), 'Wildlife could not load');
-        console.warn('wildlife', error);
-        wildlifeFailed(error);
-      } else if (!disposed) wildlifeDone();
-    });
-  };
+  const wildlife: Partial<Record<'herd' | 'dholes', Promise<void>>> = {};
+  function requireWildlife(species: 'herd' | 'dholes') {
+    return wildlife[species] ??= species === 'herd'
+      ? prepareWildlife('herd', loadHerd, model => createHerd(root, model, HERD_SIZES.length), made => { herd = made; })
+      : prepareWildlife('dholes', loadPack, model => createPack(root, model, 4), made => { dholes = made; });
+  }
   /** While comparing, `p` leaves the props out of every pass: each list starts with them. */
   const keep = <T,>(list: T[], first = 0) => (look.props ? list : list.filter((_, i) => i !== first));
 
@@ -691,7 +677,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   };
 
   stage('setup');
-  if (launch.wildlife) startWildlife();
+  const wildlifeSetup = launch.wildlife ? requireWildlife(launch.wildlife) : undefined;
   const actorSetup = (launch.people || launch.forest) ? addPeople(people) : undefined;
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
@@ -703,7 +689,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       stage(name);
     }
   } else await pipelines.compile(Object.values(compileList));
-  await Promise.all([peopleReady, physicsSetup, actorSetup, launch.wildlife && wildlifeReady]);
+  await Promise.all([peopleReady, physicsSetup, actorSetup, wildlifeSetup]);
 
   let seconds = 0;
   let frames = 0;
@@ -880,7 +866,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       bench.sums.clear();
       test.skip = -1;
     },
-    wildlifeReady, townReady,
+    requirePhysics, requireWildlife, townReady,
     get guardGone() {
       return people.guard.gone;
     },
@@ -954,11 +940,13 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       }
       mark('lamps');
       // Half a second of pictures first, then the solid world
-      if (++framesShown === (PROBE_STAGES ? 2 : 30) && !launch.physics) void startPhysics().catch(e => console.error('physics', e));
+      if (++framesShown === (PROBE_STAGES ? 2 : 30) && !launch.physics) void requirePhysics().catch(e => console.error('physics', e));
       if (framesShown === 2) {
         if (launch.forest) void townReady().catch(e => console.error('village people', e));
         else if (!launch.people) void addPeople(people).catch(e => console.error('people', e));
-        if (!launch.wildlife) startWildlife();
+        for (const species of ['herd', 'dholes'] as const) {
+          if (species !== launch.wildlife) void requireWildlife(species).catch(error => console.warn(species, error));
+        }
       }
       ride(seconds);
       riders.forEach((r, i) => {
@@ -1067,7 +1055,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     },
     destroy() {
       disposed = true;
-      wildlifeFailed(new Error('Scene destroyed before wildlife was ready'));
       herd?.destroy();
       dholes?.destroy();
       for (const made of [tex, gpu, screen, early, occlusion, lamps, cells, light, aa, built, props, flames, moving, near, far, undergrowth, meadow, landTex, trailTex, ...population, ...cardSets, ...atlases, pool, treePool, propPool, pond, air, glow, mist, eye]) made.destroy();

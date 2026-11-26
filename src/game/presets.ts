@@ -11,24 +11,9 @@ export type Run = {
   judge?(st: State, t: number, s: Scene): string | null;
 };
 
-export const solid = (s: Scene) =>
-  new Promise<void>((done, reject) => {
-    const deadline = performance.now() + 30000;
-    const wait = () => {
-      if (s.walker.solid) done();
-      else if (performance.now() > deadline) reject(new Error('solid world did not load'));
-      else setTimeout(wait, 150);
-    };
-    wait();
-  });
-/** Wait for both wildlife models and pipelines, but report stalled loading. */
-export const wildlifeReady = (s: Scene) => Promise.race([
-  s.test.wildlifeReady,
-  new Promise<never>((_, reject) => setTimeout(() => reject(new Error('wildlife did not load')), 30000)),
-]);
 /** Held at a spot, then on your feet there (danger only runs while you walk). */
 const standAt = async (s: Scene, spot: Spot) => {
-  await solid(s);
+  await s.test.requirePhysics();
   s.walker.moveTo(spot[0], spot[1], spot[2], true);
   s.view.goal.pitch = spot[3];
   s.view.jump();
@@ -36,13 +21,13 @@ const standAt = async (s: Scene, spot: Spot) => {
 };
 const pass = (ok: boolean, why: string) => (ok ? 'PASS' : `FAIL: ${why}`);
 
-export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: boolean; wildlife?: boolean }> = {
+export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: boolean; wildlife?: 'herd' | 'dholes' }> = {
   // The pack in view, held still, without physics: one standing, one stalking, one trotting, one at a gallop
   D: {
-    id: 'dholes-up-close', spot: '2', wildlife: true,
+    id: 'dholes-up-close', spot: '2', wildlife: 'dholes',
     name: 'dholes up close',
     async start(s) {
-      await wildlifeReady(s);
+      await s.test.requireWildlife('dholes');
       const [x, z, yaw] = SPOTS['2']!.at;
       s.walker.hold(x, z, yaw, 0.12, 1.62);
       s.view.jump();
@@ -53,21 +38,21 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     },
   },
   w: {
-    id: 'dhole-pack', spot: '2', physics: true, wildlife: true,
+    id: 'dhole-pack', spot: '2', physics: true, wildlife: 'dholes',
     name: 'red dogs',
     async start(s) {
-      await wildlifeReady(s);
+      await s.test.requireWildlife('dholes');
       if (s.walker.mode === 'held' || Math.hypot(...s.walker.at) < 150) await standAt(s, SPOTS['2']!.at);
-      else await solid(s);
+      else await s.test.requirePhysics();
       s.journey.danger.summon();
     },
     judge: (st, t) => (['coming', 'searching', 'attack'].includes(st.danger.pack) ? 'PASS' : t > 6 ? 'FAIL: no pack' : null),
   },
   W: {
-    id: 'stand-your-ground', spot: '2', physics: true, wildlife: true,
+    id: 'stand-your-ground', spot: '2', physics: true, wildlife: 'dholes',
     name: 'stand your ground',
     async start(s) {
-      await wildlifeReady(s);
+      await s.test.requireWildlife('dholes');
       await standAt(s, SPOTS['2']!.at);
       s.journey.state.torchOff = false;
       s.test.timeScale = 2;
@@ -76,10 +61,10 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     judge: (st, t) => (st.danger.pack === 'leaving' || st.danger.pack === 'away' && t > 4 ? 'PASS' : t > 14 ? `FAIL: still ${st.danger.pack}, nerve ${st.danger.nerve}` : null),
   },
   h: {
-    id: 'herd-charge', spot: '6', physics: true, wildlife: true,
+    id: 'herd-charge', spot: '6', physics: true, wildlife: 'herd',
     name: 'herd charge',
     async start(s) {
-      await wildlifeReady(s);
+      await s.test.requireWildlife('herd');
       await standAt(s, SPOTS['6']!.at);
       s.journey.danger.startle(1);
     },
@@ -117,7 +102,7 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     id: 'knockdown', physics: true,
     name: 'going down',
     async start(s) {
-      await solid(s);
+      await s.test.requirePhysics();
       if (s.walker.mode !== 'walk') s.walker.touched();
       const [x, z] = s.walker.at;
       const yaw = s.view.pose.yaw;
@@ -129,7 +114,7 @@ export const RUNS: Record<string, Run & { id: string; spot?: string; physics?: b
     id: 'walk-forward', physics: true,
     name: 'walk forward 3 s',
     async start(s) {
-      await solid(s);
+      await s.test.requirePhysics();
       s.walker.touched();
       s.walker.keys.add('w');
       setTimeout(() => s.walker.keys.delete('w'), 3000);

@@ -13,7 +13,7 @@ test('a selected world spread starts at its first requested location', () => {
   assert.deepEqual(launch.views.map(s => s.shot), ['bridge', 'chair']);
   assert.equal(launch.camera, SPOTS['3'].at);
   assert.equal(launch.physics, false);
-  assert.equal(launch.wildlife, false);
+  assert.equal(launch.wildlife, null);
 });
 
 test('story, encounter and free-camera entries resolve before scene creation', () => {
@@ -22,7 +22,7 @@ test('story, encounter and free-camera entries resolve before scene creation', (
   assert.equal(ending.beat, 'ending');
   assert.equal(ending.physics, true);
   assert.equal(ending.camera, SPOTS['8'].at);
-  assert.equal(open('preset=h').wildlife, true);
+  assert.equal(open('preset=h').wildlife, 'herd');
   assert.equal(open('preset=h').camera, SPOTS['6'].at);
   assert.deepEqual(open('at=12,22,1,0').camera, [12, 22, 1, 0, 1.62]);
   assert.throws(() => open('at=bad'));
@@ -45,6 +45,7 @@ test('the frame verifier rejects a camera still easing toward the correct bridge
 });
 
 test('named encounters use the same entry camera and resources as their keyboard shortcuts', () => {
+  assert.equal(open('encounter=dhole-pack').wildlife, 'dholes');
   assert.deepEqual(open('encounter=herd-charge'), open('preset=h'));
   assert.throws(() => open('encounter=missing'), /Unknown encounter/);
   assert.throws(() => open('encounter=herd-charge&preset=2'), /Choose one/);
