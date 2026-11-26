@@ -281,6 +281,16 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const solidShape = { solids, props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
   let framesShown = 0;
   let streamingWorld = false;
+  const scenarioEntry = launch.tour || launch.bungalow || !!launch.preset;
+  let userPlaying = false;
+  const input = new AbortController();
+  const beginPlay = (event: Event) => {
+    if (!event.isTrusted) return;
+    userPlaying = true;
+    input.abort();
+  };
+  for (const type of ['keydown', 'pointerdown', 'wheel'])
+    window.addEventListener(type, beginPlay, { capture: true, passive: true, signal: input.signal });
   /** Adds the townspeople to the picture, its reflection and the moon's shadow once they compile. */
   const addPeople = async (group: ReturnType<typeof createPeople>) => {
     const walking = boot.has('nopeople') ? [] : group.renderers;
@@ -860,11 +870,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
         }
       }
       mark('lamps');
-      // Half a second of pictures first, then the solid world
       framesShown++;
-      if (walker.mode !== 'held' && framesShown >= (PROBE_STAGES ? 2 : 30) && !physicsLoading)
+      // A scripted walk or seated replay prepares its own resources. A real gesture resumes free play.
+      const exploring = walker.mode !== 'held' && (!scenarioEntry || userPlaying);
+      if (exploring && (userPlaying || framesShown >= (PROBE_STAGES ? 2 : 30)) && !physicsLoading)
         void requirePhysics().catch(e => console.error('physics', e));
-      if (walker.mode !== 'held' && framesShown >= 2 && !streamingWorld) {
+      if (exploring && framesShown >= 2 && !streamingWorld) {
         streamingWorld = true;
         void Promise.all([residentsReady(), propsReady()]).catch(e => console.error('village assets', e));
         for (const species of ['herd', 'dholes'] as const) {
@@ -978,6 +989,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       cpuFrames++;
     },
     destroy() {
+      input.abort();
       disposed = true;
       herd?.destroy();
       dholes?.destroy();
