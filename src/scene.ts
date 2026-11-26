@@ -57,8 +57,8 @@ import { TRAIL_MAP, trailPatches } from './trail.ts';
 import { FAR_LAMPS } from './jungle.ts';
 import { createJourney, farLanternAt, type Tick } from './journey.ts';
 import { createCover } from './cover.ts';
-import { elephantBody, elephantEar, elephantLeg, elephantTrunk, lantern, wolfBody, wolfLeg } from './beasts.ts';
-import { createBeastRig } from './beastrig.ts';
+import { lantern } from './lantern.ts';
+import { updateDholeEyes } from './dhole-eyes.ts';
 import { createEyes } from './eyes.ts';
 import { qmul, qrot, yawQ } from './quat.ts';
 import { createFarLights } from './farlights.ts';
@@ -213,8 +213,6 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   };
   // Downloads first, so the files arrive while the town is being built
   const peopleFiles = loadPeople();
-  const herdFile = loadHerd();
-  const packFile = loadPack();
   const textures = loadTextures(root, Math.min(surface.width, surface.height) > 700);
   // The forest path's map, baked by tools/trail/map.ts
   const trailPicture = fetch(`${import.meta.env.BASE_URL}tex/trail.png`)
@@ -241,11 +239,8 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const flameModel: Model = mergeModels([{ meshes: allBuilt.flatMap((m) => m.meshes.filter(isFlame)), images: [] }]);
   const builtModels = [mergeModels(allBuilt.map(solidOf))];
   const riders = RIDERS();
-  // The animals that move: a wolf's body and leg, and each elephant's body and legs
   const HERD_SIZES = [1.05, 0.95, 0.55];
-  const beastModels = { wolf: wolfBody(), wolfLeg: wolfLeg(), elephant: { body: elephantBody(1, false), leg: elephantLeg(1), ear: elephantEar(1), trunk: elephantTrunk(1) } };
   const lanternModel = lantern();
-  const beastList = [lanternModel, beastModels.wolf, beastModels.wolfLeg, ...((e) => [e.body, e.leg, e.ear, e.trunk.upper, e.trunk.lower])(beastModels.elephant)];
   // One model per size of wheel, shared by every wheel of that size
   const wheelModels = new Map<string, ReturnType<typeof wheelModel>>();
   const wheelKey = (w: { rad: number; wid: number }) => `${w.rad}/${w.wid}`;
@@ -269,7 +264,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     return r;
   };
   const trees = [...planted.trees.map((t) => ({ at: t.at, scale: t.scale, trunk: trunkOf(t.model) })), ...planted.far.map((f) => ({ at: f.at, scale: f.scale, trunk: f.model ? trunkOf(f.model) : 0.2 }))].filter((t) => t.trunk > 0.08);
-  const [propModels, folk, herdModel, packModel] = await Promise.all([loadProps(placed), peopleFiles, herdFile, packFile]);
+  const [propModels, folk] = await Promise.all([loadProps(placed), peopleFiles]);
   // The solid world is set up just after the first picture, so it never holds up the load;
   // until it's ready the walker follows the land
   let physics: Physics | null = null;
@@ -283,6 +278,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     void pipelines.compile([...inScene, ...inPond, ...inShadow]).then(() => {
       // Solid things first, before the water, flames and air drawn over them
       drawn.splice(3, 0, ...inScene);
+      drawnNames.splice(3, 0, ...inScene.map((_, i) => 'actor:' + i));
       mirrored.splice(1, 0, ...inPond);
       moonCast.push(...inShadow);
       stage('people shown');
@@ -311,7 +307,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   stage('props');
 
   const pool = meshPool.create(root, {
-    ...meshPool.roomFor([...builtModels, flameModel, ...riders.map((r) => r.model), ...wheelModels.values(), ...beastList]),
+    ...meshPool.roomFor([...builtModels, flameModel, ...riders.map((r) => r.model), ...wheelModels.values(), lanternModel]),
     extra: { pat: d.f32, col: d.vec4f },
   });
   // Everything that grows has a pool of its own: one pool holds at most 256 meshes
@@ -336,14 +332,12 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const flames = instances.create(root, pool, { kind: Flame, capacity: flameModel.meshes.length + 1 });
   flames.add(pool.add(flameModel));
   const wheelRows = riders.reduce((n, r) => n + r.wheels.reduce((k, w) => k + wheelModels.get(wheelKey(w))!.meshes.length, 0), 0);
-  const beastRows = lanternModel.meshes.length + 4 * 5 * Math.max(beastModels.wolf.meshes.length, beastModels.wolfLeg.meshes.length) + HERD_SIZES.length * ((e) => e.body.meshes.length + 4 * e.leg.meshes.length + e.ear.meshes.length * 2 + e.trunk.upper.meshes.length + e.trunk.lower.meshes.length)(beastModels.elephant);
-  const moving = instances.create(root, pool, { kind: Built, capacity: riders.reduce((n, r) => n + r.model.meshes.length, 0) + wheelRows + beastRows, history: true });
+  const moving = instances.create(root, pool, { kind: Built, capacity: riders.reduce((n, r) => n + r.model.meshes.length, 0) + wheelRows + lanternModel.meshes.length, history: true });
   const rideIds = riders.map((r) => moving.add(pool.add(r.model), { position: [0, -50, 0] }));
   const wheelOf = new Map([...wheelModels].map(([k, m]) => [k, pool.add(m)]));
   const wheelIds = riders.map((r) => r.wheels.map((w) => moving.add(wheelOf.get(wheelKey(w))!, { position: [0, -50, 0] })));
   const hidden: V3 = [0, -50, 0];
   const lanternId = moving.add(pool.add(lanternModel), { position: hidden });
-  const beastRig = createBeastRig({ pool, moving, models: beastModels, herdSizes: [], wolves: 0, hidden });
 
   const added = new Map<object, ReturnType<typeof treePool.add>>();
   const modelOf = (m: Planted['model']) => {
@@ -497,9 +491,15 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
   const people = createPeople(root, folk, village.tulsi, village.seats, solidShape.solids);
   // The townspeople have a pipeline each, three times over; they compile after the first picture
-  const herd = createHerd(root, herdModel, HERD_SIZES.length);
-  const dholes = createPack(root, packModel, 4);
-  const walking = boot.has('nopeople') ? [herd.renderer, dholes.renderer] : [...people.renderers, herd.renderer, dholes.renderer];
+  let herd: ReturnType<typeof createHerd> | null = null;
+  let dholes: ReturnType<typeof createPack> | null = null;
+  const walking = boot.has('nopeople') ? [] : people.renderers;
+  let disposed = false;
+  let wildlifeDone!: () => void;
+  let wildlifeFailed!: (reason: unknown) => void;
+  const wildlifeReady = new Promise<void>((resolve, reject) => { wildlifeDone = resolve; wildlifeFailed = reject; });
+  // The game continues if either download fails; test callers can still observe the rejection.
+  void wildlifeReady.catch(() => {});
 
   // The town's land map: yards, lanes, litter and paddy, sampled by the ground
   const landTex = images.create(root, land, { color: 'linear' });
@@ -535,7 +535,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const thingsDrawn = scene.add(things);
   const drawnNames = ['land', 'river', 'built', 'moving', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'pond', 'farLights', 'eyes', 'flames', 'sky', 'mist', 'riverAir', 'smoke', 'kitchen', 'flies', 'moths'];
   /** The groups the bench times: the big ones, so a run fits in one short check. */
-  const BENCHED = ['land', 'built', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'sky', 'mist'].map((n) => drawnNames.indexOf(n));
+  const BENCHED = ['land', 'built', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'sky', 'mist'];
   const drawn = [
     scene.add(ground.land),
     scene.add(ground.river),
@@ -560,6 +560,50 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const early_ = [prepass.add(things), prepass.add(ground.land), prepass.add(ground.river), ...[solid, nearTrees, farMeshes, plants].map((c) => prepass.add(c))];
   const moonCast = [light.shadow.add(things), ...[solid, nearTrees, farMeshes, plants].map((c) => light.shadow.add(c))];
   const lampCast = [light.pointShadow.add(things), light.pointShadow.add(solid)];
+  // Start after the first submitted picture. Each species can succeed independently; no late
+  // completion may register drawings or retain resources after the scene has been destroyed.
+  const prepareWildlife = async <T extends ReturnType<typeof createHerd> | ReturnType<typeof createPack>>(
+    name: string, load: typeof loadHerd, make: (model: Awaited<ReturnType<typeof loadHerd>>) => T, accept: (made: T) => void,
+  ) => {
+    let made: T | undefined;
+    const added: { destroy(): void }[] = [];
+    try {
+      const model = await load();
+      if (disposed) return;
+      made = make(model);
+      await Promise.all([made.ready, made.initAsync()]);
+      if (disposed) { made.destroy(); return; }
+      const inScene = scene.add(made.renderer); added.push(inScene);
+      const inPond = pond.reflection.add(made.renderer); added.push(inPond);
+      const inShadow = light.shadow.add(made.renderer); added.push(inShadow);
+      await pipelines.compile([inScene, inPond, inShadow]);
+      if (disposed) { for (const drawing of added) drawing.destroy(); made.destroy(); return; }
+      drawn.splice(3, 0, inScene);
+      drawnNames.splice(3, 0, name);
+      mirrored.splice(1, 0, inPond);
+      moonCast.push(inShadow);
+      accept(made);
+      stage(`${name} shown`);
+    } catch (error) {
+      for (const drawing of added) drawing.destroy();
+      made?.destroy();
+      throw error;
+    }
+  };
+  const startWildlife = () => {
+    const jobs = [
+      prepareWildlife('herd', loadHerd, (model) => createHerd(root, model, HERD_SIZES.length), (made) => { herd = made; }),
+      prepareWildlife('dholes', loadPack, (model) => createPack(root, model, 4), (made) => { dholes = made; }),
+    ];
+    void Promise.allSettled(jobs).then((results) => {
+      const errors = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (errors.length) {
+        const error = new AggregateError(errors.map((r) => r.reason), 'Wildlife could not load');
+        console.warn('wildlife', error);
+        wildlifeFailed(error);
+      } else if (!disposed) wildlifeDone();
+    });
+  };
   /** While comparing, `p` leaves the props out of every pass: each list starts with them. */
   const keep = <T,>(list: T[], first = 0) => (look.props ? list : list.filter((_, i) => i !== first));
 
@@ -601,7 +645,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
 
   stage('setup');
   // People's skinning and every other pipeline compile side by side
-  const peopleReady = Promise.all([people.initAsync(), herd.initAsync(), dholes.initAsync()]).then(() => stage('people'));
+  const peopleReady = people.initAsync().then(() => stage('people'));
   const compileList = { pool, treePool, propPool, prepass, occlusion, light, cells, aa, scene, pond, air, glow, final, mist, eye };
   if (PROBE_STAGES) {
     // One at a time, to see which take longest
@@ -695,7 +739,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   };
 
   stage('compiled');
-  await Promise.all([people.ready, herd.ready, dholes.ready]).catch((e) => console.warn('people textures', e));
+  await people.ready.catch((e) => console.warn('people textures', e));
   await Promise.all(propMeshes.map((m) => m.ready)).catch((e) => console.warn('prop textures', e));
   console.log(`${townSummary()}, meshes ${pool.meshes.length}+${treePool.meshes.length}+${propPool.meshes.length}, props ${placed.length}, lights ${all.length}, trees ${planted.trees.length}, far ${planted.far.length}, plants ${planted.plants.length}`);
 
@@ -756,9 +800,9 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       lamps.fields.intensity.set(ownTorch, intensity);
     },
     beasts: (t) => {
-      poseBeasts(t.seconds, t.fwd[0], t.fwd[1], t.fwd[2]);
-      herd.update(danger.herd, t.seconds);
-      dholes.update(danger.wolves, danger.pack, t.seconds);
+      updateDholeEyes(eyes, danger.wolves, eyeAt, t.fwd, walk.torch);
+      herd?.update(danger.herd, t.seconds);
+      dholes?.update(danger.wolves, danger.pack, t.seconds);
       danger.herd.forEach((e, i) => {
         if (physics && herdBodies[i] !== undefined) physics.place(herdBodies[i]!, [e.x, heightAt(e.x, e.z), e.z], e.yaw);
       });
@@ -766,7 +810,6 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   });
   const { danger, story } = journey;
   const walk = journey.state;
-  const poseBeasts = beastRig.animate({ danger, eyes, eyeAt, torch: () => walk.torch });
   const staticSets = [built, flames, near, far, undergrowth, meadow, ...cardSets, props];
 
   /** For scenarios and the state readout (scenarios.ts); nothing here runs unless called. */
@@ -783,13 +826,11 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     },
     danger,
     story,
+    wildlifeReady,
     get guardGone() {
       return people.guard.gone;
     },
-    /** As if the cook's note had been read. */
-    readNote() {
-      walk.noteRead = true;
-    },
+    readNote() { walk.noteRead = true; },
     get state() {
       const [x, z] = walker.at;
       return {
@@ -866,7 +907,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       mark('lamps');
       // Half a second of pictures first, then the solid world
       if (++framesShown === (PROBE_STAGES ? 2 : 30)) startPhysics();
-      if (framesShown === 2) addPeople();
+      if (framesShown === 2) { addPeople(); startWildlife(); }
       ride(seconds);
       riders.forEach((r, i) => {
         const at = rideAt(r, seconds);
@@ -905,15 +946,15 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       for (const set of staticSets) set.flush();
       moving.flush(frame);
       people.flush(frame);
-      herd.flush(frame);
-      dholes.flush(frame);
+      herd?.flush(frame);
+      dholes?.flush(frame);
       mark('flush');
 
       if (bench.on && performance.now() - bench.since > 190) {
         if (bench.step + 1 < BENCHED.length * 2) {
           bench.step++;
           bench.since = performance.now();
-          test.skip = bench.step % 2 ? BENCHED[(bench.step - 1) / 2]! : -1;
+          test.skip = bench.step % 2 ? drawnNames.indexOf(BENCHED[(bench.step - 1) / 2]!) : -1;
         } else {
           bench.on = false;
           test.skip = -1;
@@ -921,7 +962,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
           const avg = (k: number) => { const g = bench.sums.get(k); return g && g[1] ? g[0] / g[1] : NaN; };
           const wholes = BENCHED.map((_, k) => avg(2 * k)).filter((v) => v === v);
           const whole = wholes.reduce((a, b) => a + b, 0) / Math.max(1, wholes.length);
-          bench.table = `all ${whole.toFixed(2)} | ` + BENCHED.map((i) => drawnNames[i]!).map((n, k) => [n, avg(2 * k) - avg(2 * k + 1)] as const).sort((a, b) => b[1] - a[1]).map(([n, d]) => `${n} ${d.toFixed(2)}`).join(', ');
+          bench.table = `all ${whole.toFixed(2)} | ` + BENCHED.map((n, k) => [n, avg(2 * k) - avg(2 * k + 1)] as const).sort((a, b) => b[1] - a[1]).map(([n, d]) => `${n} ${d.toFixed(2)}`).join(', ');
           console.log('bench', bench.table);
         }
       }
@@ -938,8 +979,8 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       light.pointShadow.prepare({ redraw: () => false });
       for (const c of culled) c.cull(compute);
       people.animate(compute, seconds);
-      herd.animate(compute, seconds);
-      dholes.animate(compute, seconds);
+      herd?.animate(compute, seconds);
+      dholes?.animate(compute, seconds);
       air.spawn(compute);
       for (let i = 0; i < steps; i++) air.step(compute);
       air.compact(compute, sim.ahead);
@@ -969,7 +1010,11 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       cpuFrames++;
     },
     destroy() {
-      for (const made of [tex, gpu, screen, early, occlusion, lamps, cells, light, aa, built, props, flames, moving, near, far, undergrowth, meadow, landTex, people, ...cardSets, ...atlases, pool, treePool, propPool, pond, air, glow, mist, eye]) made.destroy();
+      disposed = true;
+      wildlifeFailed(new Error('Scene destroyed before wildlife was ready'));
+      herd?.destroy();
+      dholes?.destroy();
+      for (const made of [tex, gpu, screen, early, occlusion, lamps, cells, light, aa, built, props, flames, moving, near, far, undergrowth, meadow, landTex, trailTex, people, ...cardSets, ...atlases, pool, treePool, propPool, pond, air, glow, mist, eye]) made.destroy();
     },
   };
 }
