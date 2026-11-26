@@ -1,12 +1,12 @@
 // A top-down inspection of the same placements the game builds, without a GPU.
-import { buildGrounds } from '../grounds.ts';
-import { buildVillage } from '../village.ts';
-import { inPlantingDensity, plantAll } from '../planting.ts';
-import { meadowPlaces } from '../meadow.ts';
-import { landMap } from '../town.ts';
-import { trailAt, TRAIL_LENGTH } from '../trail.ts';
-import { BRIDGE } from '../bridge.ts';
-import VEGETATION from '../vegetation.json';
+import { buildGrounds } from '../world/town/grounds.ts';
+import { buildVillage } from '../world/town/village.ts';
+import { inPlantingDensity, plantAll } from '../world/vegetation/planting.ts';
+import { meadowPlaces } from '../world/vegetation/meadow.ts';
+import { landMap } from '../world/town/town.ts';
+import { trailAt, TRAIL_LENGTH } from '../world/trail/trail.ts';
+import { BRIDGE } from '../world/trail/bridge.ts';
+import VEGETATION from '../content/vegetation.json';
 
 const colors: Record<string, string> = { trees: '#8bd88c', far: '#4f8f71', plants: '#e4ba6e', grass: '#99a967' };
 type Point = { at: readonly number[]; name: string; group: string };
@@ -86,7 +86,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   });
   root.querySelector('[name=export-content]')!.addEventListener('click', () => {
     settings.value = JSON.stringify({ seed: Number(seed.value), density: Number(density.value) / 100 }, null, 2);
-    share.textContent = 'Vegetation content JSON: save it as src/vegetation.json to use it in the game.';
+    share.textContent = 'Vegetation content JSON: save it as src/content/vegetation.json to use it in the game.';
   });
   root.querySelector('[name=apply]')!.addEventListener('click', () => {
     try {

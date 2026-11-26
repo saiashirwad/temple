@@ -1,13 +1,13 @@
 // Finds the forest path: from the road by the temple, out between the houses, and up into the
 // hills to a clearing where the forest bungalow stands, about a kilometre on foot. A cheapest-
 // path search over the land, where steep ground costs dearly, so the path winds along the
-// slopes the way a path worn by feet does. Writes src/trail.gen.ts.
+// slopes the way a path worn by feet does. Writes src/generated/trail.gen.ts.
 //
 //   npx tsx tools/trail/make.ts
 import { writeFileSync } from 'node:fs';
-import { heightAt, onRoad, pondQ, roadZ } from '../../src/terrain.ts';
-import { inYard, PADDY } from '../../src/town.ts';
-import { COMPOUND, ROAD } from '../../src/world.ts';
+import { heightAt, onRoad, pondQ, roadZ } from '../../src/world/terrain.ts';
+import { inYard, PADDY } from '../../src/world/town/town.ts';
+import { COMPOUND, ROAD } from '../../src/content/world.ts';
 
 const GOAL = 1000;
 const C = 3;
@@ -240,5 +240,5 @@ export const TRAIL_POINTS: readonly (readonly [number, number])[] = ${JSON.strin
 /** The clearing at the path's end and the way the path comes into it. */
 export const CLEARING = { x: ${end[0].toFixed(2)}, z: ${end[1].toFixed(2)}, heading: ${Math.atan2(end[0] - before[0], end[1] - before[1]).toFixed(4)} } as const;
 `;
-writeFileSync(new URL('../../src/trail.gen.ts', import.meta.url).pathname, src);
+writeFileSync(new URL('../../src/generated/trail.gen.ts', import.meta.url).pathname, src);
 console.log(`path ${lengthOf(out).toFixed(0)} m, ${out.length} points, ends at ${end[0].toFixed(1)}, ${end[1].toFixed(1)} (height ${heightAt(...end).toFixed(1)}), steepest ${(steep * 100).toFixed(0)}%`);

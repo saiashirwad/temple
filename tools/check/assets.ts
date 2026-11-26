@@ -4,10 +4,10 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { AVATARS, CLIP_NAMES, SOUND_FILES, BEAST_FILES } from '../../src/content/assets.ts';
-import { buildStreet } from '../../src/street.ts';
-import { buildGrounds } from '../../src/grounds.ts';
-import { buildVillage } from '../../src/village.ts';
-import { TEX_LAYERS } from '../../src/textures.gen.ts';
+import { buildStreet } from '../../src/world/town/street.ts';
+import { buildGrounds } from '../../src/world/town/grounds.ts';
+import { buildVillage } from '../../src/world/town/village.ts';
+import { TEX_LAYERS } from '../../src/generated/textures.gen.ts';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const PUB = join(ROOT, 'public');

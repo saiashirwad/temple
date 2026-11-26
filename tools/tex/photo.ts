@@ -77,12 +77,12 @@ for (const [name, { id }] of Object.entries(PHOTO)) {
   for (const size of [1024, 512]) {
     const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
     ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', '/tmp/pa.raw', ...scale, '-c:v', 'libwebp', '-quality', '86', `${OUT}${name}_${size}_c.webp`]);
-    if (size === 512) ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${S}x${S}`, '-i', '/tmp/pd.raw', ...scale, '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}${name}_${size}_d.jpg`]); // only the 512 data map is ever loaded (src/tex.ts)
+    if (size === 512) ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${S}x${S}`, '-i', '/tmp/pd.raw', ...scale, '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}${name}_${size}_d.jpg`]); // only the 512 data map is ever loaded (src/render/tex.ts)
   }
   console.log(name, id, means[name]);
 }
 // Record each photo's size and mean colour in the generated index
-const gen = new URL('../../src/textures.gen.ts', import.meta.url).pathname;
+const gen = new URL('../../src/generated/textures.gen.ts', import.meta.url).pathname;
 const src = readFileSync(gen, 'utf8');
 const m = src.match(/export const TEX_LAYERS = (.*) as const;/)!;
 const layers = JSON.parse(m[1]!) as { name: string; metres: number; metal: boolean; mean: number[]; photo?: string }[];

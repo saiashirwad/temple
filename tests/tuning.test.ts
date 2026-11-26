@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { TUNING } from '../src/tuning.ts';
+import { TUNING } from '../src/content/tuning.ts';
 
 // A snapshot of every tuning value. If this fails you changed one: if you meant to, change it here too.
 const SNAPSHOT = {

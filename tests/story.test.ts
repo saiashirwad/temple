@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createStory } from '../src/story.ts';
+import { createStory } from '../src/sim/story.ts';
 import { run } from './sim.ts';
 
 const make = () => {

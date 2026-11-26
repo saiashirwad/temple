@@ -2,10 +2,10 @@
 // path kept clear. Builds the whole planting once (a few seconds on one CPU).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildGrounds } from '../src/grounds.ts';
-import { buildVillage } from '../src/village.ts';
-import { plantAll } from '../src/planting.ts';
-import { trailNear } from '../src/trail.ts';
+import { buildGrounds } from '../src/world/town/grounds.ts';
+import { buildVillage } from '../src/world/town/village.ts';
+import { plantAll } from '../src/world/vegetation/planting.ts';
+import { trailNear } from '../src/world/trail/trail.ts';
 
 const g = buildGrounds();
 const v = buildVillage();

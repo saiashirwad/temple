@@ -1,9 +1,9 @@
-// Bakes the trail map (src/trail.ts) to public/tex/trail.png, so loading needn't work it out.
+// Bakes the trail map (src/world/trail/trail.ts) to public/tex/trail.png, so loading needn't work it out.
 // Run after tools/trail/make.ts:   npx tsx tools/trail/map.ts
 import { createCanvas } from '@napi-rs/canvas';
 import { writeFileSync } from 'node:fs';
-import { TRAIL_MAP, trailMap } from '../../src/trail.ts';
-import { BROOK_HALF, brookDistance, CROSSING, crossingDistance } from '../../src/jungle.ts';
+import { TRAIL_MAP, trailMap } from '../../src/world/trail/trail.ts';
+import { BROOK_HALF, brookDistance, CROSSING, crossingDistance } from '../../src/world/trail/jungle.ts';
 
 const { nx, nz } = TRAIL_MAP;
 const c = createCanvas(nx, nz);

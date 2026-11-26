@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createDanger } from '../src/danger.ts';
-import { GLADE } from '../src/jungle.ts';
+import { createDanger } from '../src/sim/danger.ts';
+import { GLADE } from '../src/world/trail/jungle.ts';
 import { fakeHooks, player, run, seeded } from './sim.ts';
 
 // Far from the herd, so only the pack matters

@@ -1,9 +1,9 @@
-import { buildGrounds } from '../grounds.ts';
-import { buildStreet } from '../street.ts';
-import { buildTemple } from '../temple.ts';
-import { buildVillage } from '../village.ts';
+import { buildGrounds } from '../world/town/grounds.ts';
+import { buildStreet } from '../world/town/street.ts';
+import { buildTemple } from '../world/town/temple.ts';
+import { buildVillage } from '../world/town/village.ts';
 import { plansClear } from '../content/npc-plans.ts';
-import { footprints, pushOut } from '../routes.ts';
+import { footprints, pushOut } from '../sim/routes.ts';
 import { makeWalker, stepWalker, walkerAt } from '../sim/walker.ts';
 
 export async function mount(root: HTMLElement, params: URLSearchParams) {

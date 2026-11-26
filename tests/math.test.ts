@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clamp, facingCos, lerp, smooth, stepFixed, toward, wrap } from '../src/math.ts';
+import { clamp, facingCos, lerp, smooth, stepFixed, toward, wrap } from '../src/math/math.ts';
 
 test('stepFixed splits a big dt into equal substeps no longer than max', () => {
   const hs: number[] = [];

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createDanger } from '../src/danger.ts';
-import { createStory } from '../src/story.ts';
-import { GLADE } from '../src/jungle.ts';
+import { createDanger } from '../src/sim/danger.ts';
+import { createStory } from '../src/sim/story.ts';
+import { GLADE } from '../src/world/trail/jungle.ts';
 import { fakeHooks, player, seeded } from './sim.ts';
 
 const P = { x: GLADE.x + 400, z: GLADE.z };

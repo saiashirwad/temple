@@ -1,6 +1,6 @@
 // Helpers for the logic tests: a seeded random source, fake hooks that record what happened,
 // and a player you can stand where you like.
-import type { Hooks, Player } from '../src/danger.ts';
+import type { Hooks, Player } from '../src/sim/danger.ts';
 
 /** A small seeded generator (mulberry32), so a night replays exactly. */
 export function seeded(seed = 1) {

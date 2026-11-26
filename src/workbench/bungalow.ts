@@ -1,5 +1,5 @@
-import { createBungalowStory, type BungalowInteraction } from '../bungalow-story.ts';
-import { createStory } from '../story.ts';
+import { createBungalowStory, type BungalowInteraction } from '../sim/bungalow-story.ts';
+import { createStory } from '../sim/story.ts';
 
 export type Trace = { at: number; event: string; detail?: string };
 

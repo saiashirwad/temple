@@ -1,7 +1,7 @@
 // The same tree builders used by the world, with a separately chosen random seed.
-import { Builder, rng } from '../geo.ts';
-import { arecaPalm, banyan, broadleaf, coconutPalm, rubberTree } from '../trees.ts';
-import { alstonia, cashew, drumstick, fig, gulmohar, irul, laurel, papaya, screwpine, silkCotton, tamarind, teak } from '../trees2.ts';
+import { Builder, rng } from '../render/geo.ts';
+import { arecaPalm, banyan, broadleaf, coconutPalm, rubberTree } from '../world/vegetation/trees.ts';
+import { alstonia, cashew, drumstick, fig, gulmohar, irul, laurel, papaya, screwpine, silkCotton, tamarind, teak } from '../world/vegetation/trees2.ts';
 
 export const TREE_NAMES = ['coconut', 'areca', 'mango', 'jack', 'banyan', 'rubber', 'teak', 'laurel', 'irul', 'fig', 'peepal', 'silk cotton', 'alstonia', 'cashew', 'tamarind', 'gulmohar', 'drumstick', 'papaya', 'screwpine'] as const;
 export function treeSpecimen(name: string, seed: number) {

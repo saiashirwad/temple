@@ -1,4 +1,4 @@
-import { LAND, LAND_N, landMap } from '../town.ts';
+import { LAND, LAND_N, landMap } from '../world/town/town.ts';
 import soil from '../content/soil.json';
 import { exportSettings, slider } from './settings.ts';
 

@@ -1,7 +1,7 @@
 // Shrinks the townsfolk files in public/people without their sources (FBX2glTF isn't needed):
 // avatars get their textures over 512 px scaled down to 512, clips get their keyframes resampled.
 // Skeletons, bone names, morph targets, mesh topology and material/texture slots are left as they
-// are (src/people.ts and the kit read them), and nothing is quantized.
+// are (src/render/actors/people.ts and the kit read them), and nothing is quantized.
 //
 //   nice npx tsx tools/people/shrink.ts
 //
@@ -59,7 +59,7 @@ async function shrinkClip(doc: Document) {
   await doc.transform(resample({ cleanup: false }), prune(PRUNE), dedup({ keepUniqueNames: true }));
 }
 
-/** What src/people.ts and the kit rely on; must match between backup and output. */
+/** What src/render/actors/people.ts and the kit rely on; must match between backup and output. */
 function shape(doc: Document) {
   const r = doc.getRoot();
   return JSON.stringify({

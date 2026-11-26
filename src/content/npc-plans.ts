@@ -1,11 +1,11 @@
-import { heightAt, roadZ } from '../terrain.ts';
-import { LANES, MOSQUE, PLOTS, plotPoint } from '../town.ts';
-import { ROAD } from '../world.ts';
-import type { Seat } from '../village.ts';
-import { trailAt } from '../trail.ts';
-import { boot } from '../boot.ts';
-import type { Solid, V3 } from '../geo.ts';
-import { clear, footprints, pushOut, type XZ } from '../routes.ts';
+import { heightAt, roadZ } from '../world/terrain.ts';
+import { LANES, MOSQUE, PLOTS, plotPoint } from '../world/town/town.ts';
+import { ROAD } from './world.ts';
+import type { Seat } from '../world/town/village.ts';
+import { trailAt } from '../world/trail/trail.ts';
+import { boot } from '../game/boot.ts';
+import type { Solid, V3 } from '../render/geo.ts';
+import { clear, footprints, pushOut, type XZ } from '../sim/routes.ts';
 import type { AVATARS, ClipName } from './assets.ts';
 
 type Who = keyof typeof AVATARS;

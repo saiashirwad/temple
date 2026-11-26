@@ -1,13 +1,13 @@
 // No townsperson walks through a wall: every route, against the real town's solids
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildGrounds } from '../src/grounds.ts';
+import { buildGrounds } from '../src/world/town/grounds.ts';
 import { plansClear, rawPlans } from '../src/content/npc-plans.ts';
-import { blocked, clear, footprints, type XZ } from '../src/routes.ts';
-import { buildStreet } from '../src/street.ts';
-import { buildTemple } from '../src/temple.ts';
-import { buildVillage } from '../src/village.ts';
-import { heightAt } from '../src/terrain.ts';
+import { blocked, clear, footprints, type XZ } from '../src/sim/routes.ts';
+import { buildStreet } from '../src/world/town/street.ts';
+import { buildTemple } from '../src/world/town/temple.ts';
+import { buildVillage } from '../src/world/town/village.ts';
+import { heightAt } from '../src/world/terrain.ts';
 
 const village = buildVillage();
 const solids = [...buildTemple().solids, ...buildGrounds().solids, ...buildStreet().solids, ...village.solids];

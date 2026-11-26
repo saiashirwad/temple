@@ -1,7 +1,7 @@
-import { buildBungalow, noteAt, placeBungalow } from '../bungalow.ts';
-import { Builder } from '../geo.ts';
+import { buildBungalow, noteAt, placeBungalow } from '../world/trail/bungalow.ts';
+import { Builder } from '../render/geo.ts';
 import placement from '../content/bungalow-placement.json';
-import { CLEARING } from '../trail.ts';
+import { CLEARING } from '../world/trail/trail.ts';
 import { exportSettings, slider } from './settings.ts';
 
 export function mount(root: HTMLElement) {

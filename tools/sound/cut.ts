@@ -261,7 +261,7 @@ for (const [k, it] of Object.entries(STEPS)) {
 }
 sprite('steps', steps);
 // The offsets, for the game to import: [start, length] in seconds of each clip in its sheet
-writeFileSync(join(import.meta.dirname, '../../src/sprites.json'), JSON.stringify(sheets, null, 1) + '\n');
+writeFileSync(join(import.meta.dirname, '../../src/audio/sprites.json'), JSON.stringify(sheets, null, 1) + '\n');
 
 for (const [k, b] of Object.entries(BEDS)) {
   // A loop: the stretch plus 3 s more, the extra crossfaded over the start

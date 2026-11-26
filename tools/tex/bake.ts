@@ -101,7 +101,7 @@ for (const layer of LAYERS) {
   for (const size of [1024, 512]) {
     const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
     ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', rawA, ...scale, '-c:v', 'libwebp', '-quality', '86', '-pix_fmt', 'yuva420p', `${OUT}${layer.name}_${size}_c.webp`]);
-    if (size === 512) ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${S}x${S}`, '-i', rawD, ...scale, '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}${layer.name}_${size}_d.jpg`]); // only the 512 data map is ever loaded (src/tex.ts)
+    if (size === 512) ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${S}x${S}`, '-i', rawD, ...scale, '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}${layer.name}_${size}_d.jpg`]); // only the 512 data map is ever loaded (src/render/tex.ts)
   }
   rmSync(rawA);
   rmSync(rawD);
@@ -109,7 +109,7 @@ for (const layer of LAYERS) {
 }
 if (only.length > 0) {
   // Update just the layers baked now in the index, keeping the rest (and the photo layers)
-  const gen = new URL('../../src/textures.gen.ts', import.meta.url).pathname;
+  const gen = new URL('../../src/generated/textures.gen.ts', import.meta.url).pathname;
   const old = readFileSync(gen, 'utf8');
   const m = old.match(/export const TEX_LAYERS = (.*) as const;/)!;
   const list = JSON.parse(m[1]!) as typeof meta;
@@ -123,5 +123,5 @@ if (only.length > 0) {
 export const TEX = ${JSON.stringify(Object.fromEntries(meta.map((m, i) => [m.name, i])))} as const;
 export const TEX_LAYERS = ${JSON.stringify(meta, null, 0)} as const;
 `;
-  writeFileSync(new URL('../../src/textures.gen.ts', import.meta.url).pathname, src);
+  writeFileSync(new URL('../../src/generated/textures.gen.ts', import.meta.url).pathname, src);
 }
