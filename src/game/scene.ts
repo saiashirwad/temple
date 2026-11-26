@@ -280,6 +280,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   let physics: Physics | null = null;
   const solidShape = { solids, props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
   let framesShown = 0;
+  let drewFullMaterials = false;
   let streamingWorld = false;
   const scenarioEntry = launch.tour || launch.bungalow || !!launch.preset;
   let userPlaying = false;
@@ -342,6 +343,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     extra: { pat: d.f32, col: d.vec4f },
   });
   const tex = await textures;
+  tex.refine();
   stage('tex');
   const Built = defineBuilt(pool, tex);
   const built = instances.create(root, pool, { kind: Built, capacity: buildings.meshes.length });
@@ -814,6 +816,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
   return {
     view, walker, journey, test,
+    get fullMaterialFrame() { return drewFullMaterials; },
     inspect() {
       const [x, z] = walker.at;
       return {
@@ -891,7 +894,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       const exploring = walker.mode !== 'held' && (!scenarioEntry || userPlaying);
       if (exploring && (userPlaying || framesShown >= (PROBE_STAGES ? 2 : 30)) && !physicsLoading)
         void requirePhysics().catch(e => console.error('physics', e));
-      if (exploring && framesShown >= 2 && !streamingWorld) {
+      // Give the idle camera its full detail before fetching the rest of the village.
+      // A player's first gesture starts the residents and props immediately.
+      if (exploring && framesShown >= 2 && !streamingWorld && (userPlaying || tex.detail !== 'preview')) {
         streamingWorld = true;
         void Promise.all([residentsReady(), propsReady()]).catch(e => console.error('village assets', e));
       }
@@ -1001,6 +1006,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       eye.record(frame);
       glow.record(frame, { timestampWrites: glowTime.writes() });
       final.record(frame, surface.view(frame), { timestampWrites: closing.writes() });
+      drewFullMaterials = tex.detail === 'full';
       gpu.capture(frame);
       mark('r.post');
       cpuFrames++;

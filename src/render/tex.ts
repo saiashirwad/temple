@@ -29,50 +29,98 @@ export interface Tex {
   /** A mesh tint relative to the tile's own colour, as a multiplier. */
   ratio: (layer: number, tint: d.v3f) => d.v3f;
   tinted: (layer: number, tint: d.v3f, c: d.v3f) => d.v3f;
+  /** Replace preview texels in place with the original assets. Safe to call more than once. */
+  refine(): void;
+  readonly detail: 'preview' | 'full' | 'error';
   destroy(): void;
 }
 
 export const Sampled = d.struct({ color: d.vec4f, normal: d.vec3f, rough: d.f32, metal: d.f32, ratioOn: d.f32 });
 export const Flat = d.struct({ color: d.vec4f, slope: d.vec2f, rough: d.f32 });
 
-/** In a build each array arrives in layer order in a single pack. The workbench and
- * dev server also work directly from the individual files edited by the texture tools. */
-async function loadTiles(id: string, suffix: string, mimeType: string) {
-  const pack = document.querySelector<HTMLLinkElement>(`#material-${id}`);
-  if (pack) {
-    const res = await fetch(pack.href);
-    if (!res.ok) throw new Error(`Missing texture pack ${pack.href}`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const offsets = new DataView(bytes.buffer);
-    return Promise.all(LAYERS.map((_, i) => images.decodeBitmap({
-      bytes: bytes.subarray(offsets.getUint32(4 * i, true), offsets.getUint32(4 * (i + 1), true)),
-      mimeType,
-    })));
-  }
-  return Promise.all(LAYERS.map(async layer => {
-    const file = `${layer.name}_${suffix}`;
-    const res = await fetch(`${import.meta.env.BASE_URL}tex/${file}?v=${layer.mean.join('_')}`);
-    if (!res.ok) throw new Error(`Missing texture ${file}`);
-    return images.decodeBitmap({ bytes: new Uint8Array(await res.arrayBuffer()), mimeType });
+function materialLink(id: string) {
+  return document.querySelector<HTMLLinkElement>(`#material-${id}`);
+}
+
+async function readBytes(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Missing material ${url} (${response.status})`);
+  return response.arrayBuffer();
+}
+
+function packedTile(bytes: ArrayBuffer, i: number) {
+  const offsets = new DataView(bytes);
+  const start = offsets.getUint32(4 * i, true);
+  return new Uint8Array(bytes, start, offsets.getUint32(4 * (i + 1), true) - start);
+}
+
+async function fullTiles(id: string, suffix: string, mimeType: string) {
+  const pack = materialLink(id);
+  const bytes = pack && await readBytes(pack.href);
+  return Promise.all(LAYERS.map(async (layer, i) => {
+    const tile = bytes ? packedTile(bytes, i) : new Uint8Array(await readBytes(
+      `${import.meta.env.BASE_URL}tex/${layer.name}_${suffix}?v=${layer.mean.join('_')}`));
+    return images.decodeBitmap({ bytes: tile, mimeType });
   }));
 }
 
-async function loadTileArray(root: TgpuRoot, id: string, suffix: string, mime: string, color: 'srgb' | 'linear') {
-  const pictures = await loadTiles(id, suffix, mime);
-  try {
-    return images.array(root, pictures, { color });
-  } finally {
-    // The GPU has its own copy. Release up to 96 MiB of decoded colour bitmaps.
-    for (const picture of pictures) picture.close();
-  }
+/** Scale a real 128 px tile into its final-sized slot. All mips are populated on
+ * frame one, and the shader keeps the same texture view when detail arrives. */
+function previewTiles(bytes: ArrayBuffer, offset: number, size: number) {
+  return Promise.all(LAYERS.map((_, i) => createImageBitmap(
+    new Blob([packedTile(bytes, offset + i)], { type: 'image/webp' }), {
+      resizeWidth: size, resizeHeight: size, resizeQuality: 'low', premultiplyAlpha: 'none', colorSpaceConversion: 'none',
+    })));
 }
 
 export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex> {
   const size = sharp ? 1024 : 512;
-  const [color, data] = await Promise.all([
-    loadTileArray(root, `color-${size}`, `${size}_c.webp`, 'image/webp', 'srgb'),
-    loadTileArray(root, 'data', '512_d.jpg', 'image/jpeg', 'linear'),
+  const link = materialLink('preview');
+  const preview = link?.rel === 'preload' ? await readBytes(link.href) : null;
+  let disposed = false;
+  let refining = false;
+  let detail: Tex['detail'] = preview ? 'preview' : 'full';
+
+  function upload(pictures: ImageBitmap[], color: 'srgb' | 'linear') {
+    try { return images.array(root, pictures, { color }); }
+    finally { for (const picture of pictures) picture.close(); }
+  }
+
+  async function make(id: string, suffix: string, mime: string, width: number, color: 'srgb' | 'linear') {
+    const offset = color === 'linear' ? 0 : LAYERS.length;
+    const pictures = preview ? await previewTiles(preview, offset, width) : await fullTiles(id, suffix, mime);
+    const texture = upload(pictures, color);
+    const refine = async () => {
+      const full = await fullTiles(id, suffix, mime);
+      try {
+        if (disposed) return;
+        for (const [layer, picture] of full.entries()) texture.write(picture, { origin: [0, 0, layer] });
+        texture.generateMipmaps();
+      } finally { for (const picture of full) picture.close(); }
+    };
+    return { texture, refine };
+  }
+
+  const [colors, normals] = await Promise.all([
+    make(`color-${size}`, `${size}_c.webp`, 'image/webp', size, 'srgb'),
+    make('data', '512_d.jpg', 'image/jpeg', 512, 'linear'),
   ]);
+  const color = colors.texture, data = normals.texture;
+  if (!preview) performance.mark('game:materials-ready');
+  const refine = () => {
+    if (!preview || refining || disposed) return;
+    refining = true;
+    void Promise.all([colors.refine(), normals.refine()]).then(() => {
+      if (disposed) return;
+      detail = 'full';
+      performance.mark('game:materials-ready');
+    }).catch(error => {
+      if (disposed) return;
+      detail = 'error';
+      performance.mark('game:materials-error', { detail: String(error) });
+      console.warn('Material detail', error);
+    });
+  };
   const colorView = color.createView(d.texture2dArray(d.f32));
   const dataView = data.createView(d.texture2dArray(d.f32));
   const smooth = images.sampler(root, { anisotropy: Q.anisotropy });
@@ -232,7 +280,10 @@ export async function loadTextures(root: TgpuRoot, sharp: boolean): Promise<Tex>
     ground,
     ratio: ratioOf,
     tinted: tintedOf,
+    refine,
+    get detail() { return detail; },
     destroy() {
+      disposed = true;
       color.destroy();
       data.destroy();
     },

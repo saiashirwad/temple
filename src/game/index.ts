@@ -261,6 +261,10 @@ if (!navigator.gpu) {
         delete document.body.dataset.starting;
         note.remove();
       }
+      if (canvas.dataset.fullDetail === undefined && scene.fullMaterialFrame && canvas.dataset.ready !== undefined) {
+        canvas.dataset.fullDetail = '';
+        performance.mark('game:full-detail-frame');
+      }
     },
     onError: (error) => {
       console.error(error);

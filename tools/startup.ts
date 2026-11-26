@@ -10,10 +10,10 @@ import { verifyFirstFrame, type FirstFrame } from './scenario/first-frame.ts';
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   runs: { type: 'string', default: '3' }, dist: { type: 'string', default: 'dist' },
   mbps: { type: 'string' }, latency: { type: 'string' },
-  out: { type: 'string' }, cpu: { type: 'boolean' }, gpu: { type: 'boolean' }, help: { type: 'boolean' },
+  out: { type: 'string' }, cpu: { type: 'boolean' }, gpu: { type: 'boolean' }, detail: { type: 'boolean' }, help: { type: 'boolean' },
 } });
 if (values.help) {
-  console.log("npm run startup -- [--runs N] [--dist DIR] [--out DIR] [--cpu] [--gpu] [--mbps N] [--latency MS] '/?preset=3'\nPass one or more game paths. --out saves timing and resource waterfalls. --cpu also saves Chromium CPU profiles. --gpu counts shader modules and times completion of the first frame on the GPU. --mbps and --latency emulate a download link and request latency.");
+  console.log("npm run startup -- [--runs N] [--dist DIR] [--out DIR] [--cpu] [--gpu] [--detail] [--mbps N] [--latency MS] '/?preset=3'\nPass one or more game paths. --out saves timing and resource waterfalls. --cpu also saves Chromium CPU profiles. --gpu counts shader modules and times completion of the first frame on the GPU. --detail also waits for the first full-resolution material frame. --mbps and --latency emulate a download link and request latency.");
   process.exit(0);
 }
 const runs = Number(values.runs);
@@ -37,6 +37,7 @@ try {
   for (const [pathIndex, path] of paths.entries()) {
     const frames: number[] = [];
     const nextPaints: number[] = [];
+    const detailedFrames: number[] = [];
     for (let i = 0; i < runs; i++) {
       const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--enable-unsafe-webgpu'] });
       try {
@@ -81,6 +82,10 @@ try {
         await page.goto(new URL(path, server.resolvedUrls!.local[0]).href, { waitUntil: 'commit' });
         await page.waitForFunction(gpu => document.querySelector('#note[data-error]') ||
           (performance.getEntriesByName('startup:next-frame').length && (!gpu || performance.getEntriesByName('startup:gpu-finished').length)), !!values.gpu, { timeout: 90000 });
+        if (values.detail) {
+          await page.waitForFunction(() => performance.getEntriesByName('game:full-detail-frame').length ||
+            performance.getEntriesByName('game:materials-error').length || document.querySelector('#note[data-error]'), undefined, { timeout: 90000 });
+        }
         if (trace && values.cpu) {
           const { profile } = await trace.send('Profiler.stop');
           await writeFile(join(out!, `case-${pathIndex + 1}-run-${i + 1}.cpuprofile`), JSON.stringify(profile));
@@ -88,14 +93,17 @@ try {
         const result = await page.evaluate(() => {
           const error = document.querySelector<HTMLElement>('#note[data-error]')?.dataset.error;
           if (error) throw new Error(error);
+          if (performance.getEntriesByName('game:materials-error').length) throw new Error('Full-resolution materials failed to load');
+          const fullDetail = performance.getEntriesByName('game:full-detail-frame')[0];
           const end = performance.getEntriesByName('game:first-frame')[0].startTime;
           const resources = (performance.getEntriesByType('resource') as PerformanceResourceTiming[])
-            .filter(r => r.startTime < end).map(r => ({
+            .filter(r => r.startTime < (fullDetail?.startTime ?? end)).map(r => ({
               path: new URL(r.name).pathname, startMs: Math.round(r.startTime), endMs: Math.round(r.responseEnd),
               bytes: r.transferSize, finishedByReveal: r.responseEnd <= end,
             }));
           const completed = performance.getEntriesByName('startup:gpu-finished')[0] as PerformanceMark | undefined;
           return {
+            fullDetailMs: fullDetail && Math.round(fullDetail.startTime),
             gpu: completed && { finishedMs: Math.round(completed.startTime), shaderModules: completed.detail.modules as number },
             frame: { ms: Math.round(end), ...JSON.parse(document.querySelector('canvas')!.dataset.firstFrame!) } as FirstFrame,
             nextFrameMs: Math.round(performance.getEntriesByName('startup:next-frame')[0].startTime),
@@ -107,15 +115,18 @@ try {
         verifyFirstFrame(new URL(path, 'http://localhost').searchParams, result.frame);
         frames.push(result.frame.ms);
         nextPaints.push(result.nextFrameMs);
+        if (result.fullDetailMs) detailedFrames.push(result.fullDetailMs);
         const completed = result.resources.filter(r => r.finishedByReveal);
         console.log(`${path}  ${i + 1}/${runs}  ${result.frame.ms} ms reveal  ${result.nextFrameMs} ms next frame  ${(completed.reduce((sum, r) => sum + r.bytes, 0) / 1e6).toFixed(1)} MB / ${completed.length} completed requests` +
-          (result.gpu ? `  ${result.gpu.finishedMs} ms GPU complete / ${result.gpu.shaderModules} shader modules` : ''));
+          (result.gpu ? `  ${result.gpu.finishedMs} ms GPU complete / ${result.gpu.shaderModules} shader modules` : '') +
+          (result.fullDetailMs ? `  ${result.fullDetailMs} ms full detail` : ''));
         if (out) await writeFile(join(out, `case-${pathIndex + 1}-run-${i + 1}.json`), JSON.stringify({ path, network: { mbps, latency }, ...result }, null, 2));
       } finally {
         await browser.close();
       }
     }
-    console.log(`Median  ${path}  ${median(frames)} ms reveal  ${median(nextPaints)} ms next frame`);
+    console.log(`Median  ${path}  ${median(frames)} ms reveal  ${median(nextPaints)} ms next frame` +
+      (detailedFrames.length === runs ? `  ${median(detailedFrames)} ms full detail` : ''));
   }
 } finally {
   await server.close();

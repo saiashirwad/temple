@@ -12,6 +12,22 @@ const packs = [
   { id: 'color-1024', suffix: '1024_c.webp', media: '(min-width: 701px) and (min-height: 701px) and (min-resolution: 1dppx)' },
 ];
 
+// This tiny script runs as the browser reads the game HTML, before the JavaScript
+// entry or device initialization. Capture URLs and workbench iframes stay exact.
+const preload = `{
+  const params = new URLSearchParams(location.search);
+  for (const [key, value] of new URLSearchParams(location.hash.slice(1))) {
+    if (!params.has(key)) params.set(key, value);
+  }
+  const mode = params.get('materials');
+  const play = [...params.keys()].every(key => key === 'seed' || key === 'materials');
+  const capture = window.top !== window || ['scenario', 'run', 'shot'].some(key => params.has(key));
+  const preview = !capture && (mode === 'preview' || (mode !== 'full' && play));
+  for (const link of document.querySelectorAll('link[id^="material-"]')) {
+    if (preview === (link.id === 'material-preview')) link.rel = 'preload';
+  }
+}`;
+
 export function materialTiles(): Plugin {
   let dir: string;
   let base: string;
@@ -21,12 +37,8 @@ export function materialTiles(): Plugin {
     apply: 'build',
     configResolved(config) { dir = join(config.publicDir, 'tex'); base = config.base; },
     async buildStart() {
-      links = await Promise.all(packs.map(async ({ id, suffix, media }) => {
-        const tiles = await Promise.all(materialLayers.map(({ name }) => {
-          const path = join(dir, name + '_' + suffix);
-          this.addWatchFile(path);
-          return readFile(path);
-        }));
+      const { default: sharp } = await import('sharp');
+      const pack = (id: string, tiles: Buffer[], media?: string): HtmlTagDescriptor => {
         const offsets = Buffer.alloc((tiles.length + 1) * 4);
         let offset = offsets.length;
         offsets.writeUInt32LE(offset);
@@ -40,9 +52,23 @@ export function materialTiles(): Plugin {
         this.emitFile({ type: 'asset', fileName: file, source });
         return {
           tag: 'link', injectTo: 'head',
-          attrs: { id: `material-${id}`, rel: 'preload', as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'low', href: base + file, ...(media && { media }) },
+          attrs: { id: `material-${id}`, as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'low', href: base + file, ...(media && { media }) },
         };
+      };
+      const sets = await Promise.all(packs.map(async ({ id, suffix, media }) => {
+        const tiles = await Promise.all(materialLayers.map(({ name }) => {
+          const path = join(dir, name + '_' + suffix);
+          this.addWatchFile(path);
+          return readFile(path);
+        }));
+        const previews = id === 'color-1024' ? [] : await Promise.all(tiles.map(tile =>
+          // Keep RGB even at near-zero alpha: alpha holds a surface mask on the mural.
+          sharp(tile).resize(128, 128).webp({ quality: 80 }).toBuffer()));
+        return { link: pack(id, tiles, media), previews };
       }));
+      // Store data, then colour, in the same order as the two 512px source sets above.
+      links = [...sets.map(set => set.link), pack('preview', sets.flatMap(set => set.previews)),
+        { tag: 'script', children: preload, injectTo: 'head' }];
     },
     transformIndexHtml(_html, context) {
       if (context.path === '/index.html') return links;

@@ -49,11 +49,13 @@ For load measurements, run `npm run build` and add `--built` to the scenario com
 Build once with `npm run build`. Run `npm run startup` to measure the ordinary opening, bridge and bungalow ending three times each. Each sample opens a fresh headless Chromium profile, navigates directly to the requested state and checks the first revealed frame. Times start at navigation. Browser process startup is outside the measurement.
 
 ```sh
-npm run startup -- --runs 5 --gpu --cpu --out /tmp/bridge-profile '/?preset=3&seed=42'
+npm run startup -- --runs 5 --gpu --cpu --detail --out /tmp/bridge-profile '/?preset=3&seed=42'
 npm run startup -- --runs 3 --mbps 30 --latency 40 --out /tmp/bridge-network '/?preset=3&seed=42'
 ```
 
-The JSON records the camera, story state, startup milestones and resource timings. The reveal marks the frame the game submits when it removes the loading screen. The next animation callback provides a second timing. `--gpu` records when the submitted GPU work finishes and how many shader modules were created by reveal. `--cpu` saves a Chromium CPU profile you can open in DevTools. Use `--dist` to compare a saved release build under the same conditions. For edits within one loaded world, the workbench viewpoint selector reuses its GPU device and loaded assets.
+The JSON records the camera, story state, startup milestones and resource timings. The reveal marks the frame the game submits when it removes the loading screen. The next animation callback provides a second timing. `--gpu` records when the submitted GPU work finishes and how many shader modules were created by reveal. `--cpu` saves a Chromium CPU profile you can open in DevTools. Use `--detail` to measure the first revealed frame drawn with full-resolution materials. Use `--dist` to compare a saved release build under the same conditions. For edits within one loaded world, the workbench viewpoint selector reuses its GPU device and loaded assets.
+
+In a production build, ordinary play can begin with 128-pixel material tiles. The renderer uploads the original colour and surface maps into the same textures as they arrive. Use `?materials=full` to wait for the originals. Scenario captures and workbench views use full detail from their first frame. The dev server produces the world layout when the game first requests it and reuses it until a layout dependency changes.
 
 ## Add a scenario
 
