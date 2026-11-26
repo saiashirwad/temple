@@ -1,4 +1,6 @@
 import * as web from '@typegpu/kit/web';
+import { loadSpecimenGeometry } from '../render/vegetation.ts';
+import { loadTown } from '../world/town/load.ts';
 import { createScene } from './scene.ts';
 import { boot } from './boot.ts';
 import { resolveLaunch } from './launch.ts';
@@ -100,7 +102,8 @@ if (!navigator.gpu) {
   note.dataset.error = 'WebGPU unavailable';
   note.textContent = 'This scene needs WebGPU. Try a recent Chrome, Edge or Safari.';
 } else {
-  web.host(createScene, launch, {
+  const inputs = { launch, specimensReady: loadSpecimenGeometry(), town: loadTown() };
+  web.host((root, surface) => createScene(root, surface, inputs), {
     canvas,
     // Phones have small, dense screens and modest GPUs: fewer pixels there go a long way
     maxPixelRatio: coarse ? 1.15 : 1.5,

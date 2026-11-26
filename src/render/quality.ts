@@ -19,6 +19,7 @@ const DESKTOP = {
   underFade: 6,
   /** scene.ts: distance where trees swap mesh for card. */
   lod: 46,
+  lodFade: 8,
   /** scene.ts: share of far cards (> 200 m from the origin) kept, thinned by hash at add time. */
   farCards: 1,
   /** scene.ts: moon shadow cascade reach. */
@@ -41,6 +42,7 @@ const PHONE: typeof DESKTOP = {
   underTo: 32,
   underFade: 5,
   lod: 40,
+  lodFade: 8,
   farCards: 0.65,
   shadowFar: 50,
   steps: 6,

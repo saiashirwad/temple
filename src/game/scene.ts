@@ -26,22 +26,18 @@ import {
   type Surface,
 } from '@typegpu/kit';
 import { d, std, type TgpuRoot } from 'typegpu';
-import { buildTemple } from '../world/town/temple.ts';
 import { defineBuilt, defineFlame, now } from '../render/surfaces.ts';
 import { lampAt, type Lamp } from '../render/flicker.ts';
-import { mergeModels, P } from '../render/geo.ts';
 import { loadTextures } from '../render/tex.ts';
 import { CLOISTER, COMPOUND, GROUND, POND } from '../content/world.ts';
 import { RIDERS, rideAt, wheelModel } from '../world/town/traffic.ts';
 import { createGround } from '../render/ground.ts';
 import { sky, MOON_ARRAY } from '../render/sky.ts';
 import { grade } from '../render/look.ts';
-import { createVegetation, prepareVegetation } from '../render/vegetation.ts';
-import { buildPond, createPond } from '../render/pond.ts';
-import { buildStreet } from '../world/town/street.ts';
+import { createVegetation, prepareVegetation, type loadSpecimenGeometry } from '../render/vegetation.ts';
+import { createPond } from '../render/pond.ts';
 import { createAir } from '../render/air.ts';
-import { buildGrounds } from '../world/town/grounds.ts';
-import { buildVillage } from '../world/town/village.ts';
+import type { TownData } from '../world/town/load.ts';
 import { LAND, landMap, townSummary } from '../world/town/town.ts';
 import { createPeople, peopleLoader } from '../render/actors/people.ts';
 import { createHerd, loadHerd } from '../render/actors/herd.ts';
@@ -67,7 +63,6 @@ import type { Launch } from './launch.ts';
 import { boot } from './boot.ts';
 import { plansClear, WATCHER, type Who } from '../content/npc-plans.ts';
 import { AVATARS } from '../content/assets.ts';
-import { footprints } from '../sim/routes.ts';
 import { randomStreams } from '../math/random.ts';
 import { Q } from '../render/quality.ts';
 
@@ -85,10 +80,6 @@ const MOON = {
   fogDensity: 0.016,
   fogFalloff: 0.06,
 };
-
-/** Trees nearer the eye than this are meshes, farther ones cards. */
-const LOD = Q.lod;
-const FADE = 8;
 
 /**
  * Moonlit sky dimmed where nearby surfaces hide it, and a little of the lamplight too: an
@@ -128,7 +119,9 @@ const occludedLamp = (point: shading.Point, toLight: d.v3f, distance: number, ra
 
 const PROBE_STAGES = boot.has('probe');
 
-export async function createScene(root: TgpuRoot, surface: Surface, launch: Launch) {
+type SceneInputs = { launch: Launch; specimensReady: ReturnType<typeof loadSpecimenGeometry>; town: Promise<TownData> };
+
+export async function createScene(root: TgpuRoot, surface: Surface, { launch, specimensReady, town }: SceneInputs) {
   const bakedLayout = import.meta.env.PROD ? loadWorldLayout(document.querySelector<HTMLLinkElement>('#world-layout')!.href) : undefined;
   const random = randomStreams(boot.get('seed'));
   // GPU time decides how many pixels to draw: below the budget, full size; over it, fewer,
@@ -233,26 +226,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     .then((r) => r.arrayBuffer())
     .then((b) => images.decode({ bytes: new Uint8Array(b), mimeType: 'image/png' }));
   const engine = loadPhysics();
-  const temple = buildTemple();
-  const grounds = buildGrounds();
-  const street = buildStreet();
-  const village = buildVillage();
-  const placed = [...street.props, ...grounds.props, ...village.props];
+  const { buildings, flames: flameModel, village, gaps, placed, solids, feet, lamps: all, streetLights } = await town;
   const propFiles = loadProps(placed);
-  const pondModel = buildPond();
   stage('built');
   const baked = await bakedLayout;
-  const planted = baked?.planted ?? plantAll(village.homes, grounds.gaps, village.tulsi);
+  const planted = baked?.planted ?? plantAll(village.homes, gaps, village.tulsi);
   stage('planted');
-  const { geometry, trees } = prepareVegetation(planted);
-  // Flames go to their own set, which stretches and bends them in the breeze
-  type Model = typeof temple.model;
-  const isFlame = (mesh: Model['meshes'][number]) => Math.floor((mesh.extra?.pat?.[0] ?? 0) + 0.5) === P.FLAME;
-  const solidOf = (m: Model): Model => ({ ...m, meshes: m.meshes.filter((x) => !isFlame(x)) });
-  const allBuilt = [temple.model, grounds.model, street.model, village.model, pondModel];
-  // Each material once across the whole town: one mesh (and one pool slot) per material, not per builder
-  const flameModel: Model = mergeModels([{ meshes: allBuilt.flatMap((m) => m.meshes.filter(isFlame)), images: [] }]);
-  const builtModels = [mergeModels(allBuilt.map(solidOf))];
   const riders = RIDERS();
   const HERD_SIZES = [1.05, 0.95, 0.55];
   const lanternModel = lantern();
@@ -261,11 +240,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const wheelKey = (w: { rad: number; wid: number }) => `${w.rad}/${w.wid}`;
   for (const r of riders) for (const w of r.wheels) if (!wheelModels.has(wheelKey(w))) wheelModels.set(wheelKey(w), wheelModel(w.rad, w.wid));
   // The solid world: walls, plinths, steps, posts and trunks, set up while the files download
-  const [propModels, folk] = await Promise.all([propFiles, peopleFiles]);
+  const [propModels, folk, models] = await Promise.all([propFiles, peopleFiles, specimensReady]);
+  const { geometry, trees } = prepareVegetation(planted, models);
   // The solid world is set up just after the first picture, so it never holds up the load;
   // until it's ready the walker follows the land
   let physics: Physics | null = null;
-  const solidShape = { solids: [...temple.solids, ...grounds.solids, ...street.solids, ...village.solids], props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
+  const solidShape = { solids, props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
   let framesShown = 0;
   /** Adds the townspeople to the picture, its reflection and the moon's shadow once they compile. */
   const addPeople = async (group: ReturnType<typeof createPeople>) => {
@@ -314,7 +294,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   stage('props');
 
   const pool = meshPool.create(root, {
-    ...meshPool.roomFor([...builtModels, flameModel, ...riders.map((r) => r.model), ...wheelModels.values(), lanternModel]),
+    ...meshPool.roomFor([buildings, flameModel, ...riders.map((r) => r.model), ...wheelModels.values(), lanternModel]),
     extra: { pat: d.f32, col: d.vec4f },
   });
   // Everything that grows has a pool of its own: one pool holds at most 256 meshes
@@ -324,8 +304,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const tex = await textures;
   stage('tex');
   const Built = defineBuilt(pool, tex);
-  const built = instances.create(root, pool, { kind: Built, capacity: builtModels.reduce((n, m) => n + m.meshes.length, 0) });
-  for (const m of builtModels) built.add(pool.add(m));
+  const built = instances.create(root, pool, { kind: Built, capacity: buildings.meshes.length });
+  built.add(pool.add(buildings));
   // The scanned props have a pool of their own: the scene's meshes nearly fill one
   const propPool = meshPool.create(root, { ...meshPool.roomFor([...propModels.values()]), anisotropy: 8 });
   const props = instances.create(root, propPool, { kind: Prop, capacity: rowsFor(propModels, placed) });
@@ -341,11 +321,10 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const hidden: V3 = [0, -50, 0];
   const lanternId = moving.add(pool.add(lanternModel), { position: hidden });
 
-  const vegetation = createVegetation(root, tex, planted, geometry, grassAt);
+  const vegetation = createVegetation(root, tex, planted, geometry, grassAt, view.pose);
   const { treePool, near, far, undergrowth, meadow, atlases, cardSets } = vegetation;
 
   // ---- lights: every lit wick and bulb that throws light, the moon, and a few lamp shadows
-  const all: Lamp[] = [...temple.lamps, ...grounds.lamps, ...street.lamps, ...village.lamps];
   /** Where wick smoke rises: the open oil lights, thinned so no two plumes start too close. */
   const wicksOf = (list: Lamp[]) => {
     const out: [number, number, number][] = [];
@@ -427,14 +406,13 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const flaming = flames.renderer({ blend: 'translucent' }).pipe(withTime);
   const passing = moving.renderer().pipe(withTime);
   const nearTrees = near.renderer({ cull: true }).pipe(withTime);
-  const farMeshes = far.renderer({ cull: true, to: LOD, fade: FADE, eye: view }).pipe(withTime);
-  const cardsAt = { cull: true, from: LOD, fade: FADE, eye: view, prepass: true } as const;
+  const farMeshes = far.renderer({ cull: true, to: Q.lod, fade: Q.lodFade, eye: view }).pipe(withTime);
+  const cardsAt = { cull: true, from: Q.lod, fade: Q.lodFade, eye: view, prepass: true } as const;
   const farCards = cardSets.map((set, i) => set.renderer(cardsAt).pipe(atlases[i]!.inject()));
   const plants = undergrowth.renderer({ cull: true, to: Q.underTo, fade: Q.underFade, eye: view }).pipe(withTime);
   const grass = meadow.renderer({ cull: true, to: Q.grassTo, fade: Q.grassFade, eye: view }).pipe(withTime);
   const things = props.renderer({ cull: true });
   const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
-  const feet = footprints(solidShape.solids);
   const plans = baked && !boot.has('lineup') ? baked.plans : plansClear(village.tulsi, village.seats, solidShape.solids, feet);
   const isWatcher = (p: typeof plans[number]) => p.kind === 'walk' && p.watcher;
   const people = createPeople(root, folk, launch.forest ? plans.filter(isWatcher) : plans, feet, random.people);
@@ -491,7 +469,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     farLantern,
   );
   const sim = clock.fixedStep({ step: 1 / 60 });
-  const air = createAir(root, view, sim.step, street.lamps.filter((l) => l.spot).map((l) => l.position), wicksOf(all), village.chimneys);
+  const air = createAir(root, view, sim.step, streetLights, wicksOf(all), village.chimneys);
   const thingsDrawn = scene.add(things);
   const drawnNames = ['land', 'river', 'built', 'moving', 'nearTrees', 'farTrees', ...FAR_KINDS.map((k) => 'cards:' + k), 'plants', 'grass', 'props', 'pond', 'farLights', 'eyes', 'flames', 'sky', 'mist', 'riverAir', 'smoke', 'kitchen', 'flies', 'moths'];
   /** The groups the bench times: the big ones, so a run fits in one short check. */
@@ -884,6 +862,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       sound.update(frame.dt, eyeAt, view.pose.yaw, heard);
       mark('sound');
       // The lights' grid goes where you go, so the forest's lamps are found out there too
+      vegetation.populateAround(eyeAt[0], eyeAt[2]);
       cellsLow.x = eyeAt[0] - 150;
       cellsLow.z = eyeAt[2] - 130;
       cells.move(cellsLow);
