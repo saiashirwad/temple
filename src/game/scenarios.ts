@@ -34,7 +34,6 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
   let shown = boot.has('state');
   const replay = gameReplay(launch);
   let pendingView: string | null = null;
-  let selecting = 0;
   let prepared = !launch.preset;
   addEventListener(
     'keydown',
@@ -84,12 +83,15 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : RUNS[key];
     if (!r) return;
     delete stateBox.dataset.error;
-    if (spot) pendingView = key;
     const active: NonNullable<typeof current> = { run: r, t0: performance.now(), from: [...s.walker.at], verdict: null, ready: false };
     current = active;
     try {
+      const view = spot ?? SPOTS[RUNS[key]?.spot ?? ''];
+      if (view) await s.test.prepareView(view);
+      if (current !== active) return;
       await r.start(s);
       if (current !== active) return;
+      if (spot) pendingView = key;
       active.t0 = performance.now();
       active.from = [...s.walker.at];
     } catch (error) {
@@ -97,6 +99,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
       if (current === active) stateBox.dataset.error = active.verdict;
     }
     active.ready = true;
+    return current === active && !active.verdict;
   };
 
   // Same-origin workbench switches views without recreating the device or downloading assets.
@@ -104,17 +107,10 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     const key = (event as CustomEvent<string>).detail;
     const spot = SPOTS[key];
     if (!scene || !spot) return;
-    const request = ++selecting;
-    try {
-      if (key === '1') await scene.test.townReady();
-      if (spot.shot.startsWith('herd-')) await scene.test.requireWildlife('herd');
-      if (request !== selecting) return;
-      await run(key, scene);
+    if (await run(key, scene)) {
       const url = new URL(location.href);
       url.searchParams.set('preset', key);
       history.replaceState(null, '', url);
-    } catch (error) {
-      if (request === selecting) stateBox.dataset.error = String(error);
     }
   });
 

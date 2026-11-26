@@ -48,5 +48,19 @@ export function placeProps(pool: meshPool.MeshPool, set: ReturnType<typeof insta
   return [...added.values()];
 }
 
-/** How many instance rows the placements take: one per mesh of each model placed. */
-export const rowsFor = (models: Map<string, ModelData>, placed: readonly PropAt[]) => placed.reduce((n, p) => n + models.get(p.name)!.meshes.length, 0) + 4;
+/** Reserve one pool for the entire world even when distant models have yet to download. */
+export function propBudget(placed: readonly PropAt[]) {
+  const used = [...new Set(placed.map(p => p.name))].map(name => sizes[name]!);
+  const pool = meshPool.roomFor(used);
+  const uvs1 = used.some(size => size.uvs1) ? { uvs1: true as const } : {};
+  return { pool: { ...pool, ...uvs1 }, rows: placed.reduce((n, p) => n + sizes[p.name]!.meshes, 0) };
+}
+
+export const propNear = (p: PropAt, at: readonly number[]) =>
+  Math.hypot(p.at[0] - at[0], p.at[2] - at[1]) <= 180;
+
+/** A model is fetched once, even if several copies straddle the first view's radius. */
+export function splitProps(placed: readonly PropAt[], at?: readonly number[]) {
+  const visible = new Set(placed.filter(p => !at || propNear(p, at)).map(p => p.name));
+  return { first: placed.filter(p => visible.has(p.name)), later: placed.filter(p => !visible.has(p.name)) };
+}

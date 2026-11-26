@@ -14,18 +14,19 @@ import * as std from 'typegpu/std';
 import { heightAt } from '../../world/terrain.ts';
 import type { Plan, Who } from '../../content/npc-plans.ts';
 import { type Foot, pushOut } from '../../sim/routes.ts';
-import { AVATARS, CLIP_NAMES, type ClipName, type Sex } from '../../content/assets.ts';
-export { AVATARS } from '../../content/assets.ts';
+import { AVATARS, type ClipName } from '../../content/assets.ts';
 import { makeWalker, stepWalker } from '../../sim/walker.ts';
 
 type V3 = [number, number, number];
 type ModelData = Awaited<ReturnType<typeof gltf.load>>;
 
-
-
 // ---- loading
-type Animations = { clips: Record<ClipName, poses.ClipData>; pace: Record<ClipName, number> };
-type PeopleFiles = { bodies: Map<Who, ModelData>; animations: Map<Sex, Animations> };
+const WALK_CLIPS = ['idle_neutral_01', 'walk_slow_01', 'walk_neutral_01'] as const;
+const clipsFor = (plan: Plan): readonly ClipName[] =>
+  plan.kind === 'walk' ? WALK_CLIPS : plan.swap ? [plan.clip, plan.swap] : [plan.clip];
+
+type Animation = ReturnType<typeof inPlace>;
+type PeopleFiles = { bodies: Map<Who, ModelData>; animations: Map<string, Animation> };
 
 /** Takes the clip's travel out of its root, keeping the bob, and says how fast it went. */
 function inPlace(clip: poses.ClipData) {
@@ -51,26 +52,25 @@ function inPlace(clip: poses.ClipData) {
 /** Share the watcher's body and clips when the village joins a forest-first scene. */
 export function peopleLoader(base = import.meta.env.BASE_URL) {
   const bodies = new Map<Who, Promise<ModelData>>();
-  const rigs = new Map<Sex, Promise<Animations>>();
-  async function loadRig(sex: Sex): Promise<Animations> {
-    const clips = {} as Animations['clips'], pace = {} as Animations['pace'];
-    await Promise.all(CLIP_NAMES.map(async name => {
-      const model = await gltf.load(`${base}people/clips/${sex}_${name}.glb`);
-      const animation = inPlace(poses.clip(model, name));
-      clips[name] = animation.clip;
-      pace[name] = animation.pace;
-    }));
-    return { clips, pace };
-  }
-  return async (who: Who[]): Promise<PeopleFiles> => {
-    const sexes = new Set(who.map(w => AVATARS[w].sex));
-    for (const sex of sexes) if (!rigs.has(sex)) rigs.set(sex, loadRig(sex));
+  const animations = new Map<string, Promise<Animation>>();
+  return async (plans: readonly Plan[]): Promise<PeopleFiles> => {
+    const who = [...new Set(plans.map(p => p.who))];
+    const needed = new Set<string>();
+    for (const plan of plans) {
+      for (const name of clipsFor(plan)) {
+        const key = `${AVATARS[plan.who].sex}_${name}`;
+        needed.add(key);
+        if (!animations.has(key)) {
+          animations.set(key, gltf.load(`${base}people/clips/${key}.glb`).then(model => inPlace(poses.clip(model, name))));
+        }
+      }
+    }
     for (const w of who) if (!bodies.has(w)) bodies.set(w, gltf.load(`${base}people/${AVATARS[w].file}.glb`));
-    const [models, animations] = await Promise.all([
+    const [models, clips] = await Promise.all([
       Promise.all(who.map(async w => [w, await bodies.get(w)!] as const)),
-      Promise.all([...sexes].map(async sex => [sex, await rigs.get(sex)!] as const)),
+      Promise.all([...needed].map(async key => [key, await animations.get(key)!] as const)),
     ]);
-    return { bodies: new Map(models), animations: new Map(animations) };
+    return { bodies: new Map(models), animations: new Map(clips) };
   };
 }
 
@@ -113,32 +113,17 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
     const rows = members.reduce((n, p) => n + files.bodies.get(p.who)!.meshes.length, 0);
     // The clips carry their own rig's bone lengths and face; this body keeps its own, taking only
     // their turns (and the root's sway and bob)
-    const rest = new Map(model.skin!.joints.map((j) => [j.name, j.position]));
-    const fit = (clip: poses.ClipData): poses.ClipData => ({
-      ...clip,
-      channels: clip.channels.map((ch) => {
-        const own = rest.get(ch.joint);
-        if (ch.path !== 'position' || ch.joint === 'Bip01' || !own) return ch;
-        const v = new Float32Array(ch.values.length);
-        for (let i = 0; i < v.length; i += 3) v.set(own, i);
-        return { ...ch, values: v };
-      }),
-    });
-    const c = Object.fromEntries(Object.entries(files.animations.get(sex)!.clips).map(([k, v]) => [k, fit(v)])) as Record<ClipName, poses.ClipData>;
-    const figures = poses.create(
-      root,
-      model.skin!,
-      {
-        moving: [c.idle_neutral_01, c.walk_slow_01, c.walk_neutral_01],
-        idle_neutral_01: c.idle_neutral_01,
-        idle_neutral_02: c.idle_neutral_02,
-        gestic_talk_neutral_01: c.gestic_talk_neutral_01,
-        sit_chair_idle_neutral_01: c.sit_chair_idle_neutral_01,
-        crouch_idle: c.crouch_idle,
-        idle_look_around_01: c.idle_look_around_01,
-      },
-      { capacity: members.length },
-    );
+    const clips: Record<string, poses.ClipData | poses.ClipData[]> = {};
+    const fit = (name: ClipName): poses.ClipData => {
+      const { clip } = files.animations.get(`${sex}_${name}`)!;
+      // Absent translation channels use this body's joint rest positions.
+      return { ...clip, channels: clip.channels.filter(ch => ch.path !== 'position' || ch.joint === 'Bip01') };
+    };
+    for (const plan of members) {
+      if (plan.kind === 'walk') clips.moving ??= WALK_CLIPS.map(fit);
+      else for (const name of clipsFor(plan)) clips[name] ??= fit(name);
+    }
+    const figures = poses.create(root, model.skin!, clips, { capacity: members.length });
     const set = instances.create(root, pool, { kind: Person, capacity: rows, history: true });
     groups.set(base, { figures, set });
   }
@@ -153,12 +138,14 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
       const pose = g.figures.add(plan.clip, 0, { from: phase * 10 });
       const [x, z] = plan.at;
       const id = g.set.add(body, { pose, position: [x, heightAt(x, z) + (plan.lift ?? 0), z], rotation: yawQ(plan.yaw) });
-      return { plan, g, pose, id, sex, metres: 0, dir: 1, speed: 0, yaw: plan.yaw, wait: 0, next: 8 + phase * 10, talking: true, lens: [0], length: 0, dodge: 0 };
+      return { plan, g, pose, id, slow: 0, walk: 0, metres: 0, dir: 1, speed: 0, yaw: plan.yaw, wait: 0, next: 8 + phase * 10, talking: true, lens: [0], length: 0, dodge: 0 };
     }
     const walker = makeWalker(plan);
     const pose = g.figures.add('moving', 0, { mix: 2, from: phase });
+    const slow = files.animations.get(`${sex}_walk_slow_01`)!.pace || 0.8;
+    const walk = files.animations.get(`${sex}_walk_neutral_01`)!.pace || 1.1;
     const id = g.set.add(body, { pose, position: [0, -50, 0] });
-    return { plan, g, pose, id, sex, ...walker, next: 0, talking: false };
+    return { plan, g, pose, id, slow, walk, ...walker, next: 0, talking: false };
   });
 
   /** The man walking the dark lane with a torch: where his torch is and which way it points. */
@@ -218,9 +205,7 @@ export function createPeople(root: TgpuRoot, files: PeopleFiles, list: Plan[], f
         torch.aim = [fx + -fz * sway, -0.2, fz + fx * sway];
       }
       // The line: 0 standing, 1 the slow walk, 2 the walk, each at the pace it was made for
-      const pace = files.animations.get(p.sex)!.pace;
-      const slow = pace.walk_slow_01 || 0.8;
-      const walk = pace.walk_neutral_01 || 1.1;
+      const { slow, walk } = p;
       const mix = p.speed <= slow ? p.speed / slow : 1 + Math.min(1, (p.speed - slow) / Math.max(0.05, walk - slow));
       figures.mix(p.pose, mix, time);
     });

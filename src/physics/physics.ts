@@ -6,7 +6,7 @@
 //
 // No GPU here; the scene hands in what it built and reads back where the feet are.
 
-import Box3D, { type b3BodyId, type b3Capsule, type b3Vec3, type Box3DModule, type PlaneResultBuffer } from 'box3d.js';
+import type { b3BodyId, b3Capsule, b3Vec3, Box3DModule, PlaneResultBuffer } from 'box3d.js';
 import type { PropAt, Solid } from '../render/geo.ts';
 
 type V3 = [number, number, number];
@@ -59,10 +59,10 @@ export interface WorldShape {
 export type Physics = Awaited<ReturnType<typeof createPhysics>>;
 
 /** Starts fetching and compiling the engine, to hand to `createPhysics` later. */
-export const loadPhysics = () => Box3D();
+export const loadPhysics = async () => (await import('box3d.js')).default();
 
 export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
-  const b3 = engine ?? (await Box3D());
+  const b3 = engine ?? (await loadPhysics());
   const def = b3.b3DefaultWorldDef();
   def.gravity = [0, -GRAVITY, 0];
   const world = b3.b3CreateWorld(def);

@@ -1,4 +1,3 @@
-import { loadWorldLayout } from '../world/layout.ts';
 import {
   ao,
   bindings,
@@ -37,8 +36,9 @@ import { grade } from '../render/look.ts';
 import { createVegetation, prepareVegetation, type loadSpecimenGeometry } from '../render/vegetation.ts';
 import { createPond } from '../render/pond.ts';
 import { createAir } from '../render/air.ts';
-import type { TownData } from '../world/town/load.ts';
+import { loadWorldLayout } from '../world/layout.ts';
 import { LAND, landMap, townSummary } from '../world/town/town.ts';
+import type { TownData } from '../world/town/load.ts';
 import { createPeople, peopleLoader } from '../render/actors/people.ts';
 import { createHerd, loadHerd } from '../render/actors/herd.ts';
 import { createPack, loadPack } from '../render/actors/pack.ts';
@@ -58,11 +58,10 @@ import { updateDholeEyes } from '../render/dhole-eyes.ts';
 import { createEyes } from '../render/eyes.ts';
 import { qmul, qrot, yawQ } from '../math/quat.ts';
 import { createFarLights } from '../render/farlights.ts';
-import { loadProps, placeProps, Prop, rowsFor } from '../render/props.ts';
+import { loadProps, placeProps, Prop, propBudget, propNear, splitProps } from '../render/props.ts';
 import type { Launch } from './launch.ts';
 import { boot } from './boot.ts';
-import { plansClear, WATCHER, type Who } from '../content/npc-plans.ts';
-import { AVATARS } from '../content/assets.ts';
+import { plansClear } from '../content/npc-plans.ts';
 import { randomStreams } from '../math/random.ts';
 import { Q } from '../render/quality.ts';
 
@@ -219,13 +218,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   };
   // Downloads first, so the files arrive while the town is being built
   const loadPeople = peopleLoader();
-  const peopleFiles = loadPeople(launch.forest ? [WATCHER] : Object.keys(AVATARS) as Who[]);
   const textures = loadTextures(root, Math.min(surface.width, surface.height) > 700);
   // The forest path's map, baked by tools/trail/map.ts
   const trailPicture = fetch(`${import.meta.env.BASE_URL}tex/trail.png`)
     .then((r) => r.arrayBuffer())
     .then((b) => images.decode({ bytes: new Uint8Array(b), mimeType: 'image/png' }));
-  const engine = loadPhysics();
+  const engine = launch.physics ? loadPhysics() : undefined;
   const aa = taa.create(root, {
     source: () => screen.textures.hdr,
     region: screen.regions.hdr,
@@ -251,9 +249,22 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const screenPasses = { occlusion, aa, glow, eye, final };
   const screenReady = PROBE_STAGES ? undefined : pipelines.compile(Object.values(screenPasses));
   const { buildings, flames: flameModel, village, gaps, placed, solids, feet, lamps: all, streetLights } = await town;
-  const propFiles = loadProps(placed);
-  stage('built');
+  const propGroups = splitProps(placed, launch.forest || !launch.people ? launch.camera : undefined);
+  const propFiles = loadProps(propGroups.first);
   const baked = await bakedLayout;
+  const plans = baked && !boot.has('lineup') ? baked.plans : plansClear(village.tulsi, village.seats, solids, feet);
+  const isWatcher = (p: typeof plans[number]) => p.kind === 'walk' && p.watcher;
+  // A town capture includes all residents. Other views can stream them after the first frame.
+  const customCamera = launch.camera && !launch.forest && !launch.people;
+  const cameraNearResidents = customCamera && plans.some(p => {
+    if (isWatcher(p)) return false;
+    const points = p.kind === 'walk' ? p.route : [p.at];
+    return points.some(([x, z]) => Math.hypot(x - launch.camera![0], z - launch.camera![1]) <= 180);
+  });
+  const streamResidents = !cameraNearResidents && (launch.forest || !launch.people) && !boot.has('lineup');
+  const initialPlans = streamResidents ? plans.filter(isWatcher) : plans;
+  const peopleFiles = loadPeople(initialPlans);
+  stage('built');
   const planted = baked?.planted ?? plantAll(village.homes, gaps, village.tulsi);
   stage('planted');
   const riders = RIDERS();
@@ -271,6 +282,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   let physics: Physics | null = null;
   const solidShape = { solids, props: placed, trees, heightAt, extent: 165, spacing: 1.5, patches: trailPatches(165) };
   let framesShown = 0;
+  let streamingWorld = false;
   /** Adds the townspeople to the picture, its reflection and the moon's shadow once they compile. */
   const addPeople = async (group: ReturnType<typeof createPeople>) => {
     const walking = boot.has('nopeople') ? [] : group.renderers;
@@ -297,7 +309,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   };
   let physicsLoading: Promise<void> | undefined;
   const requirePhysics = () =>
-    physicsLoading ??= engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
+    physicsLoading ??= (engine ?? loadPhysics()).then((b3) => createPhysics(solidShape, b3)).then((p) => {
       stage('physics');
       physics = p;
       walker.physics = p;
@@ -331,9 +343,10 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const built = instances.create(root, pool, { kind: Built, capacity: buildings.meshes.length });
   built.add(pool.add(buildings));
   // The scanned props have a pool of their own: the scene's meshes nearly fill one
-  const propPool = meshPool.create(root, { ...meshPool.roomFor([...propModels.values()]), anisotropy: 8 });
-  const props = instances.create(root, propPool, { kind: Prop, capacity: rowsFor(propModels, placed) });
-  const propMeshes = placeProps(propPool, props, propModels, placed);
+  const budget = propBudget(placed);
+  const propPool = meshPool.create(root, { ...budget.pool, anisotropy: 8 });
+  const props = instances.create(root, propPool, { kind: Prop, capacity: budget.rows });
+  const propMeshes = placeProps(propPool, props, propModels, propGroups.first);
   const Flame = defineFlame();
   const flames = instances.create(root, pool, { kind: Flame, capacity: flameModel.meshes.length + 1 });
   flames.add(pool.add(flameModel));
@@ -429,14 +442,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const grass = meadow.renderer({ cull: true, to: Q.grassTo, fade: Q.grassFade, eye: view }).pipe(withTime);
   const things = props.renderer({ cull: true });
   const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
-  const plans = baked && !boot.has('lineup') ? baked.plans : plansClear(village.tulsi, village.seats, solidShape.solids, feet);
-  const isWatcher = (p: typeof plans[number]) => p.kind === 'walk' && p.watcher;
-  const people = createPeople(root, folk, launch.forest ? plans.filter(isWatcher) : plans, feet, random.people);
+  const people = createPeople(root, folk, initialPlans, feet, random.people);
   const population = [people];
   let residents: typeof people | undefined;
   async function loadResidents() {
     const town = plans.filter(p => !isWatcher(p));
-    const files = await loadPeople([...new Set(town.map(p => p.who))]);
+    const files = await loadPeople(town);
     if (disposed) return;
     const group = createPeople(root, files, town, feet, random.people);
     try {
@@ -450,7 +461,32 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     }
   }
   let loadingResidents: Promise<void> | undefined;
-  const townReady = () => loadingResidents ??= launch.forest ? loadResidents() : Promise.resolve();
+  const residentsReady = () => loadingResidents ??= streamResidents ? loadResidents() : Promise.resolve();
+  const laterProps = Map.groupBy(propGroups.later, p => p.name);
+  const loadingProps = new Map<string, Promise<void>>();
+  async function propsReady(at?: readonly number[]) {
+    const near: Promise<void>[] = [];
+    for (const [name, placements] of laterProps) {
+      if (at && !placements.some(p => propNear(p, at))) continue;
+      let ready = loadingProps.get(name);
+      if (!ready) {
+        ready = loadProps(placements).then(async files => {
+          if (disposed) return;
+          await Promise.all(placeProps(propPool, props, files, placements).map(mesh => mesh.ready));
+        });
+        loadingProps.set(name, ready);
+      }
+      near.push(ready);
+    }
+    await Promise.all(near);
+  }
+  async function prepareView(spot: { shot: string; at: readonly number[] }) {
+    await Promise.all([
+      propsReady(spot.shot === 'town' ? undefined : spot.at),
+      spot.shot === 'town' && residentsReady(),
+      spot.shot.startsWith('herd-') && requireWildlife('herd'),
+    ]);
+  }
   // The townspeople have a pipeline each, three times over; they compile after the first picture
   let herd: ReturnType<typeof createHerd> | null = null;
   let dholes: ReturnType<typeof createPack> | null = null;
@@ -578,7 +614,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
 
   stage('setup');
   const wildlifeSetup = launch.wildlife ? requireWildlife(launch.wildlife) : undefined;
-  const actorSetup = (launch.people || launch.forest) ? addPeople(people) : undefined;
+  const actorSetup = addPeople(people);
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
   const compileList = { pool, treePool, propPool, prepass, light, cells, scene, pond, air, mist };
@@ -766,7 +802,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       bench.sums.clear();
       test.skip = -1;
     },
-    requirePhysics, requireWildlife, townReady,
+    requirePhysics, requireWildlife, prepareView,
     get guardGone() {
       return people.guard.gone;
     },
@@ -840,10 +876,12 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       }
       mark('lamps');
       // Half a second of pictures first, then the solid world
-      if (++framesShown === (PROBE_STAGES ? 2 : 30) && !launch.physics) void requirePhysics().catch(e => console.error('physics', e));
-      if (framesShown === 2) {
-        if (launch.forest) void townReady().catch(e => console.error('village people', e));
-        else if (!launch.people) void addPeople(people).catch(e => console.error('people', e));
+      framesShown++;
+      if (walker.mode !== 'held' && framesShown >= (PROBE_STAGES ? 2 : 30) && !physicsLoading)
+        void requirePhysics().catch(e => console.error('physics', e));
+      if (walker.mode !== 'held' && framesShown >= 2 && !streamingWorld) {
+        streamingWorld = true;
+        void Promise.all([residentsReady(), propsReady()]).catch(e => console.error('village assets', e));
         for (const species of ['herd', 'dholes'] as const) {
           if (species !== launch.wildlife) void requireWildlife(species).catch(error => console.warn(species, error));
         }
@@ -865,7 +903,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       sound.update(frame.dt, eyeAt, view.pose.yaw, heard);
       mark('sound');
       // The lights' grid goes where you go, so the forest's lamps are found out there too
-      vegetation.populateAround(eyeAt[0], eyeAt[2]);
       cellsLow.x = eyeAt[0] - 150;
       cellsLow.z = eyeAt[2] - 130;
       cells.move(cellsLow);
@@ -880,6 +917,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
         }
       }
       const lp = people.guard.lantern;
+      vegetation.populateAround(eyeAt[0], eyeAt[2]);
       moving.write(lanternId, { position: lp, rotation: yawQ(people.guard.yaw) });
       lamps.fields.position.set(guardLamp, lp[0], lp[1] + 0.05, lp[2]);
       lamps.fields.intensity.set(guardLamp, lp[1] > -40 && !people.guard.gone ? 2.2 * (0.92 + Math.sin(seconds * 13) * 0.03 + Math.sin(seconds * 7.3) * 0.05) : 0);
