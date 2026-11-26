@@ -10,7 +10,6 @@
     "test": "tsx --test tests/*.test.ts",
     "lint": "node tools/lint-leftovers.mjs",
     "check": "npm run -s lint && npm run -s test && npm run -s assets && npm run -s typecheck && echo CHECK OK",
-    "helpers": "tools/helpers/run.sh",
     "assets": "tsx tools/check/assets.ts",
     "gen:trail": "tsx tools/trail/make.ts && tsx tools/river/make.ts && tsx tools/trail/map.ts",
     "gen:tex": "tsx tools/tex/bake.ts && tsx tools/tex/photo.ts && tsx tools/posters/make.ts && tsx tools/posters/signs.ts",

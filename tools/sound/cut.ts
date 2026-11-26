@@ -1,5 +1,4 @@
-// Turns the field recordings in ~/sound-src (found by tools/helpers briefs hunt-wild, hunt-foley;
-// every source, author and licence is in their manifest.json) into the game's sounds:
+// Turns the field recordings in ~/sound-src into the game’s sounds. See manifest.json for source licences.
 //   public/sound/<bed>.mp3     looping beds: forest insects, river, town, fire
 //   public/sound/calls.mp3     one sprite of every one-shot call, offsets in calls.json
 //   public/sound/steps.mp3     one sprite of footsteps per surface, offsets in steps.json
