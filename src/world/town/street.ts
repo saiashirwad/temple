@@ -8,7 +8,7 @@
 
 import { Builder, hex, P, rng, type Mat, type V3 } from '../../render/geo.ts';
 import type { Lamp, LampKind } from '../../render/flicker.ts';
-import { GROUND, M, ROAD } from '../../content/world.ts';
+import { M, ROAD } from '../../content/world.ts';
 import { heightAt, roadZ } from '../terrain.ts';
 
 const SODIUM: V3 = [1, 0.46, 0.1];
@@ -45,7 +45,6 @@ const S = {
 };
 const GOODS = [0xd83020, 0x2050c0, 0xe8c020, 0x30a040, 0xf0f0e8, 0xe07020, 0x8030a0, 0x20a0b0].map((h) => plain(h, 0.5));
 const WALLS = [paint(0x3f8a9a), paint(0x7aa85a), paint(0xd8a040), paint(0xc87890), paint(0xe8e0cf), paint(0x4a6ab0)];
-const POSTERS = [0xd82818, 0x1838a8, 0xf0c010, 0x18a058, 0xe85898].map((h) => paint(h, 0.6));
 /** Which poster from the atlas: Che and the party, films, a coaching ad, the lottery. */
 const POLITICAL = [0, 1, 2, 3, 10];
 const FILMS = [4, 5, 6, 7, 8];
@@ -61,7 +60,6 @@ export function buildStreet() {
   const b = new Builder(true);
   const lamps: Lamp[] = [];
   const r = rng(29);
-  const G = GROUND;
   const light = (position: V3, color: V3, intensity: number, range: number, kind: LampKind, seed: number, extra: Partial<Lamp> = {}) =>
     lamps.push({ position, color, intensity, range, kind, seed, ...extra });
   /** The frame of a place beside the road: x along it, -z toward it, y from the ground. */

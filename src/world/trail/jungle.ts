@@ -12,7 +12,6 @@ import { M } from '../../content/world.ts';
 import { heightAt, riverCut } from '../terrain.ts';
 import { TRAIL_LENGTH, trailAt, trailNear, trailWidth } from './trail.ts';
 import { onBridge } from './bridge.ts';
-import { inRiver } from './river.ts';
 import { machanFree } from './machan.ts';
 
 const deg = Math.PI / 180;

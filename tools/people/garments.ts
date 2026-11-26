@@ -125,7 +125,6 @@ const inR = (r: typeof R.skirt, u: number, v: number): [number, number] => [r.u0
 
 /** Weave grain, light and fine. */
 const weave = (x: number, y: number) => 0.93 + 0.07 * ((x + y) % 2) + (hash(x, y) - 0.5) * 0.08;
-const GOLD: V3 = [0.86, 0.66, 0.3];
 
 export function paintAtlas(o: Outfit): Buffer {
   const px = Buffer.alloc(ATLAS * ATLAS * 3);
@@ -480,17 +479,6 @@ export function buildCarry(body: Body, o: Outfit): Part[] {
         }
       }
     }
-  };
-  /** A box down the line: `t0..t1` along it, half sizes across. */
-  const box = (g: Geo, t0: number, t1: number, hx: number, hy: number, cx = 0, cy = 0) => {
-    const corners: V3[] = [];
-    for (const t of [t0, t1]) for (const sy of [-1, 1]) for (const sx of [-1, 1]) corners.push(at(t, cx + sx * hx, cy + sy * hy));
-    const faces = [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]];
-    const normals: V3[] = [mul(down, -1), down, mul(front, -1), front, mul(out, -1), out];
-    faces.forEach((f, i) => {
-      const ids = f.map((k) => g.vertex(corners[k]!, normals[i]!, [0, 0], w));
-      g.quad(ids[0]!, ids[1]!, ids[2]!, ids[3]!);
-    });
   };
   if (c.kind === 'umbrella') {
     // A folded black umbrella: a crook in the hand, the furled canopy hanging past the knee

@@ -307,7 +307,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     }
   };
   const startPhysics = () => {
-    const t0 = performance.now();
     return engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
       stage('physics');
       physics = p;

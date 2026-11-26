@@ -7,7 +7,7 @@
 //   FBX2GLTF=~/tools/FBX2glTF                where the converter is (default ~/tools/FBX2glTF)
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { NodeIO } from '@gltf-transform/core';
 import { prune, dedup } from '@gltf-transform/functions';

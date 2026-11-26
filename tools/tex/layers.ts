@@ -4,7 +4,7 @@
 // means "metal" for metal layers and "takes the material's colour" for the others.
 // Image rows run down: down a wall, down a roof's slope, along the grain of wood.
 
-import { B, blocks, clamp, fbm, fract, hash, hex, lerp3, mix, noise, ridge, smooth, worley, W, type C } from './noise.ts';
+import { blocks, clamp, fbm, fract, hash, hex, lerp3, mix, noise, smooth, worley, W, type C } from './noise.ts';
 
 export interface Px {
   c: C;
