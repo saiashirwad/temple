@@ -54,11 +54,11 @@ export function encodeWorldLayout({ plans, planted, grassAt, land }: WorldLayout
 }
 
 /** Bake the world from the same authored generators the workbench edits. */
-export function bakeWorldLayout() {
+export function bakeWorldLayout(level = 9) {
   const grounds = buildGrounds(), village = buildVillage(), land = landMap();
   const planted = plantAll(village.homes, grounds.gaps, village.tulsi);
   const solids = [...buildTemple().solids, ...grounds.solids, ...buildStreet().solids, ...village.solids];
   const plans = plansClear(village.tulsi, village.seats, solids);
   const grassAt = meadowPlaces(land.pixels, planted.walked);
-  return gzipSync(new Uint8Array(encodeWorldLayout({ plans, planted, grassAt, land })), { level: 9 });
+  return gzipSync(new Uint8Array(encodeWorldLayout({ plans, planted, grassAt, land })), { level });
 }

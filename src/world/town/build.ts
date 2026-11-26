@@ -17,7 +17,7 @@ export function buildTown() {
     buildings: mergeModels([{ meshes: meshes.filter(m => !isFlame(m)), images: [] }]),
     flames: mergeModels([{ meshes: meshes.filter(isFlame), images: [] }]),
     placed: [...street.props, ...grounds.props, ...village.props],
-    solids, feet: footprints(solids), gaps: grounds.gaps,
+    solids, feet: footprints(solids),
     lamps: [...temple.lamps, ...grounds.lamps, ...street.lamps, ...village.lamps],
     streetLights: street.lamps.filter(l => l.spot).map(l => l.position),
     village: { homes: village.homes, tulsi: village.tulsi, seats: village.seats, chimneys: village.chimneys },
