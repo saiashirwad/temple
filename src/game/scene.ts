@@ -29,6 +29,7 @@ import { defineBuilt, defineFlame, now } from '../render/surfaces.ts';
 import { lampAt, type Lamp } from '../render/flicker.ts';
 import { loadTextures } from '../render/tex.ts';
 import { CLOISTER, COMPOUND, GROUND } from '../content/world.ts';
+import { TUNING } from '../content/tuning.ts';
 import { RIDERS, rideAt, wheelModel } from '../world/town/traffic.ts';
 import { createGround } from '../render/ground.ts';
 import { sky, MOON_ARRAY } from '../render/sky.ts';
@@ -49,7 +50,7 @@ import { heightAt } from '../world/terrain.ts';
 import { createWalker } from '../sim/walk.ts';
 import { createPhysics, loadPhysics, type Physics } from '../physics/physics.ts';
 import { TRAIL_MAP, trailPatches } from '../world/trail/trail.ts';
-import { FAR_LAMPS } from '../world/trail/jungle.ts';
+import { FAR_LAMPS, GLADE } from '../world/trail/jungle.ts';
 import { createJourney, farLanternAt, type Tick } from '../sim/journey.ts';
 import { createCover } from '../sim/cover.ts';
 import { lantern } from '../world/trail/lantern.ts';
@@ -266,7 +267,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   const initialPlans = streamResidents ? plans.filter(isWatcher) : plans;
   const peopleFiles = loadPeople(initialPlans);
   const riders = RIDERS();
-  const HERD_SIZES = [1.05, 0.95, 0.55];
   const lanternModel = lantern();
   // One model per size of wheel, shared by every wheel of that size
   const wheelModels = new Map<string, ReturnType<typeof wheelModel>>();
@@ -322,7 +322,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       physics = p;
       walker.physics = p;
       vehicleBodies = riders.map((r) => p.vehicle(VEHICLE[r.kind] ?? [0.5, 0.7, 1]));
-      herdBodies = HERD_SIZES.map((sz) => p.vehicle([0.85 * sz, 1.4 * sz, 1.9 * sz]));
+      herdBodies = TUNING.herd.sizes.map((sz) => p.vehicle([0.85 * sz, 1.4 * sz, 1.9 * sz]));
       console.log('physics', p.count, 'shapes');
       if (PROBE_STAGES) {
         const tag = document.createElement('div');
@@ -490,7 +490,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       pond.inView(x, heightAt(x, z) + height, z, yaw, pitch) && pond.prepare(),
       propsReady(spot.shot === 'town' ? undefined : spot.at),
       spot.shot === 'town' && residentsReady(),
-      spot.shot.startsWith('herd-') && requireWildlife('herd'),
+      (spot.shot.startsWith('herd-') || (spot.shot === 'camera' && facesHerd(spot.at))) && requireWildlife('herd'),
     ]);
   }
   // The townspeople have a pipeline each, three times over; they compile after the first picture
@@ -587,10 +587,25 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
     }
   };
   const wildlife: Partial<Record<'herd' | 'dholes', Promise<void>>> = {};
+  // A free camera may point at the elephants from outside their simulation range.
+  // Include the glade and the ground a charging cow can cover in the camera frustum.
+  function facesHerd([x, z, yaw, pitch, eyeHeight]: readonly number[]) {
+    const dx = GLADE.x - x, dz = GLADE.z - z;
+    const dy = heightAt(GLADE.x, GLADE.z) + 2 - heightAt(x, z) - eyeHeight;
+    const along = -(dx * Math.sin(yaw) + dz * Math.cos(yaw));
+    const forward = along * Math.cos(pitch) - dy * Math.sin(pitch);
+    const right = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+    const up = along * Math.sin(pitch) + dy * Math.cos(pitch);
+    const vertical = Math.tan(view.pose.fov / 2);
+    const horizontal = vertical * surface.width / Math.max(1, surface.height);
+    const radius = GLADE.r + TUNING.herd.charge.maxRun;
+    return forward >= -radius && Math.abs(right) <= forward * horizontal + radius * Math.hypot(1, horizontal)
+      && Math.abs(up) <= forward * vertical + radius * Math.hypot(1, vertical);
+  }
   function requireWildlife(species: 'herd' | 'dholes') {
     return wildlife[species] ??= species === 'herd'
-      ? prepareWildlife('herd', loadHerd, model => createHerd(root, model, HERD_SIZES.length), made => { herd = made; })
-      : prepareWildlife('dholes', loadPack, model => createPack(root, model, 4), made => { dholes = made; });
+      ? prepareWildlife('herd', loadHerd, model => createHerd(root, model, TUNING.herd.sizes.length), made => { herd = made; })
+      : prepareWildlife('dholes', loadPack, model => createPack(root, model, TUNING.dholes.size[1]), made => { dholes = made; });
   }
   /** While comparing, `p` leaves the props out of every pass: each list starts with them. */
   const keep = <T,>(list: T[], first = 0) => (look.props ? list : list.filter((_, i) => i !== first));
@@ -619,7 +634,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
   };
 
   stage('setup');
-  const wildlifeSetup = launch.wildlife ? requireWildlife(launch.wildlife) : undefined;
+  const firstWildlife = launch.wildlife ?? (launch.camera && boot.has('at') && facesHerd(launch.camera) ? 'herd' : undefined);
+  const wildlifeSetup = firstWildlife && requireWildlife(firstWildlife);
   const actorSetup = addPeople(people);
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
@@ -878,9 +894,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       if (exploring && framesShown >= 2 && !streamingWorld) {
         streamingWorld = true;
         void Promise.all([residentsReady(), propsReady()]).catch(e => console.error('village assets', e));
-        for (const species of ['herd', 'dholes'] as const) {
-          if (species !== launch.wildlife) void requireWildlife(species).catch(error => console.warn(species, error));
-        }
       }
       ride(seconds);
       riders.forEach((r, i) => {
@@ -895,6 +908,10 @@ export async function createScene(root: TgpuRoot, surface: Surface, { launch, sp
       // Timers first; if one moved you (waking up after going down), the frame starts from there
       if (runLater(dt)) fillTick(dt);
       journey.step(tick);
+      if (exploring && !wildlife.herd && Math.hypot(tick.x - GLADE.x, tick.z - GLADE.z) < TUNING.herd.range)
+        void requireWildlife('herd').catch(error => console.warn('herd', error));
+      if (exploring && !wildlife.dholes && journey.onHuntingGround)
+        void requireWildlife('dholes').catch(error => console.warn('dholes', error));
       mark('journey');
       sound.update(frame.dt, eyeAt, view.pose.yaw, heard);
       mark('sound');

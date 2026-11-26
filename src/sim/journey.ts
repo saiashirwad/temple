@@ -123,16 +123,12 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
   });
   /** Seconds left lying in the dark after going down: nothing hunts you meanwhile. */
   let downFor = 0;
+  let onHuntingGround = false;
   const danger = createDanger(GLADE, {
     cover: cover.inCover,
     mark: story.mark,
     safe: (x, z) => cover.atShrine(x, z) || aloft(x, z) || (!people.guard.gone && Math.hypot(x - people.guard.at[0], z - people.guard.at[2]) < 9) || Math.hypot(x, z) < TOWN_R || Math.hypot(x - BUNGALOW.x, z - BUNGALOW.z) < BUNGALOW_SAFE,
-    wild: (x, z) => {
-      // The cheap tests first: most of the time this is town, or the bungalow
-      if (!(state.deep > 0.5 && !state.arrived)) return false;
-      const n = trailNear(x, z, 30);
-      return n.along > 230 && n.along < TRAIL_LENGTH - 50 && Math.hypot(x - GLADE.x, z - GLADE.z) > 70;
-    },
+    wild: () => onHuntingGround,
     say: (text, showFor = 6) => {
       // The story waits while this is up
       state.alertUntil = tk.seconds + showFor;
@@ -168,6 +164,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
     const along = near.distance < 30 ? near.along : 0;
     const goal = Math.max(smooth(90, 240, along) * (1 - smooth(TRAIL_LENGTH - 40, TRAIL_LENGTH - 5, along) * 0.6), smooth(TOWN_R, 200, Math.hypot(x, z)) * 0.5);
     state.deep += (goal - state.deep) * Math.min(1, dt * 0.5);
+    onHuntingGround = state.deep > 0.5 && !state.arrived && near.along > 230 && near.along < TRAIL_LENGTH - 50 && Math.hypot(x - GLADE.x, z - GLADE.z) > 70;
     sound.forest = state.deep;
     // The crickets fall silent round a big animal: the forest's own warning that the herd is near
     if (danger.herd.some((e) => e.on && Math.hypot(e.x - x, e.z - z) < 26)) {
@@ -290,6 +287,7 @@ export function createJourney({ random, walker, people, sound, eyes, cover, view
   };
 
   return {
+    get onHuntingGround() { return onHuntingGround; },
     state, step, story, danger,
     attachHud(output: JourneyHud) { hud = output; },
     /** You've looked at, read or sat at `it`. */
