@@ -65,6 +65,8 @@ const params = new URLSearchParams(values.param?.map(pair => {
 }));
 params.set('scenario', id);
 params.set('run', '1');
+if (selection.includes('*')) params.append('shot', '*');
+else for (const shot of requested) params.append('shot', shot);
 if (values.seed !== undefined) params.set('seed', values.seed);
 const entry = (values.game ? '/' : '/workbench.html') + '?' + params;
 const capture = !listing && (values.out !== undefined || values.spread || values.target || requested.length > 0 || seconds > 0);
@@ -85,6 +87,7 @@ try {
   const shots: Shot[] = [];
   let clip: { file: string; from: string; done: Promise<void> } | undefined;
   let trace: unknown;
+  let firstFrame: unknown;
   let status = 'fail';
   let sheet: string | undefined;
   page.on('pageerror', err => errors.push(err.message));
@@ -114,11 +117,21 @@ try {
     const target = page.locator(selector);
     await page.waitForFunction(selector => {
       const el = document.querySelector<HTMLElement>(selector);
+      if (document.querySelector('#note[data-error]')) return true;
       if (!el) return false;
       if (el.dataset.error) return true;
       return el.dataset.verdict === undefined ? el.dataset.ready === 'true' : ['pass', 'fail'].includes(el.dataset.verdict);
     }, selector, {timeout: values.game ? 180000 : 60000});
+    const bootError = await page.locator('#note[data-error]').evaluateAll(nodes => nodes[0]?.getAttribute('data-error'));
+    if (bootError) throw new Error(bootError);
     status = await target.evaluate(el => el.dataset.error ?? el.dataset.verdict ?? 'ready');
+    if (values.game && status === 'pass') {
+      await page.locator('canvas[data-first-frame]').waitFor();
+      firstFrame = await page.evaluate(() => ({
+        ms: Math.round(performance.getEntriesByName('game:first-frame')[0].startTime),
+        ...JSON.parse(document.querySelector('canvas')!.dataset.firstFrame!),
+      }));
+    }
     const raw = await page.locator('[data-trace]').first().evaluateAll(nodes => nodes[0]?.textContent);
     if (raw) trace = JSON.parse(raw);
     if (['ready', 'pass'].includes(status)) {
@@ -145,7 +158,7 @@ try {
     }
     if (listing && !process.exitCode) console.log(available.join('\n'));
     else {
-      const result = { scenario: id, entry, target: values.target, status, trace, errors, shots, sheet, clip: clip && { file: clip.file, from: clip.from, seconds } };
+      const result = { scenario: id, entry, target: values.target, status, firstFrame, trace, errors, shots, sheet, clip: clip && { file: clip.file, from: clip.from, seconds } };
       const json = JSON.stringify(result, null, 2);
       if (folder) await writeFile(join(folder, 'result.json'), json + '\n');
       console.log(json);

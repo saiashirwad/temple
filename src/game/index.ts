@@ -1,16 +1,9 @@
 import * as web from '@typegpu/kit/web';
 import { createScene } from './scene.ts';
 import { boot } from './boot.ts';
+import { resolveLaunch } from './launch.ts';
 import { scenarios } from './scenarios.ts';
 import { createHud, type Hud } from './hud.ts';
-
-declare global {
-  interface Window {
-    bash?: {
-      preview?: { onCapture?: (h: (o: { capture: () => void; signal: AbortSignal }) => unknown) => () => void };
-    };
-  }
-}
 
 const canvas = document.querySelector('canvas')!;
 const forcedPhone = boot.has('phone');
@@ -57,29 +50,12 @@ function stick(walker: Walker, hud: Hud) {
 let hudFrame: (() => void) | null = null;
 const note = document.querySelector<HTMLElement>('#note')!;
 // Test scenarios by key chord (` then a key), and the state readout they report in
-const tests = scenarios(document.querySelector<HTMLPreElement>('#state')!);
+const launch = resolveLaunch(new URLSearchParams(location.search));
+const tests = scenarios(document.querySelector<HTMLPreElement>('#state')!, launch);
 if (boot.has('debug')) {
   addEventListener('error', (e) => (note.textContent = 'ERR ' + String(e.message).slice(0, 3000)));
   addEventListener('unhandledrejection', (e) => (note.textContent = 'REJ ' + String(e.reason?.message ?? e.reason).slice(0, 3000)));
 }
-
-// The preview capture copies the canvas right after a frame is submitted
-let pendingCapture: (() => void) | null = null;
-window.bash?.preview?.onCapture?.(
-  ({ capture, signal }) =>
-    new Promise<void>((resolve) => {
-      let done = false;
-      const run = () => {
-        if (done) return;
-        done = true;
-        if (!signal.aborted) capture();
-        resolve();
-      };
-      pendingCapture = run;
-      // Still loading: show the page as it is
-      setTimeout(run, 2500);
-    }),
-);
 
 // Profiling: ?profile, or the `m chord. Prints measured pass timings on the page.
 const profiling = boot.has('profile');
@@ -117,21 +93,21 @@ const report = async () => {
 };
 
 if (!navigator.gpu) {
+  note.dataset.error = 'WebGPU unavailable';
   note.textContent = 'This scene needs WebGPU. Try a recent Chrome, Edge or Safari.';
 } else {
-  web.host(createScene, {
+  web.host(createScene, launch, {
     canvas,
     // Phones have small, dense screens and modest GPUs: fewer pixels there go a long way
     maxPixelRatio: coarse ? 1.15 : 1.5,
     optionalFeatures: ['timestamp-query', 'indirect-first-instance'],
     attach: ({ scene }) => {
       console.log('scene ready');
-      canvas.dataset.ready = '';
-      note.remove();
+
       // Something for test browsers to wait on: the scene is up and drawing
       document.body.append(Object.assign(document.createElement('i'), { id: 'running', style: 'position:fixed;left:0;bottom:0;width:1px;height:1px' }));
       const controls = web.orbitControls(scene.view, canvas, { sensitivity: coarse ? 0.007 : 0.005, onChange: () => scene.touched() });
-      tests.attach(scene);
+
       const j = scene.journey;
       const walker = scene.walker;
       let shown: string | null = null;
@@ -269,25 +245,25 @@ if (!navigator.gpu) {
           sneaking: walker.sneaking,
         });
       };
-      // ?at=x,z,yaw,pitch[,height] holds the eye at a spot, for checking a view
-      const at = boot.get('at');
-      if (at) {
-        const [x, z, yaw, pitch, h] = at.split(',').map(Number);
-        scene.walker.hold(x!, z!, yaw!, pitch!, h);
-      }
+      tests.attach(scene);
       void report();
       return controls;
     },
-    onFrame: () => {
+    onFrame: ({ scene }) => {
       hudFrame?.();
-      if (pendingCapture) {
-        const run = pendingCapture;
-        pendingCapture = null;
-        queueMicrotask(run);
+      if (canvas.dataset.ready === undefined && tests.prepared) {
+        canvas.dataset.ready = '';
+        canvas.dataset.firstFrame = JSON.stringify({ at: scene.walker.at, yaw: scene.view.pose.yaw, mode: scene.walker.mode,
+          reading: document.querySelector('#caption')?.classList.contains('on'), ended: scene.test.state.ended, guardGone: scene.test.guardGone, sitting: scene.test.story.sitting });
+        performance.mark('game:first-frame');
+        delete document.body.dataset.starting;
+        note.remove();
       }
     },
     onError: (error) => {
       console.error(error);
+      if (!note.isConnected) document.body.append(note);
+      note.dataset.error = String(error);
       note.textContent = 'The scene could not start on this device.';
       if (boot.has('debug')) note.textContent += ' ' + String((error as Error)?.message ?? error).slice(0, 3000);
     },

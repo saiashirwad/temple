@@ -63,6 +63,7 @@ import { createEyes } from '../render/eyes.ts';
 import { qmul, qrot, yawQ } from '../math/quat.ts';
 import { createFarLights } from '../render/farlights.ts';
 import { loadProps, placeProps, Prop, rowsFor } from '../render/props.ts';
+import type { Launch } from './launch.ts';
 import { boot } from './boot.ts';
 import { randomStreams } from '../math/random.ts';
 import { Q } from '../render/quality.ts';
@@ -124,7 +125,7 @@ const occludedLamp = (point: shading.Point, toLight: d.v3f, distance: number, ra
 
 const PROBE_STAGES = boot.has('probe');
 
-export async function createScene(root: TgpuRoot, surface: Surface) {
+export async function createScene(root: TgpuRoot, surface: Surface, launch: Launch) {
   const random = randomStreams(boot.get('seed'));
   // GPU time decides how many pixels to draw: below the budget, full size; over it, fewer,
   // which TAA builds back up to the canvas
@@ -188,6 +189,10 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     fov: 0.95,
   });
   const walker = createWalker(view);
+  if (launch.camera) {
+    walker.hold(...launch.camera);
+    view.jump();
+  }
   const occlusion = ao.create(root, view, {
     depth: () => early.textures.depth,
     region: early.regions.depth,
@@ -225,6 +230,8 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const grounds = buildGrounds();
   const street = buildStreet();
   const village = buildVillage();
+  const placed = [...street.props, ...grounds.props, ...village.props];
+  const propFiles = loadProps(placed);
   const pondModel = buildPond();
   stage('built');
   const planted = plantAll(village.homes, grounds.gaps, village.tulsi);
@@ -247,7 +254,6 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const wheelModels = new Map<string, ReturnType<typeof wheelModel>>();
   const wheelKey = (w: { rad: number; wid: number }) => `${w.rad}/${w.wid}`;
   for (const r of riders) for (const w of r.wheels) if (!wheelModels.has(wheelKey(w))) wheelModels.set(wheelKey(w), wheelModel(w.rad, w.wid));
-  const placed = [...street.props, ...grounds.props, ...village.props];
   // The solid world: walls, plinths, steps, posts and trunks, set up while the files download
   const trunks = new Map<object, number>();
   const trunkOf = (m: Model) => {
@@ -266,7 +272,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     return r;
   };
   const trees = [...planted.trees.map((t) => ({ at: t.at, scale: t.scale, trunk: trunkOf(t.model) })), ...planted.far.map((f) => ({ at: f.at, scale: f.scale, trunk: f.model ? trunkOf(f.model) : 0.2 }))].filter((t) => t.trunk > 0.08);
-  const [propModels, folk] = await Promise.all([loadProps(placed), peopleFiles]);
+  const [propModels, folk] = await Promise.all([propFiles, peopleFiles]);
   // The solid world is set up just after the first picture, so it never holds up the load;
   // until it's ready the walker follows the land
   let physics: Physics | null = null;
@@ -277,18 +283,18 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     const inScene = walking.map((w) => scene.add(w));
     const inPond = walking.map((w) => pond.reflection.add(w));
     const inShadow = walking.map((w) => light.shadow.add(w));
-    void pipelines.compile([...inScene, ...inPond, ...inShadow]).then(() => {
+    return pipelines.compile([...inScene, ...inPond, ...inShadow]).then(() => {
       // Solid things first, before the water, flames and air drawn over them
       drawn.splice(3, 0, ...inScene);
       drawnNames.splice(3, 0, ...inScene.map((_, i) => 'actor:' + i));
       mirrored.splice(1, 0, ...inPond);
       moonCast.push(...inShadow);
       stage('people shown');
-    }, (e) => console.error('people', e));
+    });
   };
   const startPhysics = () => {
     const t0 = performance.now();
-    void engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
+    return engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
       stage(`physics ${((performance.now() - t0) / 1000).toFixed(1)}s`);
       physics = p;
       walker.physics = p;
@@ -301,11 +307,12 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
         document.body.append(tag);
         setInterval(() => (tag.textContent = `${walker.mode} eye ${view.pose.target.map((v) => v.toFixed(1)).join(',')} yaw ${view.pose.yaw.toFixed(2)}`), 200);
       }
-    }, (e) => console.error("physics failed", e));
+    });
   };
   const VEHICLE: Record<string, V3> = { scooter: [0.36, 0.6, 0.95], auto: [0.72, 0.85, 1.4], bus: [1.25, 1.5, 5.3] };
   let vehicleBodies: number[] = [];
   let herdBodies: number[] = [];
+  const physicsSetup = launch.physics ? startPhysics() : undefined;
   stage('props');
 
   const pool = meshPool.create(root, {
@@ -646,6 +653,8 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   };
 
   stage('setup');
+  if (launch.wildlife) startWildlife();
+  const actorSetup = launch.people ? addPeople() : undefined;
   // People's skinning and every other pipeline compile side by side
   const peopleReady = people.initAsync().then(() => stage('people'));
   const compileList = { pool, treePool, propPool, prepass, occlusion, light, cells, aa, scene, pond, air, glow, final, mist, eye };
@@ -656,7 +665,7 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       stage(name);
     }
   } else await pipelines.compile(Object.values(compileList));
-  await peopleReady;
+  await Promise.all([peopleReady, physicsSetup, actorSetup, launch.wildlife && wildlifeReady]);
 
   let seconds = 0;
   let frames = 0;
@@ -819,6 +828,12 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
   const test = {
     /** How fast the night's clock runs: story, danger, wind, lamps. Walking stays real time. */
     timeScale: 1,
+    /** Initialize interactions at the launch pose before the first rendered frame. */
+    stepJourney(dt: number) {
+      seconds += dt;
+      fillTick(dt);
+      journey.step(tick);
+    },
     /** Which drawing group the scene pass leaves out (`x chord), -1 for none. */
     skip: -1,
     /** Times the scene pass without each drawing group in turn, at full resolution (`b chord). */
@@ -908,8 +923,11 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
       }
       mark('lamps');
       // Half a second of pictures first, then the solid world
-      if (++framesShown === (PROBE_STAGES ? 2 : 30)) startPhysics();
-      if (framesShown === 2) { addPeople(); startWildlife(); }
+      if (++framesShown === (PROBE_STAGES ? 2 : 30) && !launch.physics) void startPhysics().catch(e => console.error('physics', e));
+      if (framesShown === 2) {
+        if (!launch.people) void addPeople().catch(e => console.error('people', e));
+        if (!launch.wildlife) startWildlife();
+      }
       ride(seconds);
       riders.forEach((r, i) => {
         const at = rideAt(r, seconds);

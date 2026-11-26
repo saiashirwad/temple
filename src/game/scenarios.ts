@@ -22,26 +22,11 @@
 
 import { checkpoint, wantsCheckpoint } from '../scenario/checkpoint.ts';
 import { boot } from './boot.ts';
-import { NOTE_AT } from '../world/trail/bungalow.ts';
+import { SPOTS, type Launch, type Spot } from './launch.ts';
 import type { createScene } from './scene.ts';
 
 type Scene = Awaited<ReturnType<typeof createScene>>;
 type State = Scene['test']['state'];
-/** x, z, yaw, pitch, eye height above the ground. Yaw π faces +z, 0 faces -z. */
-type Spot = readonly [number, number, number, number, number];
-
-export const SPOTS: Record<string, { name: string; shot: string; at: Spot }> = {
-  '1': { shot: 'town', name: 'town view', at: [122.8, -128.1, 2.41, 0.06, 1.62] },
-  '2': { shot: 'bridge-path', name: 'path before the bridge', at: [-160.5, -113.5, 1.55, 0.18, 1.62] },
-  '3': { shot: 'bridge', name: 'bridge', at: [-169.73, -108.86, 0.981, 0.22, 1.62] },
-  '4': { shot: 'dung', name: 'dung by the path', at: [-69.66, -139.88, 2.458, 0.45, 1.62] },
-  '5': { shot: 'machan', name: 'machan stair', at: [-17.44, -159.78, 0.421, 0.1, 3.8] },
-  '6': { shot: 'herd-glade', name: 'herd glade', at: [-114.55, -258.42, -2.05, 0.08, 1.62] },
-  '7': { shot: 'herd-close', name: 'herd glade, close', at: [-110.2, -256.1, -2.05, 0.12, 1.62] },
-  '8': { shot: 'veranda', name: 'veranda, the note', at: [NOTE_AT.x, NOTE_AT.z + 1.2, 0.186, 0.75, 3.5] },
-  '9': { shot: 'chair', name: 'his chair, looking out', at: [20.61, -396.33, 2.792, 0.07, 2.63] },
-};
-
 type Run = {
   name: string;
   /** Starts it; may return a promise that waits for the world. */
@@ -92,7 +77,7 @@ const RUNS: Record<string, Run> = {
     name: 'red dogs',
     async start(s) {
       await wildlifeReady(s);
-      if (Math.hypot(...s.walker.at) < 150) await standAt(s, SPOTS['2']!.at);
+      if (s.walker.mode === 'held' || Math.hypot(...s.walker.at) < 150) await standAt(s, SPOTS['2']!.at);
       else await solid(s);
       s.test.danger.summon();
     },
@@ -166,14 +151,14 @@ const RUNS: Record<string, Run> = {
   },
 };
 
-export function scenarios(stateBox: HTMLPreElement) {
+export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
   const queued: string[] = [];
   let chord = false;
   let scene: Scene | null = null;
   let current: { run: Run; t0: number; from: readonly [number, number]; verdict: string | null; ready: boolean } | null = null;
   let shown = boot.has('state');
-  const auto = boot.get('scenario') === 'story.bungalow-ending';
-  const worldTour = boot.get('scenario') === 'world.walk' && boot.get('run') === '1';
+  const { bungalow: auto, tour: worldTour } = launch;
+  let prepared = !auto && !worldTour && !launch.preset;
   const replayBox = auto || worldTour ? document.createElement('pre') : null;
   if (replayBox) {
     replayBox.id = 'game-replay';
@@ -212,12 +197,11 @@ export function scenarios(stateBox: HTMLPreElement) {
   }
   async function tour(s: Scene) {
     try {
-      await solid(s);
-      await wildlifeReady(s);
-      const preset = boot.get('preset');
+      const preset = launch.preset;
       const encounter = preset ? RUNS[preset] : undefined;
       if (encounter) {
         await encounter.start(s);
+        prepared = true;
         const start = performance.now();
         let verdict: string | null = null;
         while (encounter.judge && !verdict) {
@@ -229,11 +213,13 @@ export function scenarios(stateBox: HTMLPreElement) {
         record('encounter', encounter.name);
         await checkpoint('encounter', s.test.state);
       } else {
-        const spots = preset ? [SPOTS[preset]] : Object.values(SPOTS);
+        if (preset && !SPOTS[preset]) throw new Error('Unknown view or encounter preset: ' + preset);
+        const spots = launch.views;
         for (const spot of spots) {
-          if (!spot) throw new Error(`Unknown view or encounter preset: ${preset}`);
+          if (spot.shot.startsWith('herd-')) await wildlifeReady(s);
           s.walker.hold(...spot.at);
           s.view.jump();
+          prepared = true;
           record('view', spot.shot);
           await checkpoint(spot.shot, s.test.state);
         }
@@ -265,29 +251,50 @@ export function scenarios(stateBox: HTMLPreElement) {
       s.walker.moveTo(x, z, yaw, true);
       s.walker.touched();
       s.test.timeScale = 16;
-      record('placed at veranda');
-      await waitFor(() => s.journey.near?.id === 'bungalow.note', 'note', 45000);
-      await captureStory(s, 'veranda');
-      key('keydown', 'e'); key('keyup', 'e');
-      await waitFor(() => examined === 'bungalow.note', 'note examination');
-      await captureStory(s, 'reading-note');
-      // The normal HUD closes reading once walking for at least 600 ms.
-      key('keydown', 's');
-      try { await waitFor(() => closed === 'bungalow.note', 'putting down note', 5000); }
-      finally { key('keyup', 's'); }
-      record('walked to close note');
-      // Return if walking moved outside the interaction radius.
-      if (s.journey.near?.id !== 'bungalow.chair') {
-        key('keydown', 'w');
-        try { await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair', 5000); }
-        finally { key('keyup', 'w'); }
+      s.test.stepJourney(0);
+      const from = launch.beat;
+      const seated = from === 'seated' || from === 'guard-gone' || from === 'ending';
+      if (from !== 'veranda') record('direct entry', from);
+      const note = s.journey.near;
+      if (note?.id !== 'bungalow.note') throw new Error('Veranda entry did not reach the note');
+      if (seated) {
+        // Compose a later starting state through the same transitions as the real walk.
+        s.journey.examined(note);
+        s.test.stepJourney(0.7);
+      } else {
+        record('placed at veranda');
+        prepared = from === 'veranda';
+        await captureStory(s, 'veranda');
+        key('keydown', 'e'); key('keyup', 'e');
+        await waitFor(() => examined === 'bungalow.note', 'note examination');
+        prepared = true;
+        await captureStory(s, 'reading-note');
+        key('keydown', 's');
+        try { await waitFor(() => closed === 'bungalow.note', 'putting down note', 5000); }
+        finally { key('keyup', 's'); }
+        record('walked to close note');
+        if (s.journey.near?.id !== 'bungalow.chair') {
+          key('keydown', 'w');
+          try { await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair', 5000); }
+          finally { key('keyup', 'w'); }
+        }
       }
       await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair');
       key('keydown', 'e'); key('keyup', 'e');
-      await waitFor(() => examined === 'bungalow.chair' && s.test.state.story.sitting >= 0, 'chair examination');
+      await waitFor(() => examined === 'bungalow.chair' && s.test.story.sitting >= 0, 'chair examination');
+      if (seated) s.view.jump();
+      if (from === 'guard-gone' || from === 'ending') {
+        // Only the narrative clock needs to advance. Deliver its normal HUD and guard effects.
+        for (let i = 0; i < 1200; i++) {
+          if (from === 'ending' ? s.test.state.ended : s.test.guardGone) break;
+          s.test.story.update(0.1, { along: s.journey.furthest, moving: false, busy: false });
+        }
+        if (from === 'ending' ? !s.test.state.ended : !s.test.guardGone) throw new Error('Finale checkpoint unavailable');
+      }
+      prepared = true;
       record('sitting');
       await captureStory(s, 'seated');
-      await waitFor(() => s.test.state.guardGone, 'guard departure', 15000);
+      await waitFor(() => s.test.guardGone, 'guard departure', 15000);
       record('guard gone');
       await captureStory(s, 'guard-gone');
       await waitFor(() => s.test.state.ended, 'ending', 15000);
@@ -338,10 +345,10 @@ export function scenarios(stateBox: HTMLPreElement) {
     }
     shown = true;
     const spot = SPOTS[key];
-    const r: Run | undefined = spot ? { name: spot.name, start: (sc) => sc.walker.hold(...spot.at) } : RUNS[key];
+    const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : RUNS[key];
     if (!r) return;
     current = { run: r, t0: performance.now(), from: [...s.walker.at] as [number, number], verdict: null, ready: false };
-    void Promise.resolve(r.start(s)).then(() => current && current.run === r && ((current.t0 = performance.now()), (current.ready = true), (current.from = [...s.walker.at] as [number, number]))).catch((error: unknown) => { if (current?.run === r) { current.ready = true; current.verdict = `FAIL: ${String(error)}`; } });
+    return Promise.resolve(r.start(s)).then(() => current && current.run === r && ((current.t0 = performance.now()), (current.ready = true), (current.from = [...s.walker.at] as [number, number]))).catch((error: unknown) => { if (current?.run === r) { current.ready = true; current.verdict = `FAIL: ${String(error)}`; } });
   };
 
   let lastText = '';
@@ -362,15 +369,15 @@ export function scenarios(stateBox: HTMLPreElement) {
   }, 250);
 
   return {
+    get prepared() { return prepared; },
     attach(s: Scene) {
       scene = s;
       if (worldTour) {
-        setTimeout(() => void tour(s), 0);
+        void tour(s);
         return;
       }
-      if (auto) setTimeout(() => void replay(s), 0);
-      const preset = boot.get('preset');
-      if (preset) queued.push(preset);
+      if (auto) void replay(s);
+      else if (launch.preset) void Promise.resolve(run(launch.preset, s)).then(() => { prepared = true; });
     },
   };
 }
