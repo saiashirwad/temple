@@ -2,7 +2,7 @@ import type { createScene } from './scene.ts';
 import { SPOTS, type Spot } from './launch.ts';
 
 export type Scene = Awaited<ReturnType<typeof createScene>>;
-type State = Scene['test']['state'];
+type State = ReturnType<Scene['inspect']>;
 export type Run = {
   name: string;
   /** Starts it; may return a promise that waits for the world. */

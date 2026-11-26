@@ -18,6 +18,7 @@ export function gameReplay(launch: Launch) {
   const trace: ReplayEntry[] = [];
   const began = performance.now();
   let finished = false;
+  let scene: Scene | undefined;
   const record = (event: string, detail?: string) => {
     trace.push({ at: +((performance.now() - began) / 1000).toFixed(2), event, ...(detail ? { detail } : {}) });
     if (replayBox) replayBox.textContent = JSON.stringify(trace);
@@ -26,6 +27,7 @@ export function gameReplay(launch: Launch) {
     if (finished || !replayBox) return;
     finished = true;
     record(ok ? 'pass' : 'fail', detail);
+    if (scene) replayBox.dataset.state = JSON.stringify(scene.inspect());
     replayBox.dataset.verdict = ok ? 'pass' : 'fail';
   };
   if (replayBox) {
@@ -37,7 +39,7 @@ export function gameReplay(launch: Launch) {
     const speed = s.test.timeScale;
     s.test.timeScale = 0;
     try {
-      await checkpoint(name, s.test.state);
+      await checkpoint(name, s.inspect());
     } finally {
       s.test.timeScale = speed;
     }
@@ -53,12 +55,12 @@ export function gameReplay(launch: Launch) {
         while (encounter.judge && !verdict) {
           if (finished) return;
           await new Promise((done) => setTimeout(done, 50));
-          verdict = encounter.judge(s.test.state, (performance.now() - start) / 1000, s);
+          verdict = encounter.judge(s.inspect(), (performance.now() - start) / 1000, s);
         }
         if (verdict?.startsWith('FAIL')) throw new Error(verdict);
         prepared = true;
         record('encounter', encounter.name);
-        await checkpoint('encounter', s.test.state);
+        await checkpoint('encounter', s.inspect());
       } else {
         if (preset && !SPOTS[preset]) throw new Error('Unknown view or encounter preset: ' + preset);
         const spots = launch.views;
@@ -69,7 +71,7 @@ export function gameReplay(launch: Launch) {
           s.view.jump();
           prepared = true;
           record('view', spot.shot);
-          await checkpoint(spot.shot, s.test.state);
+          await checkpoint(spot.shot, s.inspect());
         }
       }
       finish(true);
@@ -156,7 +158,7 @@ export function gameReplay(launch: Launch) {
       record('ended');
       await captureStory(s, 'ending');
       finish(true);
-    } catch (error) { record('state', JSON.stringify(s.test.state)); finish(false, String(error)); }
+    } catch (error) { finish(false, String(error)); }
     finally {
       key('keyup', 's'); key('keyup', 'w');
       removeEventListener('temple:examined', onExamined);
@@ -166,6 +168,9 @@ export function gameReplay(launch: Launch) {
   return {
     active: auto || worldTour,
     get prepared() { return prepared; },
-    start(s: Scene) { return worldTour ? tour(s) : replay(s); },
+    start(s: Scene) {
+      scene = s;
+      return worldTour ? tour(s) : replay(s);
+    },
   };
 }

@@ -208,8 +208,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
 
   // ---- what is built, and what grows
   const t0 = performance.now();
-  /** When each startup stage finished, in seconds since the page began loading (for the readout). */
-  const stages: string[] = [`scene:${(t0 / 1000).toFixed(1)}`];
+  /** When each startup stage finished, in milliseconds since the page began loading (for the readout). */
+  const stages = [{ name: 'scene', ms: Math.round(t0) }];
   const stage = (name: string) => {
     const n = document.querySelector('#note');
     if (n && PROBE_STAGES) n.textContent = (n.textContent ?? '') + ` ${name}:${((performance.now() - t0) / 1000).toFixed(1)}`;
@@ -219,7 +219,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
       tag.textContent += ` ${name}:${((performance.now() - t0) / 1000).toFixed(2)}`;
     }
     console.log('stage', name, ((performance.now() - t0) / 1000).toFixed(2));
-    stages.push(`${name.split(' ')[0]}:${(performance.now() / 1000).toFixed(1)}`);
+    stages.push({ name, ms: Math.round(performance.now()) });
   };
   // Downloads first, so the files arrive while the town is being built
   const loadPeople = peopleLoader();
@@ -309,7 +309,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const startPhysics = () => {
     const t0 = performance.now();
     return engine.then((b3) => createPhysics(solidShape, b3)).then((p) => {
-      stage(`physics ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+      stage('physics');
       physics = p;
       walker.physics = p;
       vehicleBodies = riders.map((r) => p.vehicle(VEHICLE[r.kind] ?? [0.5, 0.7, 1]));
@@ -763,8 +763,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     cpu.set(name, (cpu.get(name) ?? 0) + t - cpuLast);
     cpuLast = t;
   };
-  (window as { cpuReport?: () => string }).cpuReport = () =>
-    [...cpu].map(([k, v]) => `cpu ${(v / Math.max(1, cpuFrames)).toFixed(2)}ms ${k}`).join('\n') + `\nscale ${detail.scale.toFixed(2)}, gpu frame ${gpu.frame.ms?.toFixed(2) ?? '?'}ms`;
+  const profile = boot.has('profile');
+
 
   // The mirror is drawn only when the pond might be on screen
   const POND_AT: V3 = [POND.x, 0, POND.z];
@@ -881,7 +881,11 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     get guardGone() {
       return people.guard.gone;
     },
-    get state() {
+  };
+
+  return {
+    view, walker, journey, test,
+    inspect() {
       const [x, z] = walker.at;
       return {
         t: +seconds.toFixed(1),
@@ -895,6 +899,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
         torch: !walk.torchOff,
         hidden: walk.hidden,
         near: walk.near?.label ?? (walk.near ? 'Look closer' : null),
+        interactionId: walk.near?.id ?? null,
+        reading: walk.reading,
         arrived: walk.arrived,
         ended: walk.ended,
         downs: walk.downs,
@@ -902,25 +908,18 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
         danger: danger.debug,
         story: story.debug,
         fps: +fpsNow.toFixed(0),
-        boot: stages.join(' '),
+        boot: stages.slice(),
         bench: bench.table,
         hiding: test.skip >= 0 ? (drawnNames[test.skip] ?? test.skip) : 'none',
         // Per-frame CPU ms by step, the GPU frame and the resolution scale, for perf at a glance
-        cpu: [...cpu].map(([k, v]) => `${k}:${(v / Math.max(1, cpuFrames)).toFixed(1)}`).join(' '),
-        gpuMs: +(gpu.frame.ms ?? -1).toFixed(1),
-        gpu: gpu.timers.map((t) => `${t.name}:${t.ms?.toFixed(1) ?? '?'}`).join(' '),
+        cpu: Object.fromEntries([...cpu].map(([name, ms]) => [name, +(ms / Math.max(1, cpuFrames)).toFixed(2)])),
+        gpuMs: gpu.frame.ms ?? null,
+        gpu: Object.fromEntries(gpu.timers.map(t => [t.name, t.ms ?? null])),
         scale: +detail.scale.toFixed(2),
         sound: sound.stats,
-        meshes: `${pool.meshes.length}+${treePool.meshes.length}+${propPool.meshes.length}`,
+        meshes: { built: pool.meshes.length, vegetation: treePool.meshes.length, props: propPool.meshes.length },
       };
     },
-  };
-
-  return {
-    view,
-    walker,
-    journey,
-    test,
     frame(frame: Frame) {
       const dt = frame.dt * test.timeScale;
       seconds += dt;
@@ -1014,7 +1013,6 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
         } else {
           bench.on = false;
           test.skip = -1;
-          delete (window as { pinScale?: number }).pinScale;
           const avg = (k: number) => { const g = bench.sums.get(k); return g && g[1] ? g[0] / g[1] : NaN; };
           const wholes = BENCHED.map((_, k) => avg(2 * k)).filter((v) => v === v);
           const whole = wholes.reduce((a, b) => a + b, 0) / Math.max(1, wholes.length);
@@ -1022,10 +1020,9 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
           console.log('bench', bench.table);
         }
       }
-      if (bench.on) (window as { pinScale?: number }).pinScale = 1;
       const steps = sim.update(frame.dt);
-      if (!(window as { pinScale?: number }).pinScale) detail.update(frame);
-      else detail.scale = (window as { pinScale?: number }).pinScale!;
+      if (bench.on || profile) detail.scale = 1;
+      else detail.update(frame);
       const compute = frame.encoder.beginComputePass({ timestampWrites: opening.writes() });
       cells.sort(compute);
       // Shadows: the lamps' never change; the moon's near cascade draws every frame (people walk,

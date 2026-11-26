@@ -145,7 +145,7 @@
       /* The test readout (scenarios.ts): top-left, above everything, readable in a screenshot */
       #state {
         position: fixed; left: 8px; top: 8px; z-index: 20; margin: 0; padding: 6px 8px; max-width: min(560px, 92vw);
-        color: #dfffd8; background: #000b; font: 12px/1.35 ui-monospace, monospace; white-space: pre-wrap; pointer-events: none;
+        max-height: 85vh; overflow: auto; overflow-wrap: anywhere; color: #dfffd8; background: #000b; font: 12px/1.35 ui-monospace, monospace; white-space: pre-wrap;
       }
       #state[hidden] { display: none; }
     </style>

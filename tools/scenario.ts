@@ -93,6 +93,7 @@ try {
   const shots: Shot[] = [];
   let clip: { file: string; from: string; done: Promise<void> } | undefined;
   let trace: unknown;
+  let finalState: unknown;
   let firstFrame: FirstFrame | undefined;
   let status = 'fail';
   let sheet: string | undefined;
@@ -141,10 +142,12 @@ try {
     }
     const raw = await page.locator('[data-trace]').first().evaluateAll(nodes => nodes[0]?.textContent);
     if (raw) trace = JSON.parse(raw);
+    const snapshot = await target.getAttribute('data-state');
+    if (snapshot) finalState = JSON.parse(snapshot);
     if (['ready', 'pass'].includes(status)) {
       if (listing || selection.includes('ready') || (!shots.length && selection.includes('*'))) {
         await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
-        await collect('ready');
+        await collect('ready', finalState);
       }
       const missing = requested.filter(name => !available.includes(name));
       if (missing.length) throw new Error('Checkpoint not reached: ' + missing.join(', ') + '. Use --list-shots.');
@@ -165,7 +168,7 @@ try {
     }
     if (listing && !process.exitCode) console.log(available.join('\n'));
     else {
-      const result = { scenario: id, entry, target: values.target, status, firstFrame, trace, errors, shots, sheet, clip: clip && { file: clip.file, from: clip.from, seconds } };
+      const result = { scenario: id, entry, target: values.target, status, firstFrame, finalState, trace, errors, shots, sheet, clip: clip && { file: clip.file, from: clip.from, seconds } };
       const json = JSON.stringify(result, null, 2);
       if (folder) await writeFile(join(folder, 'result.json'), json + '\n');
       console.log(json);

@@ -68,32 +68,30 @@ const profiling = boot.has('profile');
 const debug = profiling ? (await import('@typegpu/kit/debug')).gpuDebug : null;
 const probe = debug?.install();
 let out: HTMLPreElement | null = null;
-const report = async () => {
+const report = async (scene: Awaited<ReturnType<typeof createScene>>) => {
   if (!probe || !debug) return;
-  if (out) {
-    delete out.dataset.done;
-    out.textContent = 'measuring…';
-    const result = await probe.measure({ seconds: 2, detail: 'pass' });
-    out.textContent = debug.measureText(result) + '\n' + ((window as { cpuReport?: () => string }).cpuReport?.() ?? '');
-    out.dataset.done = '';
-    return;
+  const initial = !out;
+  if (!out) {
+    out = document.createElement('pre');
+    out.id = 'perf';
+    out.style.cssText = 'position:fixed;left:8px;top:8px;z-index:9;color:#fff;background:#000c;font:11px/1.25 monospace;padding:6px;margin:0;max-height:96vh;overflow:hidden;pointer-events:none';
+    document.body.append(out);
   }
-  (window as { pinScale?: number }).pinScale = 1;
-  out = document.createElement('pre');
-  out.id = 'perf';
-  out.style.cssText = 'position:fixed;left:8px;top:8px;z-index:9;color:#fff;background:#000c;font:11px/1.25 monospace;padding:6px;margin:0;max-height:96vh;overflow:hidden;pointer-events:none';
-  document.body.append(out);
+  delete out.dataset.done;
   out.textContent = 'measuring…';
-  // Short enough to finish inside one GPU-worker check after the `m reload
-  await new Promise((r) => setTimeout(r, 1200));
   try {
-    probe.start();
-    await new Promise((r) => setTimeout(r, 600));
-    const result = await probe.measure({ seconds: 1.5, detail: 'pass' });
-    out.textContent = debug.measureText(result) + '\n' + ((window as { cpuReport?: () => string }).cpuReport?.() ?? '') + `\ncanvas ${canvas.width}x${canvas.height}`;
-    out.dataset.done = '';
-  } catch (e) {
-    out.textContent = 'measure failed ' + String(e);
+    if (initial) {
+      await new Promise(done => setTimeout(done, 1200));
+      probe.start();
+      await new Promise(done => setTimeout(done, 600));
+    }
+    const result = await probe.measure({ seconds: 2, detail: 'pass' });
+    const state = scene.inspect();
+    const rows = Object.entries(state.cpu).map(([name, ms]) => `cpu ${ms}ms ${name}`);
+    out.textContent = [debug.measureText(result), ...rows, `scale ${state.scale}, gpu frame ${state.gpuMs ?? '?'}ms`, `canvas ${canvas.width}x${canvas.height}`].join('\n');
+  } catch (error) {
+    out.textContent = 'measure failed ' + String(error);
+  } finally {
     out.dataset.done = '';
   }
 };
@@ -108,10 +106,6 @@ if (!navigator.gpu) {
     maxPixelRatio: coarse ? 1.15 : 1.5,
     optionalFeatures: ['timestamp-query', 'indirect-first-instance'],
     attach: ({ scene }) => {
-      console.log('scene ready');
-
-      // Something for test browsers to wait on: the scene is up and drawing
-      document.body.append(Object.assign(document.createElement('i'), { id: 'running', style: 'position:fixed;left:0;bottom:0;width:1px;height:1px' }));
       const controls = web.orbitControls(scene.view, canvas, { sensitivity: coarse ? 0.007 : 0.005, onChange: () => scene.walker.touched() });
 
       const { state, danger } = scene.journey;
@@ -128,6 +122,7 @@ if (!navigator.gpu) {
         scene.journey.examine(it);
         hud.caption(it.text);
         shown = it.text;
+        state.reading = true;
         shownId = it.id;
         window.dispatchEvent(new CustomEvent('temple:examined', { detail: it.id }));
         since = performance.now();
@@ -202,7 +197,7 @@ if (!navigator.gpu) {
             torch();
             break;
           case 'm':
-            if (out) void report();
+            if (out) void report(scene);
             break;
         }
       });
@@ -211,11 +206,10 @@ if (!navigator.gpu) {
       addEventListener('blur', () => walker.keys.clear());
       setInterval(() => {
         const it = state.near;
-        const reading = shown !== null;
-        state.reading = reading;
         // Up again and the words gone once you walk on, or move away
-        if (reading && ((walker.moving && performance.now() - since > 600) || !it || it.text !== shown)) {
+        if (state.reading && ((walker.moving && performance.now() - since > 600) || !it || it.text !== shown)) {
           shown = null;
+          state.reading = false;
           window.dispatchEvent(new CustomEvent('temple:closed', { detail: shownId }));
           shownId = undefined;
           hud.caption(null);
@@ -248,7 +242,7 @@ if (!navigator.gpu) {
         });
       };
       tests.attach(scene);
-      void report();
+      void report(scene);
       return controls;
     },
     onFrame: ({ scene }) => {

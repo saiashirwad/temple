@@ -103,7 +103,7 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     if (scene) while (queued.length) run(queued.shift()!, scene);
     stateBox.hidden = !shown;
     if (!shown || !scene) return;
-    const st = scene.test.state;
+    const st = scene.inspect();
     let head = 'no scenario';
     if (current) {
       const t = (performance.now() - current.t0) / 1000;
@@ -111,7 +111,8 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
       const moved = Math.hypot(st.at[0]! - current.from[0], st.at[1]! - current.from[1]);
       head = `${current.run.name} · ${current.verdict ?? (!current.ready ? 'setting up' : current.run.judge ? 'waiting' : 'running')} · ${t.toFixed(0)}s · moved ${moved.toFixed(1)}m`;
     }
-    const text = `${head}\nx${scene.test.timeScale}  ` + JSON.stringify(st).replace(/[{}"]/g, '').replace(/,(?=[a-z])/g, '  ');
+    const fields = Object.entries(st).map(([key, value]) => `${key}  ${JSON.stringify(value)}`);
+    const text = [head, `clock ×${scene.test.timeScale}`, ...fields].join('\n');
     if (text !== lastText) stateBox.textContent = lastText = text;
   }, 250);
 
