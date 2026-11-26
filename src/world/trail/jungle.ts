@@ -153,13 +153,18 @@ export const BROOKS = [305, 690, 955].map((along) => {
     y = Math.min(y, heightAt(q[0], q[1]) + 0.05);
     ys.push(y);
   }
-  return { along, pts, ys };
+  // The distance query below only visits segments within 30 m of their starting point.
+  const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]);
+  const bounds = { x0: Math.min(...xs) - 30, x1: Math.max(...xs) + 30, z0: Math.min(...zs) - 30, z1: Math.max(...zs) + 30 };
+  return { along, pts, ys, bounds };
 });
 
 /** How far x, z is from the nearest brook's line. */
 export function brookDistance(x: number, z: number) {
   let best = Infinity;
   for (const b of BROOKS) {
+    const { x0, x1, z0, z1 } = b.bounds;
+    if (x < x0 || x > x1 || z < z0 || z > z1) continue;
     for (let i = 0; i + 1 < b.pts.length; i++) {
       const [ax, az] = b.pts[i]!;
       const [bx, bz] = b.pts[i + 1]!;

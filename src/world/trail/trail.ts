@@ -31,7 +31,7 @@ for (let k = 0; k + 1 < PTS.length; k++) {
 
 /** The nearest point of the path to x, z: how far off it is and how far along. */
 export function trailNear(x: number, z: number, reach = 40) {
-  let best = Infinity;
+  let bestSquared = Infinity;
   let along = 0;
   const n = Math.ceil(reach / CELL);
   const ci = Math.floor(x / CELL);
@@ -45,15 +45,15 @@ export function trailNear(x: number, z: number, reach = 40) {
         const dz = b[1] - a[1];
         const L2 = dx * dx + dz * dz || 1;
         const t = Math.min(1, Math.max(0, ((x - a[0]) * dx + (z - a[1]) * dz) / L2));
-        const d = Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t);
-        if (d < best) {
-          best = d;
+        const distanceSquared = (x - a[0] - dx * t) ** 2 + (z - a[1] - dz * t) ** 2;
+        if (distanceSquared < bestSquared) {
+          bestSquared = distanceSquared;
           along = ALONG[k]! + Math.sqrt(L2) * t;
         }
       }
     }
   }
-  return { distance: best, along };
+  return { distance: Math.sqrt(bestSquared), along };
 }
 /** How far x, z is from the path (Infinity beyond `reach`). */
 export const trailDistance = (x: number, z: number, reach = 40) => trailNear(x, z, reach).distance;

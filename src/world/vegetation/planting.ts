@@ -59,14 +59,16 @@ export const NEAR = 62;
 const FAR = 430;
 
 class Spacing {
+  private maxRadius = 0;
   private cells = new Map<number, [number, number, number][]>();
   private key = (i: number, j: number) => i * 100003 + j;
   constructor(private size: number) {}
   ok(x: number, z: number, r: number) {
-    const i0 = Math.floor(x / this.size);
-    const j0 = Math.floor(z / this.size);
-    for (let i = i0 - 2; i <= i0 + 2; i++) {
-      for (let j = j0 - 2; j <= j0 + 2; j++) {
+    const reach = Math.max(r, this.maxRadius);
+    const i1 = Math.floor((x + reach) / this.size);
+    const j1 = Math.floor((z + reach) / this.size);
+    for (let i = Math.floor((x - reach) / this.size); i <= i1; i++) {
+      for (let j = Math.floor((z - reach) / this.size); j <= j1; j++) {
         const list = this.cells.get(this.key(i, j));
         if (!list) continue;
         for (let k = 0; k < list.length; k++) {
@@ -81,6 +83,7 @@ class Spacing {
     return true;
   }
   put(x: number, z: number, r: number) {
+    this.maxRadius = Math.max(this.maxRadius, r);
     const k = this.key(Math.floor(x / this.size), Math.floor(z / this.size));
     const list = this.cells.get(k) ?? [];
     list.push([x, z, r]);
@@ -145,7 +148,7 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = [], options
     pondQ(x, z) < 1.08 ||
     inShops(x, z) ||
     Math.hypot(x - BANYAN[0], z - BANYAN[2]) < 6 + m ||
-    homes.some((h) => Math.hypot(h[0] - x, h[2] - z) < 7 + m) ||
+    homes.some(h => (h[0] - x) ** 2 + (h[2] - z) ** 2 < (7 + m) ** 2) ||
     onLane(x, z, m * 0.5 + 0.6) ||
     inPaddy(x, z, -1) ||
     groveAt(x, z, 1) !== null ||
@@ -510,7 +513,7 @@ export function plantAll(homes: V3[], gaps: V3[], tulsiSpots: V3[] = [], options
     // Cheapest tests first (all pure, none draws from `r`, so the order keeps the layout)
     if (onRoad(x, z, 2.5) || pondQ(x, z) < 1.1 || inPaddy(x, z, 1) || Math.hypot(x - CLEARING.x, z - CLEARING.z) < 26) continue;
     if (onLane(x, z, 1.5) || groveAt(x, z, 2) || inYard(x, z, 1)) continue;
-    if (homes.some((h) => Math.hypot(h[0] - x, h[2] - z) < 7) || trailNear(x, z, 12).distance < 12 || ravine(x, z)) continue;
+    if (homes.some(h => (h[0] - x) ** 2 + (h[2] - z) ** 2 < 49) || trailNear(x, z, 12).distance < 12 || ravine(x, z)) continue;
     const forest = Math.min(Math.max((d - 150) / 90, 0), 1);
     const palm = r() < 0.62 - forest * 0.5;
     const kind: FarKind = palm ? 'palm' : forest < 0.5 && r() < 0.12 ? 'areca' : 'broad';
