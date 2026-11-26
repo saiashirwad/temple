@@ -111,7 +111,9 @@ export function meadowModels() {
 /** Where grass grows, and how long it is let grow: 0 kept short, 1 long. */
 export function meadowPlaces(land: Uint8Array, walked: (x: number, z: number) => number, options: { seed?: number; density?: number } = {}) {
   const out: { at: V3; yaw: number; scale: number; length: 'short' | 'mid' | 'tall' }[] = [];
-  const r = seeded(options.seed ?? 17);
+  // Keep the original meadow stream for the authored seed of 5.
+  const seed = (options.seed ?? VEGETATION.seed) >>> 0;
+  const r = seeded((seed + 11) % 2147483646 + 1);
   const m = LAND_N / (2 * LAND);
   const at = (x: number, z: number, ch: number) => {
     const i = Math.floor((x + LAND) * m);

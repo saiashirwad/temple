@@ -1,0 +1,74 @@
+.forest-workbench {
+  font: 14px system-ui;
+  color: #e9eee3;
+  background: #17241e;
+  padding: 20px;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+.forest-workbench h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+.forest-workbench p {
+  color: #b5c5b8;
+  max-width: 750px;
+}
+.forest-controls {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.forest-controls label {
+  display: grid;
+  gap: 5px;
+}
+.forest-controls input,
+.forest-controls button {
+  font: inherit;
+  padding: 7px;
+  background: #2b4034;
+  color: #fff;
+  border: 1px solid #6f8976;
+  border-radius: 4px;
+}
+.forest-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 700px) minmax(200px, 1fr);
+  gap: 20px;
+}
+.forest-workbench canvas {
+  width: 100%;
+  height: auto;
+  background: #26382d;
+  border: 1px solid #718776;
+  aspect-ratio: 1;
+}
+.forest-workbench table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.forest-workbench td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #405347;
+}
+.forest-workbench td:last-child {
+  text-align: right;
+}
+.forest-key {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.forest-key span:before {
+  content: '●';
+  color: var(--c);
+  margin-right: 5px;
+}
+@media (max-width: 700px) {
+  .forest-layout {
+    grid-template-columns: 1fr;
+  }
+}

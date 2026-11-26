@@ -1,4 +1,12 @@
-export function slider(root: HTMLElement, label: string, value: number, min: number, max: number, step: number, change: (value: number) => void) {
+export function slider(
+  root: HTMLElement,
+  label: string,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  change: (value: number) => void,
+) {
   const field = document.createElement('label');
   const range = document.createElement('input');
   range.type = 'range';
@@ -8,7 +16,9 @@ export function slider(root: HTMLElement, label: string, value: number, min: num
   range.value = String(value);
   const out = document.createElement('output');
   out.textContent = range.value;
-  range.oninput = () => { out.textContent = range.value; };
+  range.oninput = () => {
+    out.textContent = range.value;
+  };
   range.onchange = () => change(range.valueAsNumber);
   field.append(label, range, out);
   root.append(field);

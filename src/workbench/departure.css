@@ -1,0 +1,46 @@
+.departure {
+  font: 15px system-ui;
+  background: #19241e;
+  color: #edf1e8;
+  padding: 24px;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+.departure h1 {
+  margin: 0;
+}
+.departure p {
+  color: #c0d0bf;
+  max-width: 760px;
+}
+.departure button {
+  font: inherit;
+  background: #324b39;
+  color: white;
+  border: 1px solid #819887;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.departure .actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.departure .state {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.departure pre {
+  background: #101b15;
+  color: #c9dec9;
+  padding: 14px;
+  overflow: auto;
+  max-height: 330px;
+  white-space: pre-wrap;
+}
+.departure strong {
+  color: #aee4a5;
+}

@@ -1,0 +1,48 @@
+.npc-lab {
+  font: 14px system-ui;
+  background: #19241e;
+  color: #eef4e9;
+  padding: 20px;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+.npc-lab h1 {
+  font-size: 24px;
+  margin: 0;
+}
+.npc-lab p {
+  color: #c2d0c3;
+  max-width: 760px;
+}
+.npc-controls {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+.npc-controls label {
+  display: grid;
+  gap: 5px;
+}
+.npc-controls select,
+.npc-controls input,
+.npc-controls button {
+  font: inherit;
+  padding: 6px;
+  background: #314638;
+  color: white;
+  border: 1px solid #839a87;
+  border-radius: 4px;
+}
+.npc-lab canvas {
+  display: block;
+  width: min(100%, 750px);
+  aspect-ratio: 1;
+  background: #24382d;
+  border: 1px solid #839a87;
+  touch-action: none;
+}
+.npc-lab output {
+  font-variant-numeric: tabular-nums;
+}

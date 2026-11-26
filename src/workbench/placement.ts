@@ -40,17 +40,35 @@ export function mount(root: HTMLElement) {
       ctx.beginPath();
       ctx.arc(px, py, 4, 0, 2 * Math.PI);
       ctx.fill();
-      if (title) { ctx.font = '14px system-ui'; ctx.fillText(title, px + 8, py - 5); }
+      if (title) {
+        ctx.font = '14px system-ui';
+        ctx.fillText(title, px + 8, py - 5);
+      }
     }
     for (const lamp of lamps) dot(lamp.position[0], lamp.position[2], '#ffc363');
     const note = noteAt(at);
     dot(note.x, note.z, '#fff7da', 'Cook’s note');
     dot(CLEARING.x, CLEARING.z, '#88d8ba', 'Trail end');
-    status.textContent = 'Collision footprints and lamps · floor ' + at.floor.toFixed(2) + ' m · note at ' + note.x.toFixed(2) + ', ' + note.z.toFixed(2);
+    status.textContent =
+      'Collision footprints and lamps · floor ' +
+      at.floor.toFixed(2) +
+      ' m · note at ' +
+      note.x.toFixed(2) +
+      ', ' +
+      note.z.toFixed(2);
   }
-  slider(controls, 'Across trail (m)', settings.right, -12, 12, 0.25, value => { settings.right = value; draw(); });
-  slider(controls, 'Along trail (m)', settings.forward, -8, 20, 0.25, value => { settings.forward = value; draw(); });
-  slider(controls, 'Turn (degrees)', settings.turn, 0, 360, 1, value => { settings.turn = value; draw(); });
+  slider(controls, 'Across trail (m)', settings.right, -12, 12, 0.25, (value) => {
+    settings.right = value;
+    draw();
+  });
+  slider(controls, 'Along trail (m)', settings.forward, -8, 20, 0.25, (value) => {
+    settings.forward = value;
+    draw();
+  });
+  slider(controls, 'Turn (degrees)', settings.turn, 0, 360, 1, (value) => {
+    settings.turn = value;
+    draw();
+  });
   exportSettings(controls, 'bungalow-placement.json', settings);
   root.append(controls, status, canvas);
   draw();
