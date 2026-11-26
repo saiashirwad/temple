@@ -1,3 +1,4 @@
+import { loadWorldLayout } from '../world/layout.ts';
 import {
   ao,
   bindings,
@@ -128,6 +129,7 @@ const occludedLamp = (point: shading.Point, toLight: d.v3f, distance: number, ra
 const PROBE_STAGES = boot.has('probe');
 
 export async function createScene(root: TgpuRoot, surface: Surface, launch: Launch) {
+  const bakedLayout = import.meta.env.PROD ? loadWorldLayout(document.querySelector<HTMLLinkElement>('#world-layout')!.href) : undefined;
   const random = randomStreams(boot.get('seed'));
   // GPU time decides how many pixels to draw: below the budget, full size; over it, fewer,
   // which TAA builds back up to the canvas
@@ -239,7 +241,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const propFiles = loadProps(placed);
   const pondModel = buildPond();
   stage('built');
-  const planted = plantAll(village.homes, grounds.gaps, village.tulsi);
+  const baked = await bakedLayout;
+  const planted = baked?.planted ?? plantAll(village.homes, grounds.gaps, village.tulsi);
   stage('planted');
   const { geometry, trees } = prepareVegetation(planted);
   // Flames go to their own set, which stretches and bends them in the breeze
@@ -315,8 +318,8 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
     extra: { pat: d.f32, col: d.vec4f },
   });
   // Everything that grows has a pool of its own: one pool holds at most 256 meshes
-  const land = landMap();
-  const grassAt = meadowPlaces(land.pixels, planted.walked);
+  const land = baked?.land ?? landMap();
+  const grassAt = baked?.grassAt ?? meadowPlaces(land.pixels, planted.walked);
   stage('meadow');
   const tex = await textures;
   stage('tex');
@@ -432,7 +435,7 @@ export async function createScene(root: TgpuRoot, surface: Surface, launch: Laun
   const things = props.renderer({ cull: true });
   const culled = [nearTrees, farMeshes, ...farCards, plants, grass, things];
   const feet = footprints(solidShape.solids);
-  const plans = plansClear(village.tulsi, village.seats, solidShape.solids, feet);
+  const plans = baked && !boot.has('lineup') ? baked.plans : plansClear(village.tulsi, village.seats, solidShape.solids, feet);
   const isWatcher = (p: typeof plans[number]) => p.kind === 'walk' && p.watcher;
   const people = createPeople(root, folk, launch.forest ? plans.filter(isWatcher) : plans, feet, random.people);
   const population = [people];

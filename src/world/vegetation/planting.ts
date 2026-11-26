@@ -91,7 +91,7 @@ class Spacing {
   }
 }
 
-const tourDistance = (x: number, z: number) => {
+export const tourDistance = (x: number, z: number) => {
   let best = Infinity;
   for (let i = 0; i < TOUR.length; i++) {
     const [ax, az] = TOUR[i]!;
