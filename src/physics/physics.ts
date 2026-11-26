@@ -6,7 +6,7 @@
 //
 // No GPU here; the scene hands in what it built and reads back where the feet are.
 
-import type { b3BodyId, b3Capsule, b3Vec3, Box3DModule, PlaneResultBuffer } from 'box3d.js';
+import type { b3BodyId, b3Capsule, b3ShapeId as ColliderId, b3Vec3, Box3DModule, PlaneResultBuffer } from 'box3d.js';
 import type { PropAt, Solid } from '../render/geo.ts';
 
 type V3 = [number, number, number];
@@ -25,19 +25,21 @@ const REST = HOVER + RADIUS;
 const GRAVITY = 18;
 const JUMP = 4.6;
 
-/** Heavy props a walker bumps into: radius, or half sizes for a box, and height. */
-const PROPS: Record<string, { r?: number; h: V3 | number }> = {
-  monobloc: { r: 0.3, h: 0.85 },
-  bench: { h: [0.85, 0.25, 0.22] },
-  crate: { h: [0.25, 0.15, 0.2] },
-  planter: { r: 0.25, h: 0.5 },
-  pole1: { r: 0.16, h: 8 },
-  pole2: { r: 0.16, h: 8 },
-  pole3: { r: 0.16, h: 8 },
-  lpg: { r: 0.17, h: 0.6 },
-  tyre: { r: 0.35, h: 0.3 },
-  gallon: { r: 0.15, h: 0.45 },
-};
+type PropCollider = { radius: number; height: number } | { halfExtents: V3 };
+
+/** Heavy props a walker bumps into. Props outside this catalogue have no collider. */
+const PROPS = new Map<string, PropCollider>([
+  ['monobloc', { radius: 0.3, height: 0.85 }],
+  ['bench', { halfExtents: [0.85, 0.25, 0.22] }],
+  ['crate', { halfExtents: [0.25, 0.15, 0.2] }],
+  ['planter', { radius: 0.25, height: 0.5 }],
+  ['pole1', { radius: 0.16, height: 8 }],
+  ['pole2', { radius: 0.16, height: 8 }],
+  ['pole3', { radius: 0.16, height: 8 }],
+  ['lpg', { radius: 0.17, height: 0.6 }],
+  ['tyre', { radius: 0.35, height: 0.3 }],
+  ['gallon', { radius: 0.15, height: 0.45 }],
+]);
 
 export interface Tree {
   at: V3;
@@ -46,7 +48,7 @@ export interface Tree {
   trunk: number;
 }
 
-export interface WorldShape {
+export interface WorldColliders {
   solids: Solid[];
   props: PropAt[];
   trees: Tree[];
@@ -63,24 +65,24 @@ export type Physics = Awaited<ReturnType<typeof createPhysics>>;
 /** Starts fetching and compiling the engine, to hand to `createPhysics` later. */
 export const loadPhysics = async () => (await import('box3d.js')).default();
 
-export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
+export async function createPhysics(colliders: WorldColliders, engine?: Box3DModule) {
   const b3 = engine ?? (await loadPhysics());
   const def = b3.b3DefaultWorldDef();
   def.gravity = [0, -GRAVITY, 0];
   const world = b3.b3CreateWorld(def);
   const filter = b3.b3DefaultQueryFilter();
-  const { heightAt } = shape;
+  const { heightAt } = colliders;
 
   // ---- the land: one static triangle mesh round the town, and square patches of it out along
   // the forest path
   const landMesh = (x0: number, z0: number, size: number) => {
-    const n = Math.floor(size / shape.spacing) + 1;
+    const n = Math.floor(size / colliders.spacing) + 1;
     const positions = new Float32Array(n * n * 3);
 
     for (let j = 0; j < n; j++)
       for (let i = 0; i < n; i++) {
-        const x = x0 + i * shape.spacing;
-        const z = z0 + j * shape.spacing;
+        const x = x0 + i * colliders.spacing;
+        const z = z0 + j * colliders.spacing;
         const k = (j * n + i) * 3;
         positions[k] = x;
         positions[k + 1] = heightAt(x, z);
@@ -109,19 +111,19 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
     b3.b3CreateMeshShape(body, b3.b3DefaultShapeDef(), mesh, [1, 1, 1]);
   };
 
-  landMesh(-shape.extent, -shape.extent, shape.extent * 2);
+  landMesh(-colliders.extent, -colliders.extent, colliders.extent * 2);
 
-  for (const [x0, z0, size] of shape.patches ?? []) landMesh(x0, z0, size);
+  for (const [x0, z0, size] of colliders.patches ?? []) landMesh(x0, z0, size);
 
   // ---- what stands on it
-  const shapeDef = b3.b3DefaultShapeDef();
+  const solidDef = b3.b3DefaultShapeDef();
   const yawQ = (yaw: number): [number, number, number, number] => [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
 
   const staticBox = (c: V3, h: V3, yaw: number) => {
     const d = b3.b3DefaultBodyDef();
     d.position = c;
-    d.rotation = yawQ(yaw) as never;
-    b3.b3CreateBoxShape(b3.b3CreateBody(world, d), shapeDef, h[0], h[1], h[2]);
+    d.rotation = yawQ(yaw);
+    b3.b3CreateBoxShape(b3.b3CreateBody(world, d), solidDef, h[0], h[1], h[2]);
   };
 
   const staticCylinder = (base: V3, r: number, h: number) => {
@@ -132,13 +134,13 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
     if (h > r * 3) {
       // Tall and thin: a capsule is cheaper than a hull and as good to bump into
       const s = h / 2 - r;
-      b3.b3CreateCapsuleShape(body, shapeDef, { center1: [0, -s, 0], center2: [0, s, 0], radius: r });
-    } else b3.b3CreateHullShape(body, shapeDef, b3.b3CreateCylinder(h, r, 0, 8));
+      b3.b3CreateCapsuleShape(body, solidDef, { center1: [0, -s, 0], center2: [0, s, 0], radius: r });
+    } else b3.b3CreateHullShape(body, solidDef, b3.b3CreateCylinder(h, r, 0, 8));
   };
 
   let count = 0;
 
-  for (const s of shape.solids) {
+  for (const s of colliders.solids) {
     const g = heightAt(s.c[0], s.c[2]);
     const lo = s.kind === 'box' ? s.c[1] - s.h[1] : s.c[1];
     const hi = s.kind === 'box' ? s.c[1] + s.h[1] : s.c[1] + s.h;
@@ -151,22 +153,22 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
     count++;
   }
 
-  for (const p of shape.props) {
-    const k = PROPS[p.name];
+  for (const p of colliders.props) {
+    const k = PROPS.get(p.name);
 
     if (!k) continue;
     const sc = p.scale[0];
 
-    if (k.r) staticCylinder(p.at, k.r * sc, (k.h as number) * sc);
+    if ('radius' in k) staticCylinder(p.at, k.radius * sc, k.height * sc);
     else {
-      const h = k.h as V3;
+      const h = k.halfExtents;
       staticBox([p.at[0], p.at[1] + h[1] * sc, p.at[2]], [h[0] * sc, h[1] * sc, h[2] * sc], p.yaw);
     }
 
     count++;
   }
 
-  for (const t of shape.trees) {
+  for (const t of colliders.trees) {
     staticCylinder([t.at[0], t.at[1] - 0.3, t.at[2]], t.trunk * t.scale, 3.2);
     count++;
   }
@@ -185,7 +187,7 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
   /** A person, as a capsule 0.25 m round from the ground to 1.7 m. */
   const person = () => {
     const body = kinematic();
-    b3.b3CreateCapsuleShape(body, shapeDef, { center1: [0, 0.25, 0], center2: [0, 1.45, 0], radius: 0.25 });
+    b3.b3CreateCapsuleShape(body, solidDef, { center1: [0, 0.25, 0], center2: [0, 1.45, 0], radius: 0.25 });
     movers.push(body);
 
     return movers.length - 1;
@@ -196,14 +198,14 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
 
   const vehicle = (h: V3) => {
     const body = kinematic();
-    b3.b3CreateBoxShape(body, shapeDef, h[0], h[1], h[2]);
+    b3.b3CreateBoxShape(body, solidDef, h[0], h[1], h[2]);
     movers.push(body);
     lift[movers.length - 1] = h[1];
 
     return movers.length - 1;
   };
 
-  const place = (id: number, at: V3, yaw: number) => b3.b3Body_SetTransform(movers[id]!, [at[0], at[1] + (lift[id] ?? 0), at[2]], yawQ(yaw) as never);
+  const place = (id: number, at: V3, yaw: number) => b3.b3Body_SetTransform(movers[id]!, [at[0], at[1] + (lift[id] ?? 0), at[2]], yawQ(yaw));
 
   // ---- the walker
   let position: b3Vec3 = [0, 0, 0];
@@ -216,7 +218,7 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
 
   let planes: Plane[] = [];
 
-  const collect = (_s: unknown, buf: PlaneResultBuffer) => {
+  const collect = (_id: ColliderId, buf: PlaneResultBuffer) => {
     for (let i = 0, n = b3.getNumPlaneResults(buf); i < n; i++) {
       b3.getPlaneResultAt(planeResult, buf, i);
       const nrm = planeResult.plane.normal;
@@ -314,7 +316,7 @@ export async function createPhysics(shape: WorldShape, engine?: Box3DModule) {
         if (delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2] < 1e-4) break;
       }
 
-      velocity = b3.b3ClipVector(velocity, planes) as b3Vec3;
+      velocity = b3.b3ClipVector(velocity, planes);
       // Never under the land, whatever happens
       const floor = heightAt(position[0], position[2]);
 
