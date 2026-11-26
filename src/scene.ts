@@ -830,7 +830,6 @@ export async function createScene(root: TgpuRoot, surface: Surface) {
     get guardGone() {
       return people.guard.gone;
     },
-    readNote() { walk.noteRead = true; },
     get state() {
       const [x, z] = walker.at;
       return {

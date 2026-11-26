@@ -265,8 +265,48 @@ export const SHRINES = [
 
 // ---------------------------------------------------------------- what to look at closely
 
-export type Interest = { x: number; z: number; r: number; text: string; low: boolean; label?: string; sit?: boolean };
-export const INTEREST: Interest[] = [];
+export type Interest = { id?: import('./bungalow-story.ts').BungalowInteraction; x: number; z: number; r: number; text: string; low: boolean; label?: string; sit?: boolean };
+function dungPosition(s: number, side: number): XZ {
+  const i = Math.round((s + 45) / 1.5);
+  const [x0, z0] = CROSSING.pts[Math.min(Math.max(i, 0), CROSSING.pts.length - 1)]!;
+  const x = x0 - CROSSING.d[1] * side;
+  const z = z0 + CROSSING.d[0] * side;
+  return [x, z];
+}
+
+export const INTEREST: readonly Interest[] = (() => {
+  const points: Interest[] = [];
+  const fresh = dungPosition(3.5, 0.5);
+  const [cx, cz] = CROSSING.pts[Math.round(CROSSING.pts.length * 0.72)]!;
+  points.push({ x: fresh[0], z: fresh[1], r: 3.2, low: true, text: 'Elephant dung. Fresh. Still warm, the flies not yet found it. The herd came through tonight.' });
+  points.push({ x: CROSSING.at[0], z: CROSSING.at[1], r: 3.5, low: true, text: 'Footprints, big as dinner plates, their edges still crisp and wet. They cross the path and go down toward the water.' });
+  points.push({ x: cx, z: cz, r: 3, low: true, text: 'Bamboo snapped off and stripped of its leaves. They were feeding as they went.' });
+  for (const [i, v] of VIEWS.entries()) {
+    const text = [
+      "The trees open here. Back down there, the town's lamps, and the temple's among them. Already small.",
+      'Across the valley, on the far ridge, a fire, and a few lamps near it: a hamlet, a watcher up all night keeping the elephants off the crop.',
+      'Down in the moonlit grass of the valley, grey shapes moving slowly. A herd of elephants. Best keep walking, quietly.',
+    ][i]!;
+    points.push({ x: v.at[0], z: v.at[1], r: 4, low: false, text });
+  }
+  // ---- what to look at, at the shrines and brooks
+  const shrineText = {
+    stone: 'A stone daubed with vermilion and turmeric, a trident hung with bells beside it. The lamp has been lit tonight. Someone passed this way not long ago.',
+    naga: "Serpent stones, the cobras worn smooth with age, smeared with turmeric. Offerings to the nagas who keep the forest.",
+    hut: "A wayside shrine no bigger than a kennel. Marigolds, half a coconut, a wick still burning. Whoever left them asked for a safe night's walk.",
+  };
+  for (const s of SHRINES) points.push({ x: s.x, z: s.z, r: 3.2, low: true, text: shrineText[s.kind] });
+  const brookText = [
+    'A brook, cold and quick off the hill. Step on the stones.',
+    'Water talking over the stones in the dark. Somewhere upstream a frog has gone quiet.',
+    'The last brook. The air is cooler here, and smells of wet leaves.',
+  ];
+  BROOKS.forEach((br, i) => {
+    const p = trailAt(br.along);
+    points.push({ x: p.x, z: p.z, r: 2.5, low: true, text: brookText[i]! });
+  });
+  return points;
+})();
 
 // ---------------------------------------------------------------- what keeps trees away
 
@@ -604,10 +644,7 @@ export function buildJungle(b: Builder) {
     }
     // Dung: a few heaps of boluses where they paused, fibrous and still moist
     const dungAt = (s: number, side: number, fresh: boolean) => {
-      const i = Math.round((s + 45) / 1.5);
-      const [x0, z0] = pts[Math.min(Math.max(i, 0), pts.length - 1)]!;
-      const x = x0 - CROSSING.d[1] * side;
-      const z = z0 + CROSSING.d[0] * side;
+      const [x, z] = dungPosition(s, side);
       // Boluses the size of a coconut, slumped where they fell, one or two broken open
       for (let k = 0; k < 7; k++) {
         const a = r() * Math.PI * 2;
@@ -629,12 +666,9 @@ export function buildJungle(b: Builder) {
         const y = g(px, pz) + 0.012;
         b.sweep(FIBRE, [[px - Math.cos(t) * l, y, pz - Math.sin(t) * l], [px + Math.cos(t) * l, y + 0.01, pz + Math.sin(t) * l]], [0.006, 0.004], 3);
       }
-      return [x, z] as XZ;
     };
-    const fresh = dungAt(3.5, 0.5, true);
+    dungAt(3.5, 0.5, true);
     dungAt(-9, -0.3, false);
-    INTEREST.push({ x: fresh[0], z: fresh[1], r: 3.2, low: true, text: 'Elephant dung. Fresh. Still warm, the flies not yet found it. The herd came through tonight.' });
-    INTEREST.push({ x: CROSSING.at[0], z: CROSSING.at[1], r: 3.5, low: true, text: 'Footprints, big as dinner plates, their edges still crisp and wet. They cross the path and go down toward the water.' });
     // Bamboo snapped and stripped, a clump trampled half flat
     const [cx, cz] = pts[Math.round(pts.length * 0.72)]!;
     const cr = rng(99);
@@ -652,21 +686,15 @@ export function buildJungle(b: Builder) {
       const z = cz + Math.sin(a) * 0.4;
       b.tube(BAMBOO, [x, g(x, z) - 0.05, z], 0.05, 0.045, 0.4 + cr() * 0.6, 5);
     }
-    INTEREST.push({ x: cx, z: cz, r: 3, low: true, text: 'Bamboo snapped off and stripped of its leaves. They were feeding as they went.' });
   });
 
   // ---- the views: a flat rock to stand on, and what's out there
-  for (const [i, v] of VIEWS.entries()) {
+  for (const v of VIEWS) {
     // A flat rock to sit on, beside and behind you, out of the view
     const px = v.at[0] - v.d[0] * 1.6 + v.d[1] * 1.4;
     const pz = v.at[1] - v.d[1] * 1.6 - v.d[0] * 1.4;
     b.blob(GRANITE[2]!, [px, g(px, pz) - 0.2, pz], [0.9, 0.42, 0.7], 9, 5, 0.12);
-    const text = [
-      "The trees open here. Back down there, the town's lamps, and the temple's among them. Already small.",
-      'Across the valley, on the far ridge, a fire, and a few lamps near it: a hamlet, a watcher up all night keeping the elephants off the crop.',
-      'Down in the moonlit grass of the valley, grey shapes moving slowly. A herd of elephants. Best keep walking, quietly.',
-    ][i]!;
-    INTEREST.push({ x: v.at[0], z: v.at[1], r: 4, low: false, text });
+
   }
   // The watcher's fire and his hut on the far ridge
   {
@@ -693,21 +721,5 @@ export function buildJungle(b: Builder) {
     }
   }
 
-  // ---- what to look at, at the shrines and brooks
-  const shrineText = {
-    stone: 'A stone daubed with vermilion and turmeric, a trident hung with bells beside it. The lamp has been lit tonight. Someone passed this way not long ago.',
-    naga: "Serpent stones, the cobras worn smooth with age, smeared with turmeric. Offerings to the nagas who keep the forest.",
-    hut: "A wayside shrine no bigger than a kennel. Marigolds, half a coconut, a wick still burning. Whoever left them asked for a safe night's walk.",
-  };
-  for (const s of SHRINES) INTEREST.push({ x: s.x, z: s.z, r: 3.2, low: true, text: shrineText[s.kind] });
-  const brookText = [
-    'A brook, cold and quick off the hill. Step on the stones.',
-    'Water talking over the stones in the dark. Somewhere upstream a frog has gone quiet.',
-    'The last brook. The air is cooler here, and smells of wet leaves.',
-  ];
-  BROOKS.forEach((br, i) => {
-    const p = trailAt(br.along);
-    INTEREST.push({ x: p.x, z: p.z, r: 2.5, low: true, text: brookText[i]! });
-  });
   return { lamps };
 }

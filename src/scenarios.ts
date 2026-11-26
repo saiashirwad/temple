@@ -21,6 +21,7 @@
 //   c    reload with the phone layout;  0  reload clean
 
 import { boot } from './boot.ts';
+import { NOTE_AT } from './bungalow.ts';
 import type { createScene } from './scene.ts';
 
 type Scene = Awaited<ReturnType<typeof createScene>>;
@@ -36,7 +37,7 @@ export const SPOTS: Record<string, { name: string; at: Spot }> = {
   '5': { name: 'machan stair', at: [-17.44, -159.78, 0.421, 0.1, 3.8] },
   '6': { name: 'herd glade', at: [-114.55, -258.42, -2.05, 0.08, 1.62] },
   '7': { name: 'herd glade, close', at: [-110.2, -256.1, -2.05, 0.12, 1.62] },
-  '8': { name: 'veranda, the note', at: [20.81, -395.27, 0.186, 0.75, 3.5] },
+  '8': { name: 'veranda, the note', at: [NOTE_AT.x, NOTE_AT.z + 1.2, 0.186, 0.75, 3.5] },
   '9': { name: 'his chair, looking out', at: [20.61, -396.33, 2.792, 0.07, 2.63] },
 };
 
@@ -49,14 +50,25 @@ type Run = {
 };
 
 const solid = (s: Scene) =>
-  new Promise<void>((done) => {
-    const wait = () => (s.walker.solid ? done() : setTimeout(wait, 150));
+  new Promise<void>((done, reject) => {
+    const deadline = performance.now() + 30000;
+    const wait = () => {
+      if (s.walker.solid) done();
+      else if (performance.now() > deadline) reject(new Error('solid world did not load'));
+      else setTimeout(wait, 150);
+    };
     wait();
   });
+/** Wait for both wildlife models and pipelines, but report stalled loading. */
+const wildlifeReady = (s: Scene) => Promise.race([
+  s.test.wildlifeReady,
+  new Promise<never>((_, reject) => setTimeout(() => reject(new Error('wildlife did not load')), 30000)),
+]);
 /** Held at a spot, then on your feet there (danger only runs while you walk). */
 const standAt = async (s: Scene, spot: Spot) => {
-  s.walker.hold(...spot);
   await solid(s);
+  s.walker.moveTo(spot[0], spot[1], spot[2], true);
+  s.view.goal.pitch = spot[3];
   s.walker.touched();
 };
 const pass = (ok: boolean, why: string) => (ok ? 'PASS' : `FAIL: ${why}`);
@@ -65,7 +77,8 @@ const RUNS: Record<string, Run> = {
   // The pack in view, held still, without physics: one standing, one stalking, one trotting, one at a gallop
   D: {
     name: 'dholes up close',
-    start(s) {
+    async start(s) {
+      await wildlifeReady(s);
       const [x, z, yaw] = SPOTS['2']!.at;
       s.walker.hold(x, z, yaw, 0.12, 1.62);
       const fx = -Math.sin(yaw);
@@ -77,6 +90,7 @@ const RUNS: Record<string, Run> = {
   w: {
     name: 'red dogs',
     async start(s) {
+      await wildlifeReady(s);
       if (Math.hypot(...s.walker.at) < 150) await standAt(s, SPOTS['2']!.at);
       else await solid(s);
       s.test.danger.summon();
@@ -86,6 +100,7 @@ const RUNS: Record<string, Run> = {
   W: {
     name: 'stand your ground',
     async start(s) {
+      await wildlifeReady(s);
       await standAt(s, SPOTS['2']!.at);
       if (!s.journey.torchOn) s.journey.toggleTorch();
       s.test.timeScale = 2;
@@ -96,6 +111,7 @@ const RUNS: Record<string, Run> = {
   h: {
     name: 'herd charge',
     async start(s) {
+      await wildlifeReady(s);
       await standAt(s, SPOTS['6']!.at);
       s.test.danger.startle(1);
     },
@@ -104,11 +120,19 @@ const RUNS: Record<string, Run> = {
   f: {
     name: 'the ending at 16x',
     async start(s) {
-      // Held in the chair, no need to wait for the solid world: the story runs in any mode
-      s.walker.hold(...SPOTS['9']!.at);
-      s.test.readNote();
-      s.test.story.sit();
+      await standAt(s, SPOTS['8']!.at);
       s.test.timeScale = 16;
+      // Exercise the same interactions as the player: read, put down, then sit.
+      const until = async (id: string) => {
+        const deadline = performance.now() + 5000;
+        while (s.journey.near?.id !== id) {
+          if (performance.now() > deadline) throw new Error(`interaction ${id} unavailable`);
+          await new Promise((done) => setTimeout(done, 50));
+        }
+        s.journey.examined(s.journey.near!);
+      };
+      await until('bungalow.note');
+      await until('bungalow.chair');
     },
     judge: (st, t) => (st.ended && st.guardGone ? 'PASS' : t > 12 ? pass(false, `finale line ${st.story.finale}, guard gone ${st.guardGone}`) : null),
   },
@@ -147,6 +171,86 @@ export function scenarios(stateBox: HTMLPreElement) {
   let scene: Scene | null = null;
   let current: { run: Run; t0: number; from: readonly [number, number]; verdict: string | null; ready: boolean } | null = null;
   let shown = boot.has('state');
+  const auto = boot.get('scenario') === 'story.bungalow-ending';
+  const replayBox = auto ? document.createElement('pre') : null;
+  if (replayBox) {
+    replayBox.id = 'game-replay';
+    replayBox.dataset.trace = '';
+    replayBox.dataset.verdict = 'running';
+    replayBox.hidden = true;
+    document.body.append(replayBox);
+  }
+  type ReplayEntry = { at: number; event: string; detail?: string };
+  const trace: ReplayEntry[] = [];
+  const began = performance.now();
+  let finished = false;
+  const record = (event: string, detail?: string) => {
+    trace.push({ at: +((performance.now() - began) / 1000).toFixed(2), event, ...(detail ? { detail } : {}) });
+    if (replayBox) replayBox.textContent = JSON.stringify(trace);
+  };
+  const finish = (ok: boolean, detail?: string) => {
+    if (finished || !replayBox) return;
+    finished = true;
+    record(ok ? 'pass' : 'fail', detail);
+    replayBox.dataset.verdict = ok ? 'pass' : 'fail';
+  };
+  if (auto) {
+    record('loading');
+    setTimeout(() => finish(false, 'game replay timed out'), 120000);
+  }
+  const replay = async (s: Scene) => {
+    const waitFor = async (predicate: () => boolean, label: string, ms = 10000) => {
+      const until = performance.now() + ms;
+      while (!predicate()) {
+        if (finished) throw new Error('replay stopped');
+        if (performance.now() >= until) throw new Error(`timed out: ${label}`);
+        await new Promise((done) => setTimeout(done, 50));
+      }
+    };
+    const key = (type: 'keydown' | 'keyup', k: string) => window.dispatchEvent(new KeyboardEvent(type, { key: k, bubbles: true }));
+    let examined = '';
+    let closed = '';
+    const onExamined = (e: Event) => { examined = (e as CustomEvent<string>).detail; record('examined', examined); };
+    const onClosed = (e: Event) => { closed = (e as CustomEvent<string>).detail; record('closed', closed); };
+    addEventListener('temple:examined', onExamined);
+    addEventListener('temple:closed', onClosed);
+    try {
+      await solid(s);
+      const [x, z, yaw] = SPOTS['8']!.at;
+      s.walker.moveTo(x, z, yaw, true);
+      s.walker.touched();
+      s.test.timeScale = 16;
+      record('placed at veranda');
+      await waitFor(() => s.journey.near?.id === 'bungalow.note', 'note', 45000);
+      key('keydown', 'e'); key('keyup', 'e');
+      await waitFor(() => examined === 'bungalow.note', 'note examination');
+      // The normal HUD closes reading once walking for at least 600 ms.
+      key('keydown', 's');
+      try { await waitFor(() => closed === 'bungalow.note', 'putting down note', 5000); }
+      finally { key('keyup', 's'); }
+      record('walked to close note');
+      // Return if walking moved outside the interaction radius.
+      if (s.journey.near?.id !== 'bungalow.chair') {
+        key('keydown', 'w');
+        try { await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair', 5000); }
+        finally { key('keyup', 'w'); }
+      }
+      await waitFor(() => s.journey.near?.id === 'bungalow.chair', 'chair');
+      key('keydown', 'e'); key('keyup', 'e');
+      await waitFor(() => examined === 'bungalow.chair' && s.test.state.story.sitting >= 0, 'chair examination');
+      record('sitting');
+      await waitFor(() => s.test.state.guardGone, 'guard departure', 15000);
+      record('guard gone');
+      await waitFor(() => s.test.state.ended, 'ending', 15000);
+      record('ended');
+      finish(true);
+    } catch (error) { record('state', JSON.stringify(s.test.state)); finish(false, String(error)); }
+    finally {
+      key('keyup', 's'); key('keyup', 'w');
+      removeEventListener('temple:examined', onExamined);
+      removeEventListener('temple:closed', onClosed);
+    }
+  };
   addEventListener(
     'keydown',
     (e) => {
@@ -167,7 +271,13 @@ export function scenarios(stateBox: HTMLPreElement) {
 
   const reloads: Record<string, string[]> = { p: ['probe', 'state'], m: ['profile'], c: ['phone', 'state'], '0': [] };
   const run = (key: string, s: Scene) => {
-    if (key in reloads) return boot.reloadWith(...reloads[key]!);
+    if (key in reloads) {
+      // The reload is one-shot; remove a launch preset so it cannot trigger itself again.
+      const url = new URL(location.href);
+      url.searchParams.delete('preset');
+      history.replaceState(null, '', url);
+      return boot.reloadWith(...reloads[key]!);
+    }
     if (key === 'j') return void (shown = !shown);
     // x: hide the next drawing group in turn (for finding what the scene pass spends its time on)
     if (key === 'b') return void (s.test.bench(), (shown = true));
@@ -181,7 +291,7 @@ export function scenarios(stateBox: HTMLPreElement) {
     const r: Run | undefined = spot ? { name: spot.name, start: (sc) => sc.walker.hold(...spot.at) } : RUNS[key];
     if (!r) return;
     current = { run: r, t0: performance.now(), from: [...s.walker.at] as [number, number], verdict: null, ready: false };
-    void Promise.resolve(r.start(s)).then(() => current && current.run === r && ((current.t0 = performance.now()), (current.ready = true), (current.from = [...s.walker.at] as [number, number])));
+    void Promise.resolve(r.start(s)).then(() => current && current.run === r && ((current.t0 = performance.now()), (current.ready = true), (current.from = [...s.walker.at] as [number, number]))).catch((error: unknown) => { if (current?.run === r) { current.ready = true; current.verdict = `FAIL: ${String(error)}`; } });
   };
 
   let lastText = '';
@@ -204,6 +314,14 @@ export function scenarios(stateBox: HTMLPreElement) {
   return {
     attach(s: Scene) {
       scene = s;
+      if (auto) setTimeout(() => void replay(s), 0);
+      const preset = boot.get('preset');
+      if (preset && Object.hasOwn(reloads, preset)) {
+        const url = new URL(location.href);
+        url.searchParams.delete('preset');
+        history.replaceState(null, '', url);
+      }
+      if (preset) queued.push(preset);
     },
   };
 }

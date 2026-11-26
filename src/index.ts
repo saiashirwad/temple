@@ -135,6 +135,7 @@ if (!navigator.gpu) {
       const j = scene.journey;
       const walker = scene.walker;
       let shown: string | null = null;
+      let shownId: string | undefined;
       let since = 0;
       // Bending down to look at something by the path: dung, prints, a shrine, a view
       const examine = () => {
@@ -145,6 +146,8 @@ if (!navigator.gpu) {
         j.examined(it);
         hud.caption(it.text);
         shown = it.text;
+        shownId = it.id;
+        window.dispatchEvent(new CustomEvent('temple:examined', { detail: it.id }));
         since = performance.now();
         hud.look(null);
       };
@@ -231,6 +234,8 @@ if (!navigator.gpu) {
         // Up again and the words gone once you walk on, or move away
         if (reading && ((walker.moving && performance.now() - since > 600) || !it || it.text !== shown)) {
           shown = null;
+          window.dispatchEvent(new CustomEvent('temple:closed', { detail: shownId }));
+          shownId = undefined;
           hud.caption(null);
           walker.standUp();
         }

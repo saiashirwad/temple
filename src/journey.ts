@@ -1,3 +1,4 @@
+import { createBungalowStory } from './bungalow-story.ts';
 // The walk up to the forest bungalow: how far you've come, the wolves and the herd, your torch,
 // the sounds of the forest, the guard, the cook's note, arriving, and the story told as you go.
 import { BUNGALOW, NOTE_AT } from './bungalow.ts';
@@ -150,7 +151,7 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
   let guardTalks = 0;
   let guardLine: { at: number; text: string } | null = null;
   let creakIn = 1;
-  let noteAt = -1;
+  const bungalow = createBungalowStory(() => story.sit());
 
   /** How far into the trees, the story's own pace, the wind. */
   const progress = (t: Tick) => {
@@ -239,10 +240,11 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
     }
     if (up) spot = { x, z, r: 3, low: false, sit: true, label: 'Sit and rest', text: REST_TEXT };
     // Once you've read the note, and put it down or stepped back: his chair
-    if (noteAt >= 0 && seconds - noteAt > 0.6 && !state.reading) state.noteRead = true;
+    bungalow.update(seconds, state.reading);
+    state.noteRead = bungalow.noteRead;
     if (Math.hypot(x - NOTE_AT.x, z - NOTE_AT.z) < NOTE_R) {
-      if (!state.noteRead) spot = { x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, label: 'Read the note', text: COOK_NOTE };
-      else if (!story.ended) spot = { x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, sit: true, label: 'Sit in his chair', text: ' ' };
+      if (!state.noteRead) spot = { id: 'bungalow.note', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, label: 'Read the note', text: COOK_NOTE };
+      else if (!story.ended) spot = { id: 'bungalow.chair', x: NOTE_AT.x, z: NOTE_AT.z, r: NOTE_R, low: false, sit: true, label: 'Sit in his chair', text: ' ' };
     }
     state.near = spot;
   };
@@ -341,9 +343,7 @@ export function createJourney({ walker, people, sound, eyes, cover, view, later,
     },
     /** You've looked at, read or sat at `it`. */
     examined(it: Interest) {
-      if (it.text === COOK_NOTE) noteAt = tk.seconds;
-      else if (it.label === 'Sit in his chair') {
-        story.sit();
+      if (it.id && bungalow.examine(it.id, tk.seconds) && it.id === 'bungalow.chair') {
         // Sitting where he sat, looking out the way he looked: off the veranda, down the hill
         const far = trailAt(FAR_FROM);
         view.goal.yaw = Math.atan2(-(far.x - tk.eye[0]), -(far.z - tk.eye[2])) + 0.1;
