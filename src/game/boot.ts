@@ -10,6 +10,8 @@
 //   park     vehicles parked in a row, for checking them (traffic.ts)
 //   noao     no ambient occlusion;  nopeople  no people;  debug  errors on screen
 
+export const RELOAD_PRESETS: Record<string, string[]> = { p: ['probe', 'state'], m: ['profile'], c: ['phone', 'state'], '0': [] };
+
 const g = globalThis as { location?: Location; sessionStorage?: Storage };
 const words = new Set<string>();
 for (const part of [g.location?.search, g.location?.hash])
@@ -17,6 +19,8 @@ for (const part of [g.location?.search, g.location?.hash])
     ?.replace(/^[?#]/, '')
     .split(/[&,]/)
     .forEach((w) => w && words.add(decodeURIComponent(w.split('=')[0]!)));
+const preset = new URLSearchParams(g.location?.search).get('preset');
+if (preset && Object.hasOwn(RELOAD_PRESETS, preset)) for (const flag of RELOAD_PRESETS[preset]) words.add(flag);
 let once: string | null = null;
 try {
   once = g.sessionStorage?.getItem('boot') ?? null;

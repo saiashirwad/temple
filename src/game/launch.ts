@@ -1,3 +1,4 @@
+import { RELOAD_PRESETS } from './boot.ts';
 import { NOTE_AT } from '../world/trail/bungalow.ts';
 
 /** x, z, yaw, pitch, eye height above the ground. Yaw π faces +z, 0 faces -z. */
@@ -22,13 +23,14 @@ const entrySpots: Record<string, string> = { w: '2', W: '2', D: '2', h: '6', n: 
 
 /** Resolve the first camera, required resources and requested views before allocating the scene. */
 export function resolveLaunch(params: URLSearchParams) {
-  const preset = params.get('preset');
+  const key = params.get('preset');
+  const preset = key && Object.hasOwn(RELOAD_PRESETS, key) ? null : key;
   const scenario = params.get('scenario');
   const bungalow = scenario === 'story.bungalow-ending';
   const tour = scenario === 'world.walk' && params.get('run') === '1';
   const shots = params.getAll('shot');
   const requested = Object.values(SPOTS).filter(s => shots.includes(s.shot) || shots.includes('*'));
-  const views = preset && SPOTS[preset] ? [SPOTS[preset]] : requested.length ? requested : [SPOTS['1']];
+  let views = preset && SPOTS[preset] ? [SPOTS[preset]] : requested.length ? requested : [SPOTS['1']];
   const start = params.get('from') ?? BUNGALOW_BEATS.find(name => shots.includes(name)) ?? 'veranda';
   if (bungalow && !BUNGALOW_BEATS.some(name => name === start)) throw new Error('Unknown bungalow checkpoint: ' + start);
   const first = bungalow ? SPOTS['8'] : preset ? SPOTS[entrySpots[preset] ?? preset] : tour ? views[0] : undefined;
@@ -38,7 +40,9 @@ export function resolveLaunch(params: URLSearchParams) {
     const coordinates = at.split(',').map(v => v.trim() ? Number(v) : NaN);
     if (![4, 5].includes(coordinates.length) || !coordinates.every(Number.isFinite))
       throw new Error('Expected at=x,z,yaw,pitch[,height]');
+    if (preset || bungalow) throw new Error('Use either a free camera or a scenario preset');
     camera = [coordinates[0], coordinates[1], coordinates[2], coordinates[3], coordinates[4] ?? 1.62];
+    views = [{ name: 'Custom camera', shot: 'camera', at: camera }];
   }
   return {
     preset, bungalow, tour, views, camera, beat: start as BungalowBeat,

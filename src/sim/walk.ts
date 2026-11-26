@@ -288,6 +288,7 @@ export function createWalker(view: OrbitCamera) {
     /** Holds the eye still at a spot, for checking a view: `?at=x,z,yaw,pitch[,height]`. */
     hold(x: number, z: number, yaw: number, pitch: number, height = EYE) {
       mode = 'held';
+      last = [x, z];
       foot = standAt(x, z) + Math.max(0, height - EYE);
       view.goal.target = [x, standAt(x, z) + height, z];
       view.goal.distance = 0.06;
