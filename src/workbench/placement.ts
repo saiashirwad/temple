@@ -2,10 +2,9 @@ import { buildBungalow, noteAt, placeBungalow } from '../world/trail/bungalow.ts
 import { Builder } from '../render/geo.ts';
 import placement from '../content/bungalow-placement.json';
 import { CLEARING } from '../world/trail/trail.ts';
-import { exportSettings, slider } from './settings.ts';
+import { exportSettings, numericSettings } from './settings.ts';
 
-export function mount(root: HTMLElement) {
-  const settings = { ...placement };
+export function mount(root: HTMLElement, params: URLSearchParams) {
   const controls = document.createElement('div');
   const canvas = document.createElement('canvas');
   canvas.width = 720;
@@ -57,18 +56,11 @@ export function mount(root: HTMLElement) {
       ', ' +
       note.z.toFixed(2);
   }
-  slider(controls, 'Across trail (m)', settings.right, -12, 12, 0.25, (value) => {
-    settings.right = value;
-    draw();
-  });
-  slider(controls, 'Along trail (m)', settings.forward, -8, 20, 0.25, (value) => {
-    settings.forward = value;
-    draw();
-  });
-  slider(controls, 'Turn (degrees)', settings.turn, 0, 360, 1, (value) => {
-    settings.turn = value;
-    draw();
-  });
+  const settings = numericSettings(controls, params, placement, [
+    ['right', 'Across trail (m)', -12, 12, 0.25],
+    ['forward', 'Along trail (m)', -8, 20, 0.25],
+    ['turn', 'Turn (degrees)', 0, 360, 1],
+  ], draw);
   exportSettings(controls, 'bungalow-placement.json', settings);
   root.append(controls, status, canvas);
   draw();

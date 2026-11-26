@@ -1,10 +1,9 @@
 import { LAND, LAND_N, landMap } from '../world/town/town.ts';
 import soil from '../content/soil.json';
-import { exportSettings, slider } from './settings.ts';
+import { exportSettings, numericSettings, setParam } from './settings.ts';
 
 const names = ['Swept yards', 'Murram lanes', 'Leaf litter', 'Paddy'];
-export function mount(root: HTMLElement) {
-  const settings = { ...soil };
+export function mount(root: HTMLElement, params: URLSearchParams) {
   const controls = document.createElement('div');
   const channel = document.createElement('select');
   channel.setAttribute('aria-label', 'Ground cover channel');
@@ -15,7 +14,17 @@ export function mount(root: HTMLElement) {
   const ctx = canvas.getContext('2d')!;
   const status = document.createElement('p');
   status.textContent = 'Select a point to sample the four ground-cover channels.';
+  const settings = numericSettings(controls, params, soil, [
+    ['laneShoulder', 'Lane shoulder (m)', 0, 4, 0.1],
+    ['yardFeather', 'Yard edge (m)', 0, 4, 0.1],
+    ['litterFeather', 'Litter edge (m)', 0, 6, 0.1],
+    ['paddyEdge', 'Paddy inner radius', 0.5, 0.99, 0.01],
+  ], () => { mask = landMap(settings); paint(); });
   let mask = landMap(settings);
+  const channels = ['composite', 'yards', 'lanes', 'litter', 'paddy'];
+  const selected = params.get('channel') ?? channels[0];
+  if (!channels.includes(selected)) throw new Error(`Unknown soil channel: ${selected}`);
+  channel.selectedIndex = channels.indexOf(selected);
   function paint() {
     const image = ctx.createImageData(LAND_N, LAND_N);
     const palette = [
@@ -37,16 +46,10 @@ export function mount(root: HTMLElement) {
     }
     ctx.putImageData(image, 0, 0);
   }
-  channel.onchange = paint;
-  const update = (key: keyof typeof soil, value: number) => {
-    settings[key] = value;
-    mask = landMap(settings);
+  channel.onchange = () => {
+    setParam('channel', channels[channel.selectedIndex]);
     paint();
   };
-  slider(controls, 'Lane shoulder (m)', settings.laneShoulder, 0, 4, 0.1, (v) => update('laneShoulder', v));
-  slider(controls, 'Yard edge (m)', settings.yardFeather, 0, 4, 0.1, (v) => update('yardFeather', v));
-  slider(controls, 'Litter edge (m)', settings.litterFeather, 0, 6, 0.1, (v) => update('litterFeather', v));
-  slider(controls, 'Paddy inner radius', settings.paddyEdge, 0.5, 0.99, 0.01, (v) => update('paddyEdge', v));
   controls.append(channel);
   exportSettings(controls, 'soil.json', settings);
   canvas.onclick = (e) => {
