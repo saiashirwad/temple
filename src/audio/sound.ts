@@ -93,8 +93,8 @@ export function createSound(world: SoundWorld, random = Math.random) {
   });
   // The first gesture starts the sound; later ones wake a context the browser suspended (iOS
   // won't resume from visibilitychange alone)
-  const wake = () => {
-    if (muted) return;
+  const wake = (event: Event) => {
+    if (muted || !event.isTrusted) return;
     if (!started) start();
     else if (ctx && ctx.state !== 'running' && !document.hidden) void ctx.resume();
   };

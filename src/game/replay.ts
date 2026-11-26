@@ -51,6 +51,7 @@ export function gameReplay(launch: Launch) {
       const encounter = preset ? RUNS[preset] : undefined;
       if (encounter) {
         await encounter.start(s);
+        prepared = true;
         const start = performance.now();
         let verdict: string | null = null;
         while (encounter.judge && !verdict) {
@@ -59,7 +60,6 @@ export function gameReplay(launch: Launch) {
           verdict = encounter.judge(s.inspect(), (performance.now() - start) / 1000, s);
         }
         if (verdict?.startsWith('FAIL')) throw new Error(verdict);
-        prepared = true;
         record('encounter', encounter.name);
         await checkpoint('encounter', s.inspect());
       } else {
@@ -97,7 +97,7 @@ export function gameReplay(launch: Launch) {
     addEventListener('temple:examined', onExamined);
     addEventListener('temple:closed', onClosed);
     try {
-      await s.test.requirePhysics();
+      if (launch.physics) await s.test.requirePhysics();
       const [x, z, yaw] = SPOTS['8']!.at;
       s.walker.moveTo(x, z, yaw, true);
       s.walker.touched();

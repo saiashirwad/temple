@@ -20,7 +20,8 @@ test('story, encounter and free-camera entries resolve before scene creation', (
   assert.equal(open('').camera, undefined);
   const ending = open('scenario=story.bungalow-ending&shot=ending');
   assert.equal(ending.beat, 'ending');
-  assert.equal(ending.physics, true);
+  assert.equal(ending.physics, false);
+  assert.equal(open('scenario=story.bungalow-ending&from=reading-note').physics, true);
   assert.equal(ending.camera, SPOTS['8'].at);
   assert.equal(open('preset=h').wildlife, 'herd');
   assert.equal(open('preset=h').camera, SPOTS['6'].at);

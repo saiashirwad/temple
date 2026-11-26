@@ -39,7 +39,7 @@ export function resolveLaunch(params: URLSearchParams) {
   return {
     preset, bungalow, tour, views, camera, beat: start as BungalowBeat,
     forest: !!first && first.shot !== 'town' && at === null,
-    physics: bungalow || encounter?.physics === true,
+    physics: (bungalow && (start === 'veranda' || start === 'reading-note')) || encounter?.physics === true,
     wildlife: encounter?.wildlife ?? (first?.shot.startsWith('herd-') ? 'herd' as const : null),
     people: bungalow || first?.shot === 'town' || first?.shot === 'veranda' || first?.shot === 'chair',
   };
