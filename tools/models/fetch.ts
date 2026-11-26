@@ -1,5 +1,5 @@
 // Downloads CC0 models from Poly Haven (polyhaven.com), shrinks them for the scene and packs
-// each into one .glb in public/models: textures resized and re-encoded as WebP, meshes
+// them into public/models: textures resized and re-encoded as WebP, meshes
 // simplified to a triangle budget, unused data dropped.
 //   npx tsx tools/models/fetch.ts [names]
 import { execFileSync } from 'node:child_process';
@@ -11,6 +11,7 @@ import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, join, flatten } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import { MODELS } from './list.ts';
+import { writeSharedModel } from './shared-images.ts';
 
 const OUT = new URL('../../public/models/', import.meta.url).pathname;
 const CACHE = '/tmp/phm/';
@@ -71,13 +72,18 @@ for (const m of MODELS) {
     t.setImage(resize(t.getImage()!, m.size, isColour ? 82 : 88)).setMimeType('image/webp').setURI('');
   }
   await doc.transform(prune());
-  const out = `${OUT}${m.name}.glb`;
-  const pending = `${OUT}.${m.name}.${process.pid}.glb`;
-  try {
-    await io.write(pending, doc);
-    renameSync(pending, out);
-  } finally {
-    rmSync(pending, { force: true });
+  const shared = MODELS.some(other => other.id === m.id && other.name !== m.name);
+  const out = `${OUT}${m.name}.${shared ? 'gltf' : 'glb'}`;
+  if (shared) {
+    await writeSharedModel(io, doc, OUT, m.name);
+  } else {
+    const pending = `${OUT}.${m.name}.${process.pid}.glb`;
+    try {
+      await io.write(pending, doc);
+      renameSync(pending, out);
+    } finally {
+      rmSync(pending, { force: true });
+    }
   }
   const b = getBounds(doc.getRoot().listScenes()[0]!);
   const dims = [0, 1, 2].map((k) => (b.max[k]! - b.min[k]!).toFixed(2)).join('×');

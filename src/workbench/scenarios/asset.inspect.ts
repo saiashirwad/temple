@@ -10,7 +10,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   <aside>
     <input type="search" placeholder="Filter assets" aria-label="Filter assets" /><select aria-label="Asset type">
       <option value="">All assets</option>
-      <option value="glb">Models</option>
+      <option value="model">Models</option>
       <option value="image">Textures</option>
       <option value="audio">Audio</option>
       <option value="specimen">Trees and undergrowth</option>
@@ -37,7 +37,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   const hint = root.querySelector<HTMLElement>('.hint')!;
   const variants = new Map(Object.values(specimens).flat().map(s => [s.id, s]));
   const supported = [
-    ...assets.filter((p) => /\.(glb|png|jpe?g|webp|mp3|wav|ogg)$/i.test(p)),
+    ...assets.filter((p) => /\.(gltf|glb|png|jpe?g|webp|mp3|wav|ogg)$/i.test(p)),
     ...variants.keys(),
   ].sort();
   const clips = assets.filter((p) => p.startsWith('people/clips/') && p.endsWith('.glb')).sort();
@@ -45,7 +45,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
   let night = params.get('light') === 'night';
   let clipPath = params.get('clip') ?? '';
   const kind = (p: string) =>
-    variants.has(p) ? 'specimen' : /\.glb$/i.test(p) ? 'glb' : /\.(mp3|wav|ogg)$/i.test(p) ? 'audio' : 'image';
+    variants.has(p) ? 'specimen' : /\.(gltf|glb)$/i.test(p) ? 'model' : /\.(mp3|wav|ogg)$/i.test(p) ? 'audio' : 'image';
   let selected = params.get('asset') ?? '';
   let cleanup = () => {};
   let generation = 0;
@@ -100,7 +100,7 @@ export async function mount(root: HTMLElement, params: URLSearchParams) {
       link.rel = 'noopener';
       hint.append(link);
     }
-    if (kind(path) === 'glb' || specimen) {
+    if (kind(path) === 'model' || specimen) {
       const lighting = document.createElement('select');
       lighting.setAttribute('aria-label', 'Lighting');
       lighting.innerHTML = '<option value="neutral">Neutral light</option><option value="night">Night light</option>';

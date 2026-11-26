@@ -1,8 +1,8 @@
 // Every file the game loads exists, and nothing ships that the game never loads. No GPU needed.
 //   npx tsx tools/check/assets.ts        (exit 1 on a missing or unused file)
 // Uses production asset catalogs and the prop names emitted by the world builders.
-import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { AVATARS, CLIP_NAMES, SOUND_FILES, BEAST_FILES } from '../../src/content/assets.ts';
 import { buildStreet } from '../../src/world/town/street.ts';
 import { buildGrounds } from '../../src/world/town/grounds.ts';
@@ -13,7 +13,19 @@ const ROOT = new URL('../../', import.meta.url).pathname;
 const PUB = join(ROOT, 'public');
 const want = new Set<string>();
 for (const build of [buildStreet, buildGrounds, buildVillage]) {
-  for (const prop of build().props) want.add(`models/${prop.name}.glb`);
+  for (const prop of build().props) {
+    const gltf = `models/${prop.name}.gltf`;
+    if (want.has(gltf)) continue;
+    if (!existsSync(join(PUB, gltf))) {
+      want.add(`models/${prop.name}.glb`);
+      continue;
+    }
+    want.add(gltf);
+    const model = JSON.parse(readFileSync(join(PUB, gltf), 'utf8')) as { buffers?: { uri?: string }[]; images?: { uri?: string }[] };
+    for (const resource of [...model.buffers ?? [], ...model.images ?? []]) {
+      if (resource.uri && !resource.uri.startsWith('data:')) want.add(join(dirname(gltf), resource.uri));
+    }
+  }
 }
 // Textures: every layer at both colour sizes, and its 512 data map
 for (const name of [...TEX_LAYERS.map((l) => l.name), 'posters', 'signs'])
@@ -38,7 +50,7 @@ const isNote = (f: string) => /CREDITS|LICENSE|README/i.test(f);
 const missing = [...want].filter((f) => !have.includes(f));
 const unused = have.filter((f) => !want.has(f) && !isNote(f));
 
-// Bytes per folder, and what a desktop (1024 colour) and a phone (512 colour) first load fetch
+// Full asset catalog by folder and colour resolution. The first frame uses a subset.
 const size = (f: string) => statSync(join(PUB, f)).size;
 const mb = (n: number) => (n / 1048576).toFixed(1).padStart(5) + ' MB';
 const folders = new Map<string, number>();
@@ -49,7 +61,7 @@ for (const f of have) {
 for (const [k, n] of [...folders].sort((a, b) => b[1] - a[1])) console.log(`${mb(n)}  ${k}`);
 const loaded = [...want].filter((f) => have.includes(f));
 const total = (skip: string) => loaded.filter((f) => !f.includes(skip)).reduce((n, f) => n + size(f), 0);
-console.log(`first load: desktop ${mb(total('_512_c.'))}, phone ${mb(total('_1024_c.'))}, ${loaded.length - TEX_LAYERS.length - 2} requests`);
+console.log(`catalog at one resolution: 1024 colour ${mb(total('_512_c.'))}, 512 colour ${mb(total('_1024_c.'))}, ${loaded.length - TEX_LAYERS.length - 2} files`);
 
 for (const f of missing) console.log(`MISSING ${f}`);
 for (const f of unused) console.log(`UNUSED  ${f}`);

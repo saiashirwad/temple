@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "types": ["node", "vite/client", "@webgpu/types"] },
-  "include": [".", "../tests"]
+  "include": [".", "../tests", "../src/**/*.d.ts"]
 }

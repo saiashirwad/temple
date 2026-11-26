@@ -1,8 +1,9 @@
 // The things people leave about: chairs, bottles, gas tanks, brass, poles, ferns. Photo-scanned
 // CC0 models from Poly Haven, shrunk by tools/models/fetch.ts into public/models, each drawn
 // with its own textures and lit by the lamps and the moon like everything else.
-import { gltf, instances, shading, type meshPool } from '@typegpu/kit';
+import { gltf, instances, shading, meshPool } from '@typegpu/kit';
 import { std } from 'typegpu';
+import sizes from 'virtual:temple-prop-sizes';
 import type { PropAt } from './geo.ts';
 
 type ModelData = Awaited<ReturnType<typeof gltf.load>>;
@@ -11,7 +12,9 @@ type ModelData = Awaited<ReturnType<typeof gltf.load>>;
 export async function loadProps(placed: readonly PropAt[]) {
   const names = [...new Set(placed.map((p) => p.name))];
   const base = import.meta.env.BASE_URL;
-  const models = await Promise.all(names.map((n) => gltf.load(`${base}models/${n}.glb`)));
+  // Shared maps have their content hash in the filename, so later variants can reuse the response.
+  const fetchModel = (url: string) => fetch(url, url.includes('/shared/') ? { cache: 'force-cache' } : undefined);
+  const models = await Promise.all(names.map(n => gltf.load(`${base}models/${sizes[n]!.file}`, { fetch: fetchModel })));
   return new Map<string, ModelData>(names.map((n, i) => [n, models[i]!]));
 }
 

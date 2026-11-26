@@ -1,0 +1,309 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.5.1",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 270,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 21966,
+      "bufferView": 0,
+      "byteOffset": 540
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 106,
+      "max": [
+        0.07000000029802322,
+        6,
+        0.07000000029802322
+      ],
+      "min": [
+        -0.07000000029802322,
+        0,
+        -0.07000000029802322
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 106,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 106,
+      "bufferView": 1,
+      "byteOffset": 24
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 11555,
+      "max": [
+        0.25567400455474854,
+        4.53419303894043,
+        0.4627809226512909
+      ],
+      "min": [
+        -0.6593990921974182,
+        -1.5919902324676514,
+        -0.8050986528396606
+      ],
+      "bufferView": 2,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 11555,
+      "bufferView": 2,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 11555,
+      "bufferView": 2,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 44472,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 44472,
+      "byteLength": 3392,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 47864,
+      "byteLength": 369760,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "extensions": {
+        "EXT_texture_webp": {
+          "source": 1
+        }
+      }
+    },
+    {
+      "sampler": 0,
+      "extensions": {
+        "EXT_texture_webp": {
+          "source": 0
+        }
+      }
+    },
+    {
+      "sampler": 0,
+      "extensions": {
+        "EXT_texture_webp": {
+          "source": 2
+        }
+      }
+    },
+    {
+      "sampler": 0,
+      "extensions": {
+        "EXT_texture_webp": {
+          "source": 4
+        }
+      }
+    },
+    {
+      "sampler": 0,
+      "extensions": {
+        "EXT_texture_webp": {
+          "source": 3
+        }
+      }
+    },
+    {
+      "sampler": 0,
+      "extensions": {
+        "EXT_texture_webp": {
+          "source": 5
+        }
+      }
+    }
+  ],
+  "images": [
+    {
+      "name": "modular_electricity_poles_pieces_nor_gl",
+      "mimeType": "image/webp",
+      "uri": "shared/872397699d44dde2db723821.webp"
+    },
+    {
+      "name": "modular_electricity_poles_pieces_diff",
+      "mimeType": "image/webp",
+      "uri": "shared/17bba589f43b5462f5904fe8.webp"
+    },
+    {
+      "name": "modular_electricity_poles_pieces_metal-modular_electricity_poles_pieces_rough",
+      "mimeType": "image/webp",
+      "uri": "shared/122d647335602ec0e5056e1f.webp"
+    },
+    {
+      "name": "modular_electricity_poles_nor_gl",
+      "mimeType": "image/webp",
+      "uri": "shared/4c47a3e1cd536d6f9e398d15.webp"
+    },
+    {
+      "name": "modular_electricity_poles_diff",
+      "mimeType": "image/webp",
+      "uri": "shared/92eb753c9bb71676622a1d39.webp"
+    },
+    {
+      "name": "modular_electricity_poles_rough",
+      "mimeType": "image/webp",
+      "uri": "shared/b50d40f6cefdb012f200bd48.webp"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "pole3.bin",
+      "byteLength": 417624
+    }
+  ],
+  "materials": [
+    {
+      "name": "modular_electricity_poles_pieces",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    },
+    {
+      "name": "modular_electricity_poles",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 3
+        },
+        "metallicRoughnessTexture": {
+          "index": 5
+        }
+      },
+      "normalTexture": {
+        "index": 4
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cylinder.058",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 2,
+            "NORMAL": 3,
+            "TEXCOORD_0": 4
+          },
+          "mode": 4,
+          "material": 1,
+          "indices": 0
+        }
+      ]
+    },
+    {
+      "name": "Cylinder.062",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 5,
+            "NORMAL": 6,
+            "TEXCOORD_0": 7
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 1
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "preset_03_bolt_small_01",
+      "translation": [
+        0.20653681339344665,
+        1.5900003146380186,
+        -0.004785946148178399
+      ],
+      "rotation": [
+        -0.023621613159775734,
+        0.7097347974777222,
+        -0.015472901985049248,
+        0.7039028406143188
+      ],
+      "mesh": 1
+    },
+    {
+      "name": "preset_03_pole",
+      "translation": [
+        0.20653681339344665,
+        2.812594175338745e-7,
+        8.703515785857263e-8
+      ],
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1
+      ]
+    }
+  ],
+  "scene": 0,
+  "extensionsUsed": [
+    "EXT_texture_webp"
+  ],
+  "extensionsRequired": [
+    "EXT_texture_webp"
+  ]
+}
