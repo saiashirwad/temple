@@ -5,6 +5,7 @@
 // behind the houses, a rubber estate past the pond, paddy fields where the valley opens out, and
 // the forest on every hill beyond. Pure CPU layout: everything else places itself from here.
 
+import soil from './content/soil.json';
 import { rng, type V3 } from './geo.ts';
 import { BANYAN, COMPOUND, PADDY, POND, ROAD } from './world.ts';
 import { onRoad, pondQ, roadZ } from './terrain.ts';
@@ -246,7 +247,7 @@ export const LAND_N = 1024;
  * What the ground is at each texel: red swept yards (r), murram lanes (g), leaf litter under
  * the plantations (b), paddy (a), each 0..255 with soft edges.
  */
-export function landMap() {
+export function landMap(settings = soil) {
   const N = LAND_N;
   const px = new Uint8Array(N * N * 4);
   const m = N / (2 * LAND);
@@ -273,10 +274,10 @@ export function landMap() {
     for (let i = 0; i + 1 < l.pts.length; i++) {
       const a = l.pts[i]!;
       const b = l.pts[i + 1]!;
-      const pad = l.half + 1.5;
+      const pad = l.half + Math.max(1.5, settings.laneShoulder);
       each(Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad, (x, z) => {
         const d = segDist(x, z, a, b).d;
-        put(x, z, 1, 1 - ss(l.half - 0.4, l.half + 0.8, d));
+        put(x, z, 1, 1 - ss(l.half - 0.4, l.half + settings.laneShoulder, d));
       });
     }
   }
@@ -285,7 +286,7 @@ export function landMap() {
     const hw = p.w + 2.6;
     const front = p.d + 5.5;
     const back = p.d + 2;
-    const R = Math.hypot(hw, front) + 1;
+    const R = Math.hypot(hw, front) + Math.max(1, settings.yardFeather);
     each(p.x - R, p.z - R, p.x + R, p.z + R, (x, z) => {
       const dx = x - p.x;
       const dz = z - p.z;
@@ -294,7 +295,7 @@ export function landMap() {
       const u = dx * c - dz * s;
       const v = dx * s + dz * c;
       const e = Math.max(Math.abs(u) - hw, v - front, -v - back);
-      put(x, z, 0, 1 - ss(-0.8, 0.4, e));
+      put(x, z, 0, 1 - ss(-0.8, settings.yardFeather, e));
     });
   }
   for (const big of [CHURCH, MOSQUE]) {
@@ -306,20 +307,20 @@ export function landMap() {
   // Leaf litter under the rubber and areca
   for (const g of GROVES) {
     if (g.kind === 'coconut') continue;
-    const R = Math.hypot(g.hx, g.hz) + 4;
+    const R = Math.hypot(g.hx, g.hz) + Math.max(4, settings.litterFeather);
     each(g.x - R, g.z - R, g.x + R, g.z + R, (x, z) => {
       const dx = x - g.x;
       const dz = z - g.z;
       const c = Math.cos(g.yaw);
       const s = Math.sin(g.yaw);
       const e = Math.max(Math.abs(dx * c - dz * s) - g.hx, Math.abs(dx * s + dz * c) - g.hz);
-      put(x, z, 2, 1 - ss(-1, 3, e));
+      put(x, z, 2, 1 - ss(-1, settings.litterFeather, e));
     });
   }
   // Paddy
   each(PADDY.x - PADDY.rx - 4, PADDY.z - PADDY.rz - 4, PADDY.x + PADDY.rx + 4, PADDY.z + PADDY.rz + 4, (x, z) => {
     const q = Math.hypot((x - PADDY.x) / PADDY.rx, (z - PADDY.z) / PADDY.rz);
-    put(x, z, 3, 1 - ss(0.92, 1.0, q));
+    put(x, z, 3, 1 - ss(settings.paddyEdge, 1.0, q));
   });
   return { width: N, height: N, pixels: px };
 }

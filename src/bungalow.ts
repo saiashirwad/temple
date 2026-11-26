@@ -10,6 +10,8 @@ import { M } from './world.ts';
 import { heightAt } from './terrain.ts';
 import { CLEARING, TRAIL_LENGTH, trailAt } from './trail.ts';
 
+import placement from './content/bungalow-placement.json';
+
 const LIME: Mat = { color: hex(0xe6e0d0), roughness: 0.9, pattern: P.PLASTER };
 const SHUTTER: Mat = { color: hex(0x2f5a3a), roughness: 0.65, pattern: P.PAINT };
 const FRAME: Mat = { color: hex(0x3a2418), roughness: 0.6, pattern: P.WOOD };
@@ -22,27 +24,29 @@ const PAPER: Mat = { color: hex(0xd8d0b8), roughness: 0.9, pattern: P.PLAIN };
 const DARK: Mat = { color: hex(0x0a0908), roughness: 1, pattern: P.PLAIN };
 
 /** Where the bungalow stands and which way it faces: back down the path. */
-export const BUNGALOW = (() => {
-  const yaw = CLEARING.heading + Math.PI;
-  // Its front steps a few metres past the path's end
-  const back = 9.5;
-  const x = CLEARING.x + Math.sin(CLEARING.heading) * back;
-  const z = CLEARING.z + Math.cos(CLEARING.heading) * back;
-  return { x, z, yaw, floor: heightAt(x, z) + 0.95 };
-})();
+export function placeBungalow(settings = placement) {
+  const { x, z, heading } = CLEARING;
+  const c = Math.cos(heading);
+  const s = Math.sin(heading);
+  const bx = x + c * settings.right + s * settings.forward;
+  const bz = z - s * settings.right + c * settings.forward;
+  return { x: bx, z: bz, yaw: heading + settings.turn * Math.PI / 180, floor: heightAt(bx, bz) + 0.95 };
+}
+
+export const BUNGALOW = placeBungalow();
 
 /** The little table between the cane chairs, with the cook's note on it: in the bungalow's frame. */
 const TABLE: [number, number] = [-3.9, 4.5 + 1.95];
-export const NOTE_AT = (() => {
-  const { x, z, yaw } = BUNGALOW;
+export function noteAt({ x, z, yaw } = BUNGALOW) {
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
   return { x: x + TABLE[0] * c + TABLE[1] * s, z: z - TABLE[0] * s + TABLE[1] * c };
-})();
+}
+export const NOTE_AT = noteAt();
 
-export function buildBungalow(b: Builder) {
+export function buildBungalow(b: Builder, building = BUNGALOW) {
   const lamps: Lamp[] = [];
-  const { x, z, yaw, floor } = BUNGALOW;
+  const { x, z, yaw, floor } = building;
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
   /** A point in the bungalow's frame (front toward +z), in the world. */
@@ -246,5 +250,5 @@ export function buildBungalow(b: Builder) {
     b.tube(FRAME, [sx - n[0] * 0.06, g - 0.1, sz - n[2] * 0.06], 0.05, 0.045, 2.1, 6);
     b.board([sx, g + 1.55, sz], n, 0.7, 0.7, 11);
   }
-  return { lamps, at: BUNGALOW };
+  return { lamps, at: building };
 }
