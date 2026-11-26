@@ -51,7 +51,7 @@ let hudFrame: (() => void) | null = null;
 const note = document.querySelector<HTMLElement>('#note')!;
 // Test scenarios by key chord (` then a key), and the state readout they report in
 const launch = (() => {
-  try { return resolveLaunch(new URLSearchParams(location.search)); }
+  try { return resolveLaunch(boot); }
   catch (error) {
     note.dataset.error = note.textContent = String(error);
     throw error;

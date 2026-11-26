@@ -1,4 +1,5 @@
 import { SPOTS } from '../src/content/viewpoints.ts';
+import { launchOptions } from '../src/game/boot.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveLaunch } from '../src/game/launch.ts';
@@ -47,4 +48,12 @@ test('named encounters use the same entry camera and resources as their keyboard
   assert.deepEqual(open('encounter=herd-charge'), open('preset=h'));
   assert.throws(() => open('encounter=missing'), /Unknown encounter/);
   assert.throws(() => open('encounter=herd-charge&preset=2'), /Choose one/);
+});
+
+test('launch switches preserve coordinates and repeatable shots, and expand debug shortcuts', () => {
+  const params = launchOptions('?at=1,2,3,4&shot=bridge&shot=chair&preset=m', '#phone');
+  assert.deepEqual(params.getAll('shot'), ['bridge', 'chair']);
+  assert.equal(params.get('at'), '1,2,3,4');
+  assert.ok(params.has('profile') && params.has('phone'));
+  assert.equal(params.has('preset') || params.has('2'), false);
 });

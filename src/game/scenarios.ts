@@ -55,29 +55,48 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     { capture: true },
   );
 
-  const run = (key: string, s: Scene) => {
+  const run = async (key: string, s: Scene) => {
     if (Object.hasOwn(RELOAD_PRESETS, key)) {
-      // The reload is one-shot; remove a launch preset so it cannot trigger itself again.
       const url = new URL(location.href);
-      url.searchParams.delete('preset');
-      history.replaceState(null, '', url);
-      return boot.reloadWith(...RELOAD_PRESETS[key]!);
+      url.hash = '';
+      if (key === '0') url.search = '';
+      else {
+        for (const option of Object.values(RELOAD_PRESETS).flat()) url.searchParams.delete(option);
+        if (Object.hasOwn(RELOAD_PRESETS, url.searchParams.get('preset') ?? '')) url.searchParams.delete('preset');
+        for (const option of RELOAD_PRESETS[key]) url.searchParams.set(option, '');
+      }
+      location.assign(url.href);
+      return;
     }
-    if (key === 'j') return void (shown = !shown);
-    // x: hide the next drawing group in turn (for finding what the scene pass spends its time on)
-    if (key === 'b') return void (s.test.bench(), (shown = true));
-    if (key === 'x' || key === 'X') return void ((s.test.skip = s.test.skip + (key === 'X' ? 5 : 1)), (shown = true));
-    if (key === 't') {
-      s.test.timeScale = s.test.timeScale === 1 ? 4 : s.test.timeScale === 4 ? 10 : 1;
-      return void (shown = true);
+    if (key === 'j') {
+      shown = !shown;
+      return;
+    }
+    if (key === 'b' || key === 'x' || key === 'X' || key === 't') {
+      shown = true;
+      if (key === 'b') s.test.bench();
+      else if (key === 't') s.test.timeScale = s.test.timeScale === 1 ? 4 : s.test.timeScale === 4 ? 10 : 1;
+      else s.test.skip += key === 'X' ? 5 : 1;
+      return;
     }
     shown = true;
     const spot = SPOTS[key];
     const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : RUNS[key];
     if (!r) return;
+    delete stateBox.dataset.error;
     if (spot) pendingView = key;
-    current = { run: r, t0: performance.now(), from: [...s.walker.at] as [number, number], verdict: null, ready: false };
-    return Promise.resolve(r.start(s)).then(() => current && current.run === r && ((current.t0 = performance.now()), (current.ready = true), (current.from = [...s.walker.at] as [number, number]))).catch((error: unknown) => { if (current?.run === r) { current.ready = true; current.verdict = `FAIL: ${String(error)}`; } });
+    const active: NonNullable<typeof current> = { run: r, t0: performance.now(), from: [...s.walker.at], verdict: null, ready: false };
+    current = active;
+    try {
+      await r.start(s);
+      if (current !== active) return;
+      active.t0 = performance.now();
+      active.from = [...s.walker.at];
+    } catch (error) {
+      active.verdict = `FAIL: ${String(error)}`;
+      if (current === active) stateBox.dataset.error = active.verdict;
+    }
+    active.ready = true;
   };
 
   // Same-origin workbench switches views without recreating the device or downloading assets.
@@ -101,7 +120,6 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
 
   let lastText = '';
   setInterval(() => {
-    if (scene) while (queued.length) run(queued.shift()!, scene);
     stateBox.hidden = !shown;
     if (!shown || !scene) return;
     const st = scene.inspect();
@@ -127,7 +145,8 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     attach(s: Scene) {
       scene = s;
       if (replay.active) void replay.start(s);
-      else if (launch.preset) void Promise.resolve(run(launch.preset, s)).then(() => { prepared = true; });
+      else if (launch.preset) void run(launch.preset, s).then(() => { prepared = true; });
+      for (const key of queued.splice(0)) void run(key, s);
     },
   };
 }
