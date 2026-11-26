@@ -1,0 +1,4 @@
+cow.glb: from "African Elephant Bull - Rigged & Animated" by AnimalAnimator (https://animalanimator.com/the-ultimate-african-elephant-for-animal-animators/),
+CC BY 4.0, https://github.com/animalanimator/african-elephant-rig-blender
+Changed: ears reduced toward an Asian elephant's, tusks drawn back to tushes, mesh simplified,
+textures resized, roughness map removed (tools/beasts/elephant.ts). Shared under CC BY 4.0.

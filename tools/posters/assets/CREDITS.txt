@@ -1,0 +1,4 @@
+Poster atlas (public/tex/posters_*), painted by tools/posters/make.ts. The films, notices and ads are made up.
+- che.png: "Che por Jim Fitzpatrick.svg", Wikimedia Commons (User:Jgaray), public domain. After Jim Fitzpatrick's 1968 poster, which he released copyright-free.
+- hs.png: "Hammer and Sickle and Star.svg", Wikimedia Commons (User:RootOfAllLight), public domain.
+- Anton.ttf, Oswald.ttf: Google Fonts, SIL Open Font License 1.1.

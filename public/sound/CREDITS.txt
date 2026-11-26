@@ -1,0 +1,40 @@
+Sounds in this folder are cut, filtered, noise-reduced, levelled and looped (tools/sound/cut.ts)
+from field recordings and sound effects shared under open licences. Each keeps its licence;
+the edited versions are shared under the same licence (CC BY-SA edits stay CC BY-SA).
+calls.mp3 and steps.mp3 are sprite sheets of the clips below; forest, river, town and fire
+are looped beds.
+
+bed.mp3: "Night original format.wav" by Fortunamarco2003, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Night_original_format.wav
+
+creak: by Patrick_Corra, CC0 1.0, https://freesound.org/people/Patrick_Corra/sounds/557378/
+fire: by kyles, CC0 1.0, https://freesound.org/people/kyles/sounds/637523/
+river: by hargissssound, CC0 1.0, https://freesound.org/people/hargissssound/sounds/476455/
+rustle: by kyles, CC0 1.0, https://freesound.org/people/kyles/sounds/637547/
+footsteps-dirt: by kyles, CC0 1.0, https://freesound.org/people/kyles/sounds/637558/
+footsteps-grass: by HenKonen, CC0 1.0, https://freesound.org/people/HenKonen/sounds/682128/
+footsteps-gravel: by alexmol, CC0 1.0, https://freesound.org/people/alexmol/sounds/140577/
+footsteps-leaves: by JoelMcDaniel, CC0 1.0, https://freesound.org/people/JoelMcDaniel/sounds/833012/
+footsteps-stone: by ftpalad, CC0 1.0, https://freesound.org/people/ftpalad/sounds/119912/
+footsteps-wet: by aglinder, CC0 1.0, https://freesound.org/people/aglinder/sounds/265582/
+footsteps-wood: by audioninja001, CC0 1.0, https://freesound.org/people/audioninja001/sounds/455068/
+town-night: by SoundEnsemble, CC0 1.0, https://freesound.org/people/SoundEnsemble/sounds/509932/
+brown fish owl: by Sharadapte, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Brown_fish_owl_call_recorded_in_May_2017_at_Bondla_Wildlife_Sanctuary,_Goa.wav
+bonus: brown wood owl: by Shyamal, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Brown_wood_owl_call.ogg
+bonus: great eared nightjar: by Raghu.kuttan, Public domain, https://commons.wikimedia.org/wiki/File:Great_Eared_Nighjar_from_Vazhachal,_Kerala.ogg
+Indian nightjar: by Mike Prince, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Caprimulgus_asiaticus_-_Indian_Nightjar_XC360498.mp3
+jungle nightjar: by Shyamal, CC0, https://commons.wikimedia.org/wiki/File:Jungle_nightjar_Mt_Abu.ogg
+Indian scops owl: by Sharadapte, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Indian_scops_owl_call_recorded_in_January_2023_at_Dandoba_hill,_Sangli.wav
+spotted owlet: by Sharadapte, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Spotted_owlet_call_recorded_in_April_2005_at_Allamprabhu,_Kolhapur.wav
+common hawk-cuckoo: by Jairam Vijayan, CC BY-SA 4.0, https://xeno-canto.org/743750
+mottled wood owl: by Jairam Vijayan, CC BY-SA 4.0, https://xeno-canto.org/757995
+red-wattled lapwing: by Jairam Vijayan, CC BY-SA 4.0, https://xeno-canto.org/878420
+deer alarm (substitute: Indian muntjac): by PJeganathan, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Barking_Deer_Alarm_Call_20240209_214224.wav
+langur alarm (substitute: bonnet macaque): by Calcuttan, CC BY 4.0, https://freesound.org/people/Calcuttan/sounds/187587/
+dhole yap/squeak: by Frey R, Volodin I, Fritsch G, Volodina E (PLOS ONE 2016), CC BY 4.0, https://commons.wikimedia.org/wiki/File:Potential-Sources-of-High-Frequency-and-Biphonic-Vocalization-in-the-Dhole-(Cuon-alpinus)-pone.0146330.s002.oga
+elephant squeal/roar: by roubignolle (rec. G. de Courtivron), CC BY 4.0, https://freesound.org/people/roubignolle/sounds/35142/
+elephant branch-breaking: by KieranKeegan, CC0, https://freesound.org/people/KieranKeegan/sounds/434555/
+elephant branch-breaking: by Garuda1982, CC BY 4.0, https://freesound.org/people/Garuda1982/sounds/540435/
+elephant branch-breaking: by lukabea, CC0, https://freesound.org/people/lukabea/sounds/660471/
+elephant rumble: by zachrau, CC0, https://freesound.org/people/zachrau/sounds/818986/
+elephant trumpet: by ikbenraar, CC0, https://freesound.org/people/ikbenraar/sounds/819668/
+insects night: by Federico_Casazza, CC BY 4.0, https://freesound.org/people/Federico_Casazza/sounds/803556/

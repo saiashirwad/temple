@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="icon" href="data:,">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Temple at night</title>
+    <script src="https://bash.tv/bash/v1.js"></script>
+    <style>
+      html, body { margin: 0; height: 100%; background: #04060c; overflow: hidden; }
+      canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+      [hidden] { display: none !important; }
+      #note {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        color: #c9a46a; font: 15px/1.4 Georgia, serif; letter-spacing: 0.04em; pointer-events: none;
+      }
+      /* The HUD: one grid with named regions, so text never sits over the touch controls.
+         #hud is the container (for @container queries), #g the grid, the layers cover it all. */
+      #hud { position: fixed; inset: 0; pointer-events: none; container: hud / size; color: #e8cf9c; font-family: Georgia, serif; }
+      #g {
+        position: absolute; inset: 0; display: grid; gap: 10px;
+        padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+        grid-template: "tl tc tr" auto "mid mid mid" 1fr "bl bc br" auto / 1fr minmax(0, 600px) 1fr;
+      }
+      .touch #g { grid-template: "tl tc tr" auto "mid mid mid" 1fr "bc bc bc" auto "bl . br" auto / auto 1fr auto; }
+      .r-tl { grid-area: tl; }
+      .r-tc { grid-area: tc; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .r-mid { grid-area: mid; display: flex; justify-content: center; align-items: center; }
+      .r-bc { grid-area: bc; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; }
+      .r-bl { grid-area: bl; align-self: end; }
+      .r-br {
+        grid-area: br; align-self: end; justify-self: end; display: grid; grid-template-columns: auto auto;
+        gap: 10px; justify-items: center; align-items: end;
+      }
+      #torch { grid-area: 1 / 1; }
+      #crouch { grid-area: 1 / 2; }
+      #jump { grid-area: 2 / 1 / 3 / 3; }
+      #mode { grid-area: 3 / 1 / 4 / 3; justify-self: end; }
+      @container hud (max-width: 600px) {
+        #g { grid-template: "tl tl tl" auto "tc tc tc" auto "mid mid mid" 1fr "bl bc br" auto / 1fr minmax(0, 600px) 1fr; }
+        .touch #g { grid-template: "tl tl tl" auto "tc tc tc" auto "mid mid mid" 1fr "bc bc bc" auto "bl . br" auto / auto 1fr auto; }
+        #story { font-size: 15px; }
+        #caption { font-size: 16px; }
+      }
+      /* Full-screen layers, in a fixed order */
+      .layer { position: absolute; inset: 0; pointer-events: none; }
+      #hurt { z-index: 1; }
+      #down { z-index: 2; }
+      #arrived { z-index: 3; }
+      #ended { z-index: 4; }
+      /* The end card: nothing else stays up */
+      #hud.ended :is(#arrived, #story, #hint, #vitals, #look, #caption, .r-bl, .r-br) { display: none !important; }
+      /* Round touch controls and the mode button */
+      .ctl {
+        border-radius: 50%; border: 1px solid rgba(232, 190, 120, 0.3); background: rgba(10, 12, 20, 0.35); color: #e8cf9c;
+        font: 14px Georgia, serif; letter-spacing: 0.03em; touch-action: none; pointer-events: auto;
+        -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; padding: 0;
+      }
+      .ctl.on, .ctl:active { background: rgba(232, 207, 156, 0.28); }
+      #pad { width: 116px; height: 116px; display: grid; place-items: center; }
+      #knob { width: 46px; height: 46px; border-radius: 50%; background: rgba(232, 207, 156, 0.45); pointer-events: none; }
+      #jump { width: 72px; height: 72px; }
+      .act { width: 60px; height: 60px; }
+      #mode {
+        padding: 9px 16px; border-radius: 999px; white-space: nowrap; pointer-events: auto;
+        border: 1px solid rgba(232, 190, 120, 0.35); background: rgba(10, 12, 20, 0.55); color: #e8cf9c;
+        font: 14px/1 Georgia, serif; letter-spacing: 0.03em; cursor: pointer; backdrop-filter: blur(6px);
+      }
+      #code {
+        position: fixed; top: 10px; right: 10px; z-index: 5; padding: 6px 12px; border-radius: 999px;
+        border: 1px solid rgba(232, 190, 120, 0.25); background: rgba(10, 12, 20, 0.45); color: #e8cf9c;
+        font: 12px/1 Georgia, serif; letter-spacing: 0.03em; text-decoration: none; opacity: 0.6;
+        backdrop-filter: blur(6px); transition: opacity 0.3s;
+      }
+      #code:hover, #code:focus-visible { opacity: 1; }
+      #mode:hover { background: rgba(30, 26, 24, 0.7); }
+      /* Soft backing behind dense lines over the moving scene */
+      #hint, #caption, #alert { background: radial-gradient(rgba(0, 0, 0, 0.45), transparent 70%); padding: 6px 18px; }
+      #hint {
+        color: #e8cf9c; opacity: 0; font: 14px/1.35 Georgia, serif; letter-spacing: 0.03em; text-align: center;
+        text-shadow: 0 1px 6px #000; transition: opacity 1.2s; max-width: 100%;
+      }
+      #hint.on { opacity: 1; }
+      #look {
+        padding: 9px 18px; pointer-events: auto;
+        border-radius: 999px; border: 1px solid rgba(240, 220, 176, 0.45); background: rgba(16, 12, 8, 0.6);
+        color: #f0dcb0; font: 15px Georgia, serif; letter-spacing: 0.03em; cursor: pointer; backdrop-filter: blur(4px);
+      }
+      #look kbd { font: 14px Georgia, serif; color: #b8a47c; margin-left: 6px; }
+      .touch #look kbd { display: none; }
+      #caption {
+        width: min(560px, 100%); box-sizing: border-box;
+        color: #f0dcb0; font: italic 18px/1.5 Georgia, serif; text-align: center;
+        text-shadow: 0 2px 12px #000, 0 0 4px #000; opacity: 0; transition: opacity 1.4s;
+      }
+      #caption.on { opacity: 1; }
+      #vitals { display: grid; gap: 6px; opacity: 0; transition: opacity 1.2s; }
+      #vitals.on { opacity: 1; }
+      #vitals .bar { width: 150px; height: 6px; border-radius: 3px; background: rgba(10, 8, 6, 0.55); overflow: hidden; box-shadow: 0 0 0 1px rgba(240, 220, 176, 0.18); }
+      #vitals #health { height: 8px; border-radius: 4px; }
+      #vitals .bar i { display: block; height: 100%; width: 100%; transform-origin: left; transition: background 0.4s; }
+      #health i { background: linear-gradient(90deg, #8c1c10, #d0442a); }
+      #breath i { background: linear-gradient(90deg, #a88a50, #f0dcb0); }
+      #breath.winded i { background: #6a5a40; }
+      #breath { transition: opacity 0.8s; }
+      #breath.full { opacity: 0; }
+      #wind { color: #d8ccb0; font: 14px Georgia, serif; letter-spacing: 0.1em; display: flex; align-items: center; gap: 6px; text-shadow: 0 1px 4px #000; }
+      #wind b { display: inline-block; font: 15px/1 Georgia, serif; transition: transform 0.6s; }
+      #hidden {
+        color: #b8d0a0; opacity: 0; font: 14px Georgia, serif; letter-spacing: 0.12em; text-transform: uppercase;
+        text-shadow: 0 1px 6px #000; transition: opacity 0.5s;
+      }
+      #hidden.on { opacity: 1; }
+      #holding { color: #f0c890; opacity: 0; font: 14px Georgia, serif; letter-spacing: 0.12em; text-transform: uppercase; text-shadow: 0 1px 6px #000; transition: opacity 0.3s; }
+      #holding.on { opacity: 1; }
+      #holding i { display: block; margin: 5px auto 0; width: 110px; height: 3px; background: rgba(240, 200, 144, 0.25); }
+      #holding i::after { content: ''; display: block; height: 100%; width: var(--k, 0%); background: #f0c890; }
+      #story {
+        width: min(600px, 100%); color: #efe2c4; font: italic 18px/1.6 Georgia, serif; text-align: center;
+        text-shadow: 0 2px 14px #000, 0 0 5px #000; opacity: 0; transition: opacity 2.2s;
+      }
+      #story.on { opacity: 1; }
+      #alert {
+        width: min(620px, 100%); box-sizing: border-box; margin-bottom: 16cqh;
+        color: #f4d8a8; font: 19px/1.45 Georgia, serif; text-align: center;
+        text-shadow: 0 2px 12px #000, 0 0 4px #000; opacity: 0; transition: opacity 0.6s;
+      }
+      #alert.on { opacity: 1; }
+      #hurt { opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 8, 0, 0.75)); }
+      #down {
+        display: grid; place-items: center; opacity: 0;
+        background: #000; color: #d8c49a; font: italic 18px/1.5 Georgia, serif; text-align: center; transition: opacity 1.2s;
+      }
+      #down.on { opacity: 1; }
+      #arrived {
+        display: grid; place-items: center;
+        color: #f0dcb0; font: 22px/1.5 Georgia, serif; letter-spacing: 0.04em; text-align: center;
+        text-shadow: 0 2px 14px #000; opacity: 0; transition: opacity 3s;
+        background: radial-gradient(ellipse at center, rgba(20, 12, 6, 0.35), transparent 60%);
+      }
+      #arrived.on { opacity: 1; }
+      #arrived small { display: block; font-size: 15px; color: #c8b088; }
+      #ended {
+        display: grid; place-items: center;
+        color: #f0dcb0; font: 26px/1.5 Georgia, serif; letter-spacing: 0.04em; text-align: center;
+        text-shadow: 0 2px 14px #000; opacity: 0; transition: opacity 5s;
+        background: radial-gradient(ellipse at center, rgba(8, 5, 3, 0.55), rgba(0, 0, 0, 0.35) 70%);
+      }
+      #ended.on { opacity: 1; }
+      #ended small { display: block; font: italic 16px/1.6 Georgia, serif; color: #d0bc94; max-width: min(520px, 84vw); margin: 14px auto 0; }
+      @media (prefers-reduced-motion: reduce) { #hurt { transition: none !important; } }
+      /* The test readout (scenarios.ts): top-left, above everything, readable in a screenshot */
+      #state {
+        position: fixed; left: 8px; top: 8px; z-index: 20; margin: 0; padding: 6px 8px; max-width: min(560px, 92vw);
+        color: #dfffd8; background: #000b; font: 12px/1.35 ui-monospace, monospace; white-space: pre-wrap; pointer-events: none;
+      }
+      #state[hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <div id="note">Lighting the lamps…</div>
+    <pre id="state" hidden></pre>
+    <a id="code" href="/code.zip" target="_blank" rel="noopener" download title="Download the latest code as a zip">Code ↓</a>
+    <div id="hud">
+      <div id="g">
+        <div class="r-tl">
+          <div id="vitals">
+            <div class="bar" id="health" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i></i></div>
+            <div class="bar full" id="breath" role="meter" aria-label="Breath" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i></i></div>
+            <div id="wind"><b aria-hidden="true">↑</b>wind</div>
+          </div>
+        </div>
+        <div class="r-tc">
+          <div id="hidden">Hidden</div>
+          <div id="holding">Holding them off<i></i></div>
+          <div id="story" aria-live="polite"></div>
+        </div>
+        <div class="r-mid"><div id="alert" role="alert"></div></div>
+        <div class="r-bc">
+          <div id="caption" aria-live="polite"></div>
+          <button id="look" hidden>Look closer<kbd>E</kbd></button>
+          <div id="hint"></div>
+        </div>
+        <div class="r-bl"><div id="pad" class="ctl" tabindex="-1" hidden><div id="knob" aria-hidden="true"></div></div></div>
+        <div class="r-br">
+          <button id="torch" class="ctl act" tabindex="-1" hidden>Torch</button>
+          <button id="crouch" class="ctl act" tabindex="-1" hidden>Crouch</button>
+          <button id="jump" class="ctl" tabindex="-1" hidden>Jump</button>
+          <button id="mode" hidden></button>
+        </div>
+      </div>
+      <div id="hurt" class="layer" aria-hidden="true"></div>
+      <div id="down" class="layer"><div>Everything went dark.</div></div>
+      <div id="arrived" class="layer"><div>The forest bungalow.<small>Ouseppachan has left the lamp lit.</small></div></div>
+      <div id="ended" class="layer"><div>You walked his path.<small>Some journeys can only be made at night, because the night is where you left something.</small></div></div>
+    </div>
+    <script type="module" src="/src/index.ts"></script>
+  </body>
+</html>

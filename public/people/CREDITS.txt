@@ -1,0 +1,6 @@
+The townsfolk are avatars and animations from the Microsoft Rocketbox Avatar Library
+(https://github.com/microsoft/Microsoft-Rocketbox), MIT licence, Copyright (c) Microsoft Corporation.
+Converted to glTF with FBX2glTF; skin tones warmed, clothes repainted, textures resized.
+Each avatar is dressed in Kerala clothes made for this scene: the scans' own clothes repainted,
+and a skinned mundu, lungi, sari, pallu, thorthu, thoppi or jasmine string added to the model.
+home_m12: Microsoft Rocketbox Male_Adult_12 (MIT), re-dressed in a white mundu and thorthu
