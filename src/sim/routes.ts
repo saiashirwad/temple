@@ -95,6 +95,21 @@ function near(feet: readonly Foot[], x0: number, z0: number, x1: number, z1: num
   return [...out];
 }
 
+/** Visibility only needs the first hit. Avoid materializing a candidate set for every edge. */
+function obstructed(grid: Map<number, Foot[]>, a: XZ, b: XZ, radius: number) {
+  const margin = radius + 0.1;
+  const x1 = Math.floor((Math.max(a[0], b[0]) + margin) / CELL);
+  const z1 = Math.floor((Math.max(a[1], b[1]) + margin) / CELL);
+  const z0 = Math.floor((Math.min(a[1], b[1]) - margin) / CELL);
+  for (let x = Math.floor((Math.min(a[0], b[0]) - margin) / CELL); x <= x1; x++) {
+    for (let z = z0; z <= z1; z++) {
+      const cell = grid.get(x * 65536 + z);
+      if (cell) for (const foot of cell) if (crosses(foot, a, b, radius)) return true;
+    }
+  }
+  return false;
+}
+
 /** Into a box's own frame (x along its width, z along its depth). */
 const local = (f: Extract<Foot, { kind: 'box' }>, x: number, z: number): XZ => {
   const dx = x - f.x;
@@ -171,22 +186,23 @@ function detour(a: XZ, b: XZ, feet: readonly Foot[], radius: number, clear: numb
   const nodes: XZ[] = [a, b];
   for (const f of close) for (const c of corners(f, radius + clear)) if (!close.some((g) => inside(g, c[0], c[1], radius))) nodes.push(c);
   // A corner can lie past what was gathered: test each leg against what's near it
-  const free = (p: XZ, q: XZ) => !near(feet, p[0], p[1], q[0], q[1], radius + 0.1).some((f) => crosses(f, p, q, radius));
-  // Dijkstra over the free legs between nodes
+  const grid = gridOf(feet);
+  // A straight line to the destination bounds the remaining walking distance.
   const dist = nodes.map(() => Infinity);
+  const remaining = nodes.map(p => Math.hypot(p[0] - b[0], p[1] - b[1]));
   const prev = nodes.map(() => -1);
   const done = nodes.map(() => false);
   dist[0] = 0;
   for (;;) {
     let u = -1;
-    for (let i = 0; i < nodes.length; i++) if (!done[i] && dist[i]! < Infinity && (u < 0 || dist[i]! < dist[u]!)) u = i;
+    for (let i = 0; i < nodes.length; i++) if (!done[i] && dist[i]! < Infinity && (u < 0 || dist[i]! + remaining[i]! < dist[u]! + remaining[u]!)) u = i;
     if (u < 0) return null;
     if (u === 1) break;
     done[u] = true;
     for (let v = 0; v < nodes.length; v++) {
       if (done[v]) continue;
       const d = dist[u]! + Math.hypot(nodes[v]![0] - nodes[u]![0], nodes[v]![1] - nodes[u]![1]);
-      if (d < dist[v]! && free(nodes[u]!, nodes[v]!)) {
+      if (d < dist[v]! && !obstructed(grid, nodes[u]!, nodes[v]!, radius)) {
         dist[v] = d;
         prev[v] = u;
       }
@@ -230,7 +246,7 @@ export function clear(route: readonly XZ[], feet: readonly Foot[], o: { radius?:
   const out: XZ[] = [];
   const n = pts.length;
   const last = o.loop ? n : n - 1;
-  const hit = (a: XZ, b: XZ) => near(feet, a[0], a[1], b[0], b[1], radius + 0.1).some((f) => crosses(f, a, b, radius));
+  const hit = (a: XZ, b: XZ) => obstructed(gridOf(feet), a, b, radius);
   const round = (a: XZ, b: XZ) => (hit(a, b) ? (detour(a, b, feet, radius, room) ?? detour(a, b, feet, radius, room, 9)) : []);
   let i = 0;
   out.push(pts[0]!);
