@@ -44,6 +44,17 @@ A game launch resolves the camera and the resources it needs before presenting t
 
 For load measurements, run `npm run build` and add `--built` to the scenario command. This serves that build from `dist/`. The default mode serves current source. The result includes `firstFrame.ms` from page navigation, the camera pose, and the visible story state. The runner checks the first location and relevant story conditions, in addition to the final verdict. Browser startup, Vite startup and artifact encoding are outside this timing. Seeded random choices are repeatable. Frame times and pixels can vary by device.
 
+### Profile a cold game launch
+
+Build once with `npm run build`. Run `npm run startup` to measure the ordinary opening, bridge and bungalow ending three times each. Each sample opens a fresh headless Chromium profile, navigates directly to the requested state and checks the first revealed frame. Times start at navigation. Browser process startup is outside the measurement.
+
+```sh
+npm run startup -- --runs 5 --gpu --cpu --out /tmp/bridge-profile '/?preset=3&seed=42'
+npm run startup -- --runs 3 --mbps 30 --latency 40 --out /tmp/bridge-network '/?preset=3&seed=42'
+```
+
+The JSON records the camera, story state, startup milestones and resource timings. The reveal marks the frame the game submits when it removes the loading screen. The next animation callback provides a second timing. `--gpu` records when the submitted GPU work finishes and how many shader modules were created by reveal. `--cpu` saves a Chromium CPU profile you can open in DevTools. Use `--dist` to compare a saved release build under the same conditions. For edits within one loaded world, the workbench viewpoint selector reuses its GPU device and loaded assets.
+
 ## Add a scenario
 
 Add `src/workbench/scenarios/<id>.ts` exporting a `title` and a `mount(root, params)` function. Both the URL router and CLI discover the filename automatically. Import the production builder or transition under test. Read scenario options from `URLSearchParams` so another developer or agent can reopen the same case. For a replay, follow the verdict and trace conventions in `src/workbench/scenarios/story.bungalow-ending.ts`.
