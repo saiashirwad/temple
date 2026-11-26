@@ -1,7 +1,8 @@
 import './departure.css';
+import { checkpoint, wantsCheckpoint } from '../scenario/checkpoint.ts';
 import { DEPARTURE_SCRIPT, initialDeparture, replayDeparture, type Command, type Tick } from '../sim/departure.ts';
 
-export function mount(root: HTMLElement, params: URLSearchParams) {
+export async function mount(root: HTMLElement, params: URLSearchParams) {
   root.innerHTML = `
 <section class="departure">
   <p>
@@ -62,10 +63,23 @@ export function mount(root: HTMLElement, params: URLSearchParams) {
       update();
     }),
   );
-  if (params.get('run') === '1') {
+  if (params.has('tick')) {
+    const tick = Number(params.get('tick'));
+    if (!Number.isInteger(tick) || tick < 0 || tick > DEPARTURE_SCRIPT.length)
+      throw new Error(`Expected tick from 0 to ${DEPARTURE_SCRIPT.length}`);
+    commands = DEPARTURE_SCRIPT.slice(0, tick);
+    update();
+  } else if (params.get('run') === '1') {
     commands = [...DEPARTURE_SCRIPT];
     const first = replayDeparture(commands);
     const second = replayDeparture(commands);
+    for (let index = 0; index <= first.length; index++) {
+      const name = `tick-${index}`;
+      if (!wantsCheckpoint(name)) continue;
+      const prefix = first.slice(0, index);
+      render(prefix);
+      await checkpoint(name, prefix.at(-1)?.state ?? initialDeparture());
+    }
     const duplicate = first[3];
     root.dataset.verdict =
       first.at(-1)?.state.quest === 'departed' &&

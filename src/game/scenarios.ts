@@ -20,6 +20,7 @@
 //   p    reload with stage timings (probe);  m  reload with GPU timings (profile)
 //   c    reload with the phone layout;  0  reload clean
 
+import { checkpoint, wantsCheckpoint } from '../scenario/checkpoint.ts';
 import { boot } from './boot.ts';
 import { NOTE_AT } from '../world/trail/bungalow.ts';
 import type { createScene } from './scene.ts';
@@ -29,16 +30,16 @@ type State = Scene['test']['state'];
 /** x, z, yaw, pitch, eye height above the ground. Yaw π faces +z, 0 faces -z. */
 type Spot = readonly [number, number, number, number, number];
 
-export const SPOTS: Record<string, { name: string; at: Spot }> = {
-  '1': { name: 'town view', at: [122.8, -128.1, 2.41, 0.06, 1.62] },
-  '2': { name: 'path before the bridge', at: [-160.5, -113.5, 1.55, 0.18, 1.62] },
-  '3': { name: 'bridge', at: [-169.73, -108.86, 0.981, 0.22, 1.62] },
-  '4': { name: 'dung by the path', at: [-69.66, -139.88, 2.458, 0.45, 1.62] },
-  '5': { name: 'machan stair', at: [-17.44, -159.78, 0.421, 0.1, 3.8] },
-  '6': { name: 'herd glade', at: [-114.55, -258.42, -2.05, 0.08, 1.62] },
-  '7': { name: 'herd glade, close', at: [-110.2, -256.1, -2.05, 0.12, 1.62] },
-  '8': { name: 'veranda, the note', at: [NOTE_AT.x, NOTE_AT.z + 1.2, 0.186, 0.75, 3.5] },
-  '9': { name: 'his chair, looking out', at: [20.61, -396.33, 2.792, 0.07, 2.63] },
+export const SPOTS: Record<string, { name: string; shot: string; at: Spot }> = {
+  '1': { shot: 'town', name: 'town view', at: [122.8, -128.1, 2.41, 0.06, 1.62] },
+  '2': { shot: 'bridge-path', name: 'path before the bridge', at: [-160.5, -113.5, 1.55, 0.18, 1.62] },
+  '3': { shot: 'bridge', name: 'bridge', at: [-169.73, -108.86, 0.981, 0.22, 1.62] },
+  '4': { shot: 'dung', name: 'dung by the path', at: [-69.66, -139.88, 2.458, 0.45, 1.62] },
+  '5': { shot: 'machan', name: 'machan stair', at: [-17.44, -159.78, 0.421, 0.1, 3.8] },
+  '6': { shot: 'herd-glade', name: 'herd glade', at: [-114.55, -258.42, -2.05, 0.08, 1.62] },
+  '7': { shot: 'herd-close', name: 'herd glade, close', at: [-110.2, -256.1, -2.05, 0.12, 1.62] },
+  '8': { shot: 'veranda', name: 'veranda, the note', at: [NOTE_AT.x, NOTE_AT.z + 1.2, 0.186, 0.75, 3.5] },
+  '9': { shot: 'chair', name: 'his chair, looking out', at: [20.61, -396.33, 2.792, 0.07, 2.63] },
 };
 
 type Run = {
@@ -172,7 +173,8 @@ export function scenarios(stateBox: HTMLPreElement) {
   let current: { run: Run; t0: number; from: readonly [number, number]; verdict: string | null; ready: boolean } | null = null;
   let shown = boot.has('state');
   const auto = boot.get('scenario') === 'story.bungalow-ending';
-  const replayBox = auto ? document.createElement('pre') : null;
+  const worldTour = boot.get('scenario') === 'world.walk' && boot.get('run') === '1';
+  const replayBox = auto || worldTour ? document.createElement('pre') : null;
   if (replayBox) {
     replayBox.id = 'game-replay';
     replayBox.dataset.trace = '';
@@ -194,9 +196,52 @@ export function scenarios(stateBox: HTMLPreElement) {
     record(ok ? 'pass' : 'fail', detail);
     replayBox.dataset.verdict = ok ? 'pass' : 'fail';
   };
-  if (auto) {
+  if (replayBox) {
     record('loading');
     setTimeout(() => finish(false, 'game replay timed out'), 120000);
+  }
+  async function captureStory(s: Scene, name: string) {
+    if (!wantsCheckpoint(name)) return;
+    const speed = s.test.timeScale;
+    s.test.timeScale = 0;
+    try {
+      await checkpoint(name, s.test.state);
+    } finally {
+      s.test.timeScale = speed;
+    }
+  }
+  async function tour(s: Scene) {
+    try {
+      await solid(s);
+      await wildlifeReady(s);
+      const preset = boot.get('preset');
+      const encounter = preset ? RUNS[preset] : undefined;
+      if (encounter) {
+        await encounter.start(s);
+        const start = performance.now();
+        let verdict: string | null = null;
+        while (encounter.judge && !verdict) {
+          if (finished) return;
+          await new Promise((done) => setTimeout(done, 50));
+          verdict = encounter.judge(s.test.state, (performance.now() - start) / 1000, s);
+        }
+        if (verdict?.startsWith('FAIL')) throw new Error(verdict);
+        record('encounter', encounter.name);
+        await checkpoint('encounter', s.test.state);
+      } else {
+        const spots = preset ? [SPOTS[preset]] : Object.values(SPOTS);
+        for (const spot of spots) {
+          if (!spot) throw new Error(`Unknown view or encounter preset: ${preset}`);
+          s.walker.hold(...spot.at);
+          s.view.jump();
+          record('view', spot.shot);
+          await checkpoint(spot.shot, s.test.state);
+        }
+      }
+      finish(true);
+    } catch (error) {
+      finish(false, String(error));
+    }
   }
   const replay = async (s: Scene) => {
     const waitFor = async (predicate: () => boolean, label: string, ms = 10000) => {
@@ -222,8 +267,10 @@ export function scenarios(stateBox: HTMLPreElement) {
       s.test.timeScale = 16;
       record('placed at veranda');
       await waitFor(() => s.journey.near?.id === 'bungalow.note', 'note', 45000);
+      await captureStory(s, 'veranda');
       key('keydown', 'e'); key('keyup', 'e');
       await waitFor(() => examined === 'bungalow.note', 'note examination');
+      await captureStory(s, 'reading-note');
       // The normal HUD closes reading once walking for at least 600 ms.
       key('keydown', 's');
       try { await waitFor(() => closed === 'bungalow.note', 'putting down note', 5000); }
@@ -239,10 +286,13 @@ export function scenarios(stateBox: HTMLPreElement) {
       key('keydown', 'e'); key('keyup', 'e');
       await waitFor(() => examined === 'bungalow.chair' && s.test.state.story.sitting >= 0, 'chair examination');
       record('sitting');
+      await captureStory(s, 'seated');
       await waitFor(() => s.test.state.guardGone, 'guard departure', 15000);
       record('guard gone');
+      await captureStory(s, 'guard-gone');
       await waitFor(() => s.test.state.ended, 'ending', 15000);
       record('ended');
+      await captureStory(s, 'ending');
       finish(true);
     } catch (error) { record('state', JSON.stringify(s.test.state)); finish(false, String(error)); }
     finally {
@@ -314,6 +364,10 @@ export function scenarios(stateBox: HTMLPreElement) {
   return {
     attach(s: Scene) {
       scene = s;
+      if (worldTour) {
+        setTimeout(() => void tour(s), 0);
+        return;
+      }
       if (auto) setTimeout(() => void replay(s), 0);
       const preset = boot.get('preset');
       if (preset) queued.push(preset);
