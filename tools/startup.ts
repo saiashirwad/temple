@@ -9,15 +9,20 @@ import { verifyFirstFrame, type FirstFrame } from './scenario/first-frame.ts';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   runs: { type: 'string', default: '3' }, dist: { type: 'string', default: 'dist' },
+  mbps: { type: 'string' }, latency: { type: 'string' },
   out: { type: 'string' }, cpu: { type: 'boolean' }, help: { type: 'boolean' },
 } });
 if (values.help) {
-  console.log("npm run startup -- [--runs N] [--dist DIR] [--out DIR] [--cpu] '/?preset=3'\nPass one or more game paths. --out saves timing and resource waterfalls. --cpu also saves Chromium CPU profiles.");
+  console.log("npm run startup -- [--runs N] [--dist DIR] [--out DIR] [--cpu] [--mbps N] [--latency MS] '/?preset=3'\nPass one or more game paths. --out saves timing and resource waterfalls. --cpu also saves Chromium CPU profiles. --mbps and --latency emulate a download link and request latency.");
   process.exit(0);
 }
 const runs = Number(values.runs);
 if (!Number.isSafeInteger(runs) || runs < 1) throw new Error('--runs must be a positive integer');
 if (values.cpu && !values.out) throw new Error('--cpu requires an output directory');
+const mbps = values.mbps === undefined ? undefined : Number(values.mbps);
+const latency = Number(values.latency ?? 0);
+if (mbps !== undefined && (!Number.isFinite(mbps) || mbps <= 0)) throw new Error('--mbps must be positive');
+if (!Number.isFinite(latency) || latency < 0) throw new Error('--latency must be nonnegative');
 const paths = positionals.length ? positionals : ['/?seed=42', '/?preset=3&seed=42', '/?scenario=story.bungalow-ending&from=ending&seed=42'];
 if (paths.some(p => !p.startsWith('/') || p.startsWith('//'))) throw new Error('Expected local game paths starting with /');
 const out = values.out ? resolve(values.out) : undefined;
@@ -36,7 +41,13 @@ try {
       const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--enable-unsafe-webgpu'] });
       try {
         const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-        const trace = values.cpu ? await page.context().newCDPSession(page) : null;
+        const trace = values.cpu || mbps || latency ? await page.context().newCDPSession(page) : null;
+        if (trace && (mbps || latency)) {
+          await trace.send('Network.enable');
+          await trace.send('Network.emulateNetworkConditions', {
+            offline: false, latency, downloadThroughput: mbps ? mbps * 1e6 / 8 : -1, uploadThroughput: -1,
+          });
+        }
         const errors: string[] = [];
         page.on('pageerror', err => errors.push(err.message));
         await page.addInitScript(() => {
@@ -48,10 +59,10 @@ try {
             requestAnimationFrame(() => performance.mark('startup:next-frame'));
           }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-starting'] });
         });
-        if (trace) { await trace.send('Profiler.enable'); await trace.send('Profiler.start'); }
+        if (trace && values.cpu) { await trace.send('Profiler.enable'); await trace.send('Profiler.start'); }
         await page.goto(new URL(path, server.resolvedUrls!.local[0]).href, { waitUntil: 'commit' });
         await page.waitForFunction(() => performance.getEntriesByName('startup:next-frame').length || document.querySelector('#note[data-error]'), undefined, { timeout: 90000 });
-        if (trace) {
+        if (trace && values.cpu) {
           const { profile } = await trace.send('Profiler.stop');
           await writeFile(join(out!, `case-${pathIndex + 1}-run-${i + 1}.cpuprofile`), JSON.stringify(profile));
         }
@@ -77,7 +88,7 @@ try {
         nextPaints.push(result.nextFrameMs);
         const completed = result.resources.filter(r => r.finishedByReveal);
         console.log(`${path}  ${i + 1}/${runs}  ${result.frame.ms} ms reveal  ${result.nextFrameMs} ms next frame  ${(completed.reduce((sum, r) => sum + r.bytes, 0) / 1e6).toFixed(1)} MB / ${completed.length} completed requests`);
-        if (out) await writeFile(join(out, `case-${pathIndex + 1}-run-${i + 1}.json`), JSON.stringify({ path, ...result }, null, 2));
+        if (out) await writeFile(join(out, `case-${pathIndex + 1}-run-${i + 1}.json`), JSON.stringify({ path, network: { mbps, latency }, ...result }, null, 2));
       } finally {
         await browser.close();
       }
