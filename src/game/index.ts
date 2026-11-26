@@ -261,7 +261,8 @@ if (!navigator.gpu) {
       if (viewpoint) canvas.dataset.view = viewpoint;
       if (canvas.dataset.ready === undefined && tests.prepared) {
         canvas.dataset.ready = '';
-        canvas.dataset.firstFrame = JSON.stringify({ at: scene.walker.at, yaw: scene.view.pose.yaw, mode: scene.walker.mode,
+        const pose = scene.view.pose;
+        canvas.dataset.firstFrame = JSON.stringify({ at: [pose.target[0], pose.target[2]], yaw: pose.yaw, pitch: pose.pitch, mode: scene.walker.mode,
           readingNote: document.querySelector('#caption')?.classList.contains('on') && scene.test.story.sitting < 0, ended: scene.test.state.ended, guardGone: scene.test.guardGone, sitting: scene.test.story.sitting });
         performance.mark('game:first-frame');
         delete document.body.dataset.starting;

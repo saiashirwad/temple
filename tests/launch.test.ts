@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveLaunch, SPOTS } from '../src/game/launch.ts';
 
+import { verifyFirstFrame } from '../tools/scenario/first-frame.ts';
+
 const open = (query: string) => resolveLaunch(new URLSearchParams(query));
 
 test('a selected world spread starts at its first requested location', () => {
@@ -29,4 +31,13 @@ test('world captures honor the order of the requested views and custom cameras',
   assert.equal(open('scenario=world.walk&run=1&shot=bridge&shot=town').views[0].shot, 'bridge');
   assert.equal(open('scenario=world.walk&run=1&at=2,4,0,0').views[0].shot, 'camera');
   assert.throws(() => open('scenario=story.bungalow-ending&from=ending&shot=seated'));
+});
+
+test('the frame verifier rejects a camera still easing toward the correct bridge', () => {
+  const params = new URLSearchParams('scenario=world.walk&run=1&shot=bridge');
+  const [x, z, yaw, pitch] = SPOTS['3'].at;
+  const frame = { ms: 123, at: [x, z] as [number, number], yaw, pitch, mode: 'held', readingNote: false, sitting: -1, ended: false, guardGone: false };
+  verifyFirstFrame(params, frame);
+  assert.throws(() => verifyFirstFrame(params, { ...frame, at: [x + 1, z] }));
+  assert.throws(() => verifyFirstFrame(params, { ...frame, pitch: 0 }));
 });

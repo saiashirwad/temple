@@ -143,11 +143,15 @@ export function gameReplay(launch: Launch) {
         if (from === 'ending' ? !s.test.state.ended : !s.test.guardGone) throw new Error('Finale checkpoint unavailable');
       }
       prepared = true;
-      record('sitting');
-      await captureStory(s, 'seated');
-      await waitFor(() => s.test.guardGone, 'guard departure', 15000);
-      record('guard gone');
-      await captureStory(s, 'guard-gone');
+      if (from !== 'guard-gone' && from !== 'ending') {
+        record('sitting');
+        await captureStory(s, 'seated');
+      }
+      if (from !== 'ending') {
+        await waitFor(() => s.test.guardGone, 'guard departure', 15000);
+        record('guard gone');
+        await captureStory(s, 'guard-gone');
+      }
       await waitFor(() => s.test.state.ended, 'ending', 15000);
       record('ended');
       await captureStory(s, 'ending');
