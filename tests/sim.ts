@@ -16,9 +16,22 @@ export function seeded(seed = 1) {
   };
 }
 
+interface DangerEvents {
+  said: string[];
+  marks: Parameters<Hooks['mark']>[0][];
+  downs: number;
+  sounds: (keyof Hooks['sound'])[];
+}
+
 export function fakeHooks(over: Partial<Hooks> = {}) {
-  const log = { said: [] as string[], marks: [] as string[], downs: 0, sounds: [] as string[] };
-  const sound = new Proxy({} as Hooks['sound'], { get: (_, name) => () => void log.sounds.push(String(name)) });
+  const log: DangerEvents = { said: [], marks: [], downs: 0, sounds: [] };
+
+  const record = (name: keyof Hooks['sound']) => () => { log.sounds.push(name); };
+
+  const sound: Hooks['sound'] = {
+    whistle: record('whistle'), yap: record('yap'), howl: record('howl'), growl: record('growl'),
+    bite: record('bite'), trumpet: record('trumpet'), rumble: record('rumble'), thud: record('thud'), alarm: record('alarm'),
+  };
 
   const hooks: Hooks = {
     cover: () => false,

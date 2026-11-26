@@ -95,8 +95,43 @@ interface JourneyHud {
   end(): void;
 }
 
+interface JourneyState {
+  furthest: number;
+  deep: number;
+  torch: number;
+  torchOff: boolean;
+  hidden: boolean;
+  arrived: boolean;
+  near: Interest | null;
+  wind: [number, number];
+  reading: boolean;
+  arrivedAt: number;
+  metHerd: boolean;
+  darkFor: number;
+  ended: boolean;
+  downs: number;
+  alertUntil: number;
+}
+
 export function createJourney({ random, walker, people, sound, eyes, cover, view, later, fog, torchLamp, beasts }: JourneyDeps) {
-  const state = { furthest: 0, deep: 0, torch: 0, torchOff: false, hidden: false, arrived: false, near: null as Interest | null, wind: [0, 1] as [number, number], reading: false, arrivedAt: -99, metHerd: false, darkFor: 0, ended: false, downs: 0, alertUntil: 0 };
+  const state: JourneyState = {
+    furthest: 0,
+    deep: 0,
+    torch: 0,
+    torchOff: false,
+    hidden: false,
+    arrived: false,
+    near: null,
+    wind: [0, 1],
+    reading: false,
+    arrivedAt: -99,
+    metHerd: false,
+    darkFor: 0,
+    ended: false,
+    downs: 0,
+    alertUntil: 0,
+  };
+
   let hud: JourneyHud | undefined;
   /** The last frame's tick; before the first, a still one at the origin. */
   let tk: Tick = { seconds: 0, dt: 0, eye: [0, 0, 0], fwd: [0, 0, -1], yaw: 0, x: 0, z: 0 };

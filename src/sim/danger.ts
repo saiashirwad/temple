@@ -140,12 +140,12 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
   // ---- the herd: a cow, her sister and a calf, wandering about the glade
   type Elephant = Beast & { size: number; goal: [number, number]; wait: number };
 
-  const herd: Elephant[] = H.sizes.map((s, i) => {
+  const herd: Elephant[] = H.sizes.map((s, i): Elephant => {
     const a = glade.facing + Math.PI + (i - 1) * H.spreadAngle;
     const x = glade.x + Math.sin(a) * H.spacing * i;
     const z = glade.z + Math.cos(a) * H.spacing * i;
 
-    return { x, z, yaw: glade.facing + rand(-H.startYaw, H.startYaw), speed: 0, phase: 0, on: true, alert: 0, size: s, goal: [x, z] as [number, number], wait: randIn(H.firstWait) };
+    return { x, z, yaw: glade.facing + rand(-H.startYaw, H.startYaw), speed: 0, phase: 0, on: true, alert: 0, size: s, goal: [x, z], wait: randIn(H.firstWait) };
   });
 
   let alarm = 0;
@@ -187,7 +187,7 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
   };
 
   /** One substep, no longer than TUNING.maxStep. */
-  const step = (dt: number, p: Player): { hidden: boolean } => {
+  const step = (dt: number, p: Player) => {
     clock += dt;
     downed = false;
     const hidden = (p.crouching && !p.running && hooks.cover(p.x, p.z)) || hooks.safe(p.x, p.z);
@@ -555,8 +555,8 @@ export function createDanger(glade: Glade, hooks: Hooks, random: () => number = 
 
   return {
     update,
-    wolves: wolves as readonly Beast[],
-    herd: herd as readonly (Beast & { size: number })[],
+    get wolves(): readonly Beast[] { return wolves; },
+    get herd(): readonly (Beast & { size: number })[] { return herd; },
     get health() {
       return health;
     },

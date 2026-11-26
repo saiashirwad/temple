@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeWalker, stepWalker } from '../src/sim/walker.ts';
+import { makeWalker, stepWalker, type WalkPlan } from '../src/sim/walker.ts';
 
 test('walker slows for an obstacle and returns to its route once clear', () => {
-  const plan = { route: [[0, 0], [0, 20]] as [number, number][], speed: 1 };
+  const plan: WalkPlan = { route: [[0, 0], [0, 20]], speed: 1 };
   const p = makeWalker(plan);
 
   for (let i = 0; i < 10; i++) stepWalker(p, plan, 0.05, [0, 0.5], () => false);
@@ -16,7 +16,7 @@ test('walker slows for an obstacle and returns to its route once clear', () => {
 });
 
 test('walker waits and reverses at the end of a non-loop route', () => {
-  const plan = { route: [[0, 0], [0, 1]] as [number, number][], speed: 1, pause: 0.2 };
+  const plan: WalkPlan = { route: [[0, 0], [0, 1]], speed: 1, pause: 0.2 };
   const p = makeWalker(plan);
 
   for (let i = 0; i < 30; i++) stepWalker(p, plan, 0.05, [100, 100], () => false);

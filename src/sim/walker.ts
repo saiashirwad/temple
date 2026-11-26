@@ -2,7 +2,7 @@
 export type XZ = [number, number];
 
 export interface WalkPlan {
-  route: XZ[];
+  route: readonly XZ[];
   loop?: boolean;
   speed: number;
   from?: number;
@@ -18,7 +18,7 @@ export interface Walker {
   wait: number;
   lens: number[];
   length: number;
-  pts: XZ[];
+  pts: readonly XZ[];
   dodge: number;
 }
 

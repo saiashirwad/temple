@@ -14,7 +14,7 @@ export const WATCHER = 'tea_m01';
 
 /** How a person spends the evening. */
 export type Plan =
-  | { kind: 'walk'; who: Who; watcher?: boolean; route: XZ[]; loop?: boolean; speed: number; from?: number; pause?: number; side?: number; lift?: number }
+  | { kind: 'walk'; who: Who; watcher?: boolean; route: readonly XZ[]; loop?: boolean; speed: number; from?: number; pause?: number; side?: number; lift?: number }
   | { kind: 'stay'; who: Who; at: XZ; yaw: number; clip: ClipName; lift?: number; swap?: ClipName };
 
 // ---- where everyone is
@@ -35,7 +35,7 @@ const CIRCUIT: XZ[] = [
 ];
 
 const TEA: XZ = [3.4, roadZ(3.4) + ROAD.half + 1.7];
-const mosqueGate = (): XZ => [MOSQUE.x + 0 * Math.cos(MOSQUE.yaw) + MOSQUE.hz * Math.sin(MOSQUE.yaw), MOSQUE.z + MOSQUE.hz * Math.cos(MOSQUE.yaw)];
+const mosqueGate = (): XZ => [MOSQUE.x + MOSQUE.hz * Math.sin(MOSQUE.yaw), MOSQUE.z + MOSQUE.hz * Math.cos(MOSQUE.yaw)];
 
 const LINEUP = boot.has('lineup');
 
@@ -59,7 +59,7 @@ export function plansClear(tulsi: V3[], seats: Seat[], solids: readonly Solid[],
 }
 
 /** A route moved `side` metres to the right of the way it goes (as the walker steps out). */
-const beside = (route: XZ[], side: number): XZ[] =>
+const beside = (route: readonly XZ[], side: number): XZ[] =>
   route.map((p, i) => {
     const a = route[Math.max(0, i - 1)]!;
     const b = route[Math.min(route.length - 1, i + 1)]!;
@@ -111,7 +111,7 @@ export function rawPlans(tulsi: V3[], seats: Seat[]): Plan[] {
   out.push({ kind: 'walk', who: WATCHER, watcher: true, route: beat, speed: 0.85, from: 120, pause: 14 });
 
   if (LINEUP) {
-    (['road_m08', 'home_m09', 'road_f11', 'dev_f15', 'gate_f02'] as Who[]).forEach((who, i) =>
+    (['road_m08', 'home_m09', 'road_f11', 'dev_f15', 'gate_f02'] as const).forEach((who, i) =>
       out.push({ kind: 'stay', who, at: [-1.6 + i * 0.8, 24.5], yaw: i % 2 ? 0.4 : -0.4, clip: i === 3 ? 'idle_neutral_02' : 'idle_neutral_01' }),
     );
   }

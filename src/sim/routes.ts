@@ -215,7 +215,7 @@ const corners = (f: Foot, clear: number): XZ[] => {
 
   const r = (f.r + clear) / Math.cos(Math.PI / 8);
 
-  return Array.from({ length: 8 }, (_, k) => [f.x + Math.cos((k * Math.PI) / 4) * r, f.z + Math.sin((k * Math.PI) / 4) * r] as XZ);
+  return Array.from({ length: 8 }, (_, k): XZ => [f.x + Math.cos((k * Math.PI) / 4) * r, f.z + Math.sin((k * Math.PI) / 4) * r]);
 };
 
 /**
@@ -293,13 +293,13 @@ export function pushOut(p: XZ, feet: readonly Foot[], radius = 0.3, clear = 0.05
  * The route with every leg that passes through a solid walked round it instead. Waypoints inside
  * a solid move out first. A route that is already clear comes back unchanged (the same array).
  */
-export function clear(route: readonly XZ[], feet: readonly Foot[], o: { radius?: number; clear?: number; loop?: boolean } = {}): XZ[] {
+export function clear(route: readonly XZ[], feet: readonly Foot[], o: { radius?: number; clear?: number; loop?: boolean } = {}): readonly XZ[] {
   const radius = o.radius ?? 0.3;
   const room = o.clear ?? 0.35;
   const pts = route.map((p) => pushOut(p, feet, radius));
   const moved = pts.some((p, i) => p[0] !== route[i]![0] || p[1] !== route[i]![1]);
 
-  if (!moved && !blocked(pts, feet, radius, o.loop).length) return route as XZ[];
+  if (!moved && !blocked(pts, feet, radius, o.loop).length) return route;
   const out: XZ[] = [];
   const n = pts.length;
   const last = o.loop ? n : n - 1;
