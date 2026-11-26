@@ -43,7 +43,7 @@ For load measurements, run `npm run build` and add `--built` to the scenario com
 
 ## Add a scenario
 
-Add `src/workbench/scenarios/<id>.ts` exporting a `title` and a `mount(root, params)` function. Both the URL router and CLI discover the filename automatically. Import the production builder or transition under test. Read scenario options from `URLSearchParams` so another developer or agent can reopen the same case. For a replay, follow the verdict and trace conventions in `src/workbench/bungalow.ts`.
+Add `src/workbench/scenarios/<id>.ts` exporting a `title` and a `mount(root, params)` function. Both the URL router and CLI discover the filename automatically. Import the production builder or transition under test. Read scenario options from `URLSearchParams` so another developer or agent can reopen the same case. For a replay, follow the verdict and trace conventions in `src/workbench/scenarios/story.bungalow-ending.ts`.
 
 Inventory, equipment and the departure quest each own a transition function. One command advances a tick. For example, acquiring the torch emits an inventory fact, equipping it emits an equipment fact, and the quest observes both equipment and note state to decide whether departure is possible. Their fixed delivery order gives the rehearsal a readable trace. Keep these low-frequency narrative decisions separate from the loops that place and render thousands of plants. XState actors become an option if story branches need independent lifetimes or asynchronous mailboxes. [XState actors](https://stately.ai/docs/xstate/v5/actors)
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { rehearseBungalow, replayBungalow } from '../src/workbench/bungalow.ts';
+import { rehearseBungalow, replayBungalow } from '../src/workbench/scenarios/story.bungalow-ending.ts';
 
 test('the note must be read and put down before the chair can start the ending', () => {
   const run = rehearseBungalow();
@@ -17,8 +17,8 @@ test('the note must be read and put down before the chair can start the ending',
 });
 
 test('replay produces the production finale, guard departure and end in order', () => {
-  const trace = replayBungalow();
-  assert.deepEqual(trace, replayBungalow());
+  const { trace } = replayBungalow();
+  assert.deepEqual(trace, replayBungalow().trace);
   assert.equal(trace.slice(trace.findIndex((e) => e.event === 'sit') + 1).filter((e) => e.event === 'line').length, 4);
   assert.ok(trace.findIndex((e) => e.event === 'guard gone') > trace.findIndex((e) => e.event === 'sit'));
   assert.ok(trace.findIndex((e) => e.event === 'end') > trace.findIndex((e) => e.event === 'guard gone'));
