@@ -158,6 +158,8 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
   let current: { run: Run; t0: number; from: readonly [number, number]; verdict: string | null; ready: boolean } | null = null;
   let shown = boot.has('state');
   const { bungalow: auto, tour: worldTour } = launch;
+  let pendingView: string | null = null;
+  let selecting = 0;
   let prepared = !auto && !worldTour && !launch.preset;
   const replayBox = auto || worldTour ? document.createElement('pre') : null;
   if (replayBox) {
@@ -322,7 +324,8 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
       chord = false;
       e.preventDefault();
       e.stopImmediatePropagation();
-      queued.push(e.key);
+      if (scene) run(e.key, scene);
+      else queued.push(e.key);
     },
     { capture: true },
   );
@@ -348,9 +351,29 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
     const spot = SPOTS[key];
     const r: Run | undefined = spot ? { name: spot.name, start(sc) { sc.walker.hold(...spot.at); sc.view.jump(); } } : RUNS[key];
     if (!r) return;
+    if (spot) pendingView = key;
     current = { run: r, t0: performance.now(), from: [...s.walker.at] as [number, number], verdict: null, ready: false };
     return Promise.resolve(r.start(s)).then(() => current && current.run === r && ((current.t0 = performance.now()), (current.ready = true), (current.from = [...s.walker.at] as [number, number]))).catch((error: unknown) => { if (current?.run === r) { current.ready = true; current.verdict = `FAIL: ${String(error)}`; } });
   };
+
+  // Same-origin workbench switches views without recreating the device or downloading assets.
+  addEventListener('temple:view', async event => {
+    const key = (event as CustomEvent<string>).detail;
+    const spot = SPOTS[key];
+    if (!scene || !spot) return;
+    const request = ++selecting;
+    try {
+      if (key === '1') await scene.test.townReady();
+      if (spot.shot.startsWith('herd-')) await wildlifeReady(scene);
+      if (request !== selecting) return;
+      await run(key, scene);
+      const url = new URL(location.href);
+      url.searchParams.set('preset', key);
+      history.replaceState(null, '', url);
+    } catch (error) {
+      if (request === selecting) stateBox.dataset.error = String(error);
+    }
+  });
 
   let lastText = '';
   setInterval(() => {
@@ -371,6 +394,11 @@ export function scenarios(stateBox: HTMLPreElement, launch: Launch) {
 
   return {
     get prepared() { return prepared; },
+    takeViewChange() {
+      const key = pendingView;
+      pendingView = null;
+      return key;
+    },
     attach(s: Scene) {
       scene = s;
       if (worldTour) {

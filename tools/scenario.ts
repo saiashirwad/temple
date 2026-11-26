@@ -79,7 +79,7 @@ try {
   const address = server.httpServer!.address();
   if (!address || typeof address === 'string') throw new Error('No HTTP port available.');
   const asset = params.get('asset') ?? '';
-  const needsGpu = values.game || (id === 'asset.inspect' && (asset.startsWith('tree/') || asset.endsWith('.glb')));
+  const needsGpu = values.game || (id === 'world.walk' && params.has('view')) || (id === 'asset.inspect' && (asset.startsWith('tree/') || asset.endsWith('.glb')));
   const headed = values.headed || (process.platform === 'darwin' && needsGpu);
   browser = await chromium.launch({ headless: !headed, args: ['--enable-unsafe-webgpu'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });

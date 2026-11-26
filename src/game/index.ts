@@ -251,6 +251,8 @@ if (!navigator.gpu) {
     },
     onFrame: ({ scene }) => {
       hudFrame?.();
+      const viewpoint = tests.takeViewChange();
+      if (viewpoint) canvas.dataset.view = viewpoint;
       if (canvas.dataset.ready === undefined && tests.prepared) {
         canvas.dataset.ready = '';
         canvas.dataset.firstFrame = JSON.stringify({ at: scene.walker.at, yaw: scene.view.pose.yaw, mode: scene.walker.mode,
