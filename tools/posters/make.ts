@@ -6,7 +6,7 @@
 //   npx tsx tools/posters/make.ts
 import { createCanvas, GlobalFonts, loadImage, type SKRSContext2D } from '@napi-rs/canvas';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { writeColourTiers } from '../tex/write-maps.ts';
 
 const A = new URL('./assets/', import.meta.url).pathname;
 const OUT = new URL('../../public/tex/', import.meta.url).pathname;
@@ -375,19 +375,11 @@ for (const [i, poster] of POSTERS.entries()) {
 
 // Out as the texture array wants it: colour at 1024 and 512, and flat data (paper: no relief,
 // fairly rough, a little glossier where the paste is)
-const raw = '/tmp/posters_raw.rgba';
+await writeColourTiers('posters', S, canvas.data(), 88);
 
-writeFileSync(raw, canvas.data());
-
-const ff = (args: string[]) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args]);
-
-for (const size of [1024, 512]) {
-  const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
-  ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', raw, ...scale, '-c:v', 'libwebp', '-quality', '88', '-pix_fmt', 'yuva420p', `${OUT}posters_${size}_c.webp`]);
-}
-
-ff(['-f', 'lavfi', '-i', 'color=c=0x8080b0:s=512x512', '-frames:v', '1', '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}posters_512_d.jpg`]);
-
-ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', raw, '-frames:v', '1', '/tmp/posters_atlas.png']);
+execFileSync('ffmpeg', [
+  '-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x8080b0:s=512x512',
+  '-frames:v', '1', '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}posters_512_d.jpg`,
+]);
 
 console.log('posters', POSTERS.length);

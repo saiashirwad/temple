@@ -2,15 +2,11 @@
 // roughness), at 1024 and 512, and writes the names, sizes and mean colours for the shaders.
 //   npx tsx tools/tex/bake.ts [names...]
 
-import { execFileSync } from 'node:child_process';
-import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { writeMaterialMaps } from './write-maps.ts';
+import { writeTextureIndex, type TextureLayer } from './metadata.ts';
 import { LAYERS, type Px } from './layers.ts';
 
 const S = 1024;
-const OUT = new URL('../../public/tex/', import.meta.url).pathname;
-
-mkdirSync(OUT, { recursive: true });
-
 const only = process.argv.slice(2);
 
 const toSrgb = (x: number) => {
@@ -53,9 +49,7 @@ function blur(src: Float32Array, r: number) {
   return out;
 }
 
-const ff = (args: string[]) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args]);
-
-const meta: { name: string; metres: number; metal: boolean; mean: number[] }[] = [];
+const meta: TextureLayer[] = [];
 
 for (const layer of LAYERS) {
   const t0 = Date.now();
@@ -114,42 +108,15 @@ for (const layer of LAYERS) {
   meta.push({ name: layer.name, metres: layer.metres, metal: layer.metal, mean: mean.map((m) => +(m / (S * S)).toFixed(4)) });
 
   if (skip) continue;
-  const rawA = `/tmp/${layer.name}_a.raw`;
-  const rawD = `/tmp/${layer.name}_d.raw`;
-  writeFileSync(rawA, albedo);
-  writeFileSync(rawD, data);
-
-  for (const size of [1024, 512]) {
-    const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
-    ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', rawA, ...scale, '-c:v', 'libwebp', '-quality', '86', '-pix_fmt', 'yuva420p', `${OUT}${layer.name}_${size}_c.webp`]);
-
-    if (size === 512) ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${S}x${S}`, '-i', rawD, ...scale, '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}${layer.name}_${size}_d.jpg`]); // only the 512 data map is ever loaded (src/render/tex.ts)
-  }
-
-  rmSync(rawA);
-  rmSync(rawD);
+  await writeMaterialMaps(layer.name, S, albedo, data);
   console.log(`${layer.name} ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
 
 if (only.length > 0) {
   // Update just the layers baked now in the index, keeping the rest (and the photo layers)
-  const gen = new URL('../../src/generated/textures.gen.ts', import.meta.url).pathname;
-  const old = readFileSync(gen, 'utf8');
-  const m = old.match(/export const TEX_LAYERS = (.*) as const;/)!;
-  const list = JSON.parse(m[1]!) as typeof meta;
-
-  for (const l of meta) {
-    const at = list.findIndex((x) => x.name === l.name);
-
-    if (at >= 0 && only.includes(l.name)) list[at] = l;
-  }
-
-  writeFileSync(gen, old.replace(m[0], `export const TEX_LAYERS = ${JSON.stringify(list)} as const;`));
+  const { TEX_LAYERS } = await import('../../src/generated/textures.gen.ts');
+  const updates = new Map(meta.map(layer => [layer.name, layer]));
+  writeTextureIndex(TEX_LAYERS.map(layer => only.includes(layer.name) ? updates.get(layer.name) ?? layer : layer));
 } else {
-  const src = `// Baked by tools/tex/bake.ts: the texture array's layers, their tile sizes and mean colours.
-export const TEX = ${JSON.stringify(Object.fromEntries(meta.map((m, i) => [m.name, i])))} as const;
-export const TEX_LAYERS = ${JSON.stringify(meta, null, 0)} as const;
-`;
-
-  writeFileSync(new URL('../../src/generated/textures.gen.ts', import.meta.url).pathname, src);
+  writeTextureIndex(meta);
 }

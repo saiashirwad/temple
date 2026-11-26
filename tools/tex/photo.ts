@@ -2,10 +2,15 @@
 // colour × ambient occlusion in sRGB (alpha: metalness for metal layers, else 1 = takes the
 // mesh tint), and the DirectX normal's x, y with roughness, in the same files bake.ts writes.
 //   npx tsx tools/tex/photo.ts
+import { z } from 'zod';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 
-export const PHOTO: Record<string, { id: string; metres: number }> = {
+import { TEX_LAYERS } from '../../src/generated/textures.gen.ts';
+import { writeMaterialMaps } from './write-maps.ts';
+import { writeTextureIndex, type TextureLayer } from './metadata.ts';
+
+export const PHOTO = {
   laterite: { id: 'red_sandstone_wall', metres: 2 },
   plaster: { id: 'painted_plaster_wall', metres: 2 },
   paint: { id: 'peeling_painted_wall', metres: 1.8 },
@@ -26,7 +31,6 @@ export const PHOTO: Record<string, { id: string; metres: number }> = {
 
 const METAL = new Set(['tin']);
 const S = 1024;
-const OUT = new URL('../../public/tex/', import.meta.url).pathname;
 const CACHE = '/tmp/phcache/';
 
 mkdirSync(CACHE, { recursive: true });
@@ -42,17 +46,29 @@ const get = async (url: string, file: string) => {
   writeFileSync(file, new Uint8Array(await res.arrayBuffer()));
 };
 
-const means: Record<string, number[]> = {};
+const updates = new Map<string, Pick<TextureLayer, 'photo' | 'metres' | 'mean'>>();
 
-for (const [name, { id }] of Object.entries(PHOTO)) {
-  const files = (await (await fetch(`https://api.polyhaven.com/files/${id}`)).json()) as Record<string, Record<string, Record<string, { url: string }>>>;
-  const pick = (map: string) => files[map]!['1k']!['jpg']?.url ?? files[map]!['1k']!['png']!.url;
+const download = z.object({ url: z.httpUrl() });
+
+const image = z.union([
+  z.object({ jpg: download }).transform(format => format.jpg.url),
+  z.object({ png: download }).transform(format => format.png.url),
+]);
+
+const sourceMap = z.object({ '1k': image });
+const materialFiles = z.object({ Diffuse: sourceMap, nor_dx: sourceMap, arm: sourceMap });
+
+for (const [name, { id, metres }] of Object.entries(PHOTO)) {
+  const response = await fetch(`https://api.polyhaven.com/files/${id}`);
+
+  if (!response.ok) throw new Error(`${id}: Poly Haven returned ${response.status}`);
+  const files = materialFiles.parse(await response.json());
   const diff = `${CACHE}${id}_diff.jpg`;
   const nor = `${CACHE}${id}_nor.jpg`;
   const arm = `${CACHE}${id}_arm.jpg`;
-  await get(pick('Diffuse'), diff);
-  await get(pick('nor_dx'), nor);
-  await get(pick('arm'), arm);
+  await get(files.Diffuse['1k'], diff);
+  await get(files.nor_dx['1k'], nor);
+  await get(files.arm['1k'], arm);
   const c = raw(diff, 'rgb24');
   const n = raw(nor, 'rgb24');
   const a = raw(arm, 'rgb24');
@@ -83,33 +99,11 @@ for (const [name, { id }] of Object.entries(PHOTO)) {
     data[i * 3 + 2] = a[i * 3 + 1]!;
   }
 
-  means[name] = mean.map((m) => +(m / (S * S)).toFixed(4));
-  writeFileSync('/tmp/pa.raw', albedo);
-  writeFileSync('/tmp/pd.raw', data);
-
-  for (const size of [1024, 512]) {
-    const scale = size === S ? [] : ['-vf', `scale=${size}:${size}:flags=lanczos`];
-    ff(['-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${S}x${S}`, '-i', '/tmp/pa.raw', ...scale, '-c:v', 'libwebp', '-quality', '86', `${OUT}${name}_${size}_c.webp`]);
-
-    if (size === 512) ff(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${S}x${S}`, '-i', '/tmp/pd.raw', ...scale, '-pix_fmt', 'yuvj444p', '-q:v', '4', `${OUT}${name}_${size}_d.jpg`]); // only the 512 data map is ever loaded (src/render/tex.ts)
-  }
-
-  console.log(name, id, means[name]);
+  const average = mean.map((m) => +(m / (S * S)).toFixed(4));
+  updates.set(name, { metres, mean: average, photo: id });
+  await writeMaterialMaps(name, S, albedo, data);
+  console.log(name, id, average);
 }
 
 // Record each photo's size and mean colour in the generated index
-const gen = new URL('../../src/generated/textures.gen.ts', import.meta.url).pathname;
-const src = readFileSync(gen, 'utf8');
-const m = src.match(/export const TEX_LAYERS = (.*) as const;/)!;
-const layers = JSON.parse(m[1]!) as { name: string; metres: number; metal: boolean; mean: number[]; photo?: string }[];
-
-for (const l of layers) {
-  const p = PHOTO[l.name];
-
-  if (!p) continue;
-  l.metres = p.metres;
-  l.mean = means[l.name]!;
-  l.photo = p.id;
-}
-
-writeFileSync(gen, src.replace(m[0], `export const TEX_LAYERS = ${JSON.stringify(layers)} as const;`));
+writeTextureIndex(TEX_LAYERS.map(layer => ({ ...layer, ...updates.get(layer.name) })));
