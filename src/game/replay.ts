@@ -112,7 +112,10 @@ export function gameReplay(launch: Launch) {
       } else {
         record('placed at veranda');
         prepared = from === 'veranda';
-        await captureStory(s, 'veranda');
+        if (from === 'veranda') {
+          if (wantsCheckpoint('veranda')) await captureStory(s, 'veranda');
+          else await new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+        }
         key('keydown', 'e'); key('keyup', 'e');
         await waitFor(() => examined === 'bungalow.note', 'note examination');
         prepared = true;

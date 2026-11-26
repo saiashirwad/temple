@@ -31,6 +31,7 @@ const standAt = async (s: Scene, spot: Spot) => {
   await solid(s);
   s.walker.moveTo(spot[0], spot[1], spot[2], true);
   s.view.goal.pitch = spot[3];
+  s.view.jump();
   s.walker.touched();
 };
 const pass = (ok: boolean, why: string) => (ok ? 'PASS' : `FAIL: ${why}`);
@@ -43,6 +44,7 @@ export const RUNS: Record<string, Run> = {
       await wildlifeReady(s);
       const [x, z, yaw] = SPOTS['2']!.at;
       s.walker.hold(x, z, yaw, 0.12, 1.62);
+      s.view.jump();
       const fx = -Math.sin(yaw);
       const fz = -Math.cos(yaw);
       const at = (ahead: number, side: number, speed: number, turn: number) => ({ x: x + fx * ahead + fz * side, z: z + fz * ahead - fx * side, yaw: Math.atan2(fx, fz) + Math.PI + turn, speed });

@@ -50,7 +50,13 @@ function stick(walker: Walker, hud: Hud) {
 let hudFrame: (() => void) | null = null;
 const note = document.querySelector<HTMLElement>('#note')!;
 // Test scenarios by key chord (` then a key), and the state readout they report in
-const launch = resolveLaunch(new URLSearchParams(location.search));
+const launch = (() => {
+  try { return resolveLaunch(new URLSearchParams(location.search)); }
+  catch (error) {
+    note.dataset.error = note.textContent = String(error);
+    throw error;
+  }
+})();
 const tests = scenarios(document.querySelector<HTMLPreElement>('#state')!, launch);
 if (boot.has('debug')) {
   addEventListener('error', (e) => (note.textContent = 'ERR ' + String(e.message).slice(0, 3000)));
@@ -256,7 +262,7 @@ if (!navigator.gpu) {
       if (canvas.dataset.ready === undefined && tests.prepared) {
         canvas.dataset.ready = '';
         canvas.dataset.firstFrame = JSON.stringify({ at: scene.walker.at, yaw: scene.view.pose.yaw, mode: scene.walker.mode,
-          reading: document.querySelector('#caption')?.classList.contains('on'), ended: scene.test.state.ended, guardGone: scene.test.guardGone, sitting: scene.test.story.sitting });
+          readingNote: document.querySelector('#caption')?.classList.contains('on') && scene.test.story.sitting < 0, ended: scene.test.state.ended, guardGone: scene.test.guardGone, sitting: scene.test.story.sitting });
         performance.mark('game:first-frame');
         delete document.body.dataset.starting;
         note.remove();

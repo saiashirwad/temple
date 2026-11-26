@@ -29,10 +29,13 @@ export function resolveLaunch(params: URLSearchParams) {
   const bungalow = scenario === 'story.bungalow-ending';
   const tour = scenario === 'world.walk' && params.get('run') === '1';
   const shots = params.getAll('shot');
-  const requested = Object.values(SPOTS).filter(s => shots.includes(s.shot) || shots.includes('*'));
+  const all = Object.values(SPOTS);
+  const requested = shots.includes('*') ? all : shots.flatMap(name => all.filter(spot => spot.shot === name));
   let views = preset && SPOTS[preset] ? [SPOTS[preset]] : requested.length ? requested : [SPOTS['1']];
   const start = params.get('from') ?? BUNGALOW_BEATS.find(name => shots.includes(name)) ?? 'veranda';
   if (bungalow && !BUNGALOW_BEATS.some(name => name === start)) throw new Error('Unknown bungalow checkpoint: ' + start);
+  if (bungalow && shots.some(name => BUNGALOW_BEATS.some((beat, index) => beat === name && index < BUNGALOW_BEATS.indexOf(start as BungalowBeat))))
+    throw new Error('Requested checkpoint precedes the bungalow starting state');
   const first = bungalow ? SPOTS['8'] : preset ? SPOTS[entrySpots[preset] ?? preset] : tour ? views[0] : undefined;
   let camera = first?.at;
   const at = params.get('at');

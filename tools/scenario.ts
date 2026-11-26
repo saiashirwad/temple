@@ -1,24 +1,26 @@
 // Use the same static game and workbench entries as a human player.
 import type {} from '../src/scenario/checkpoint.ts';
 import { chromium } from 'playwright';
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 import { parseArgs } from 'node:util';
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { verifyFirstFrame, type FirstFrame } from './scenario/first-frame.ts';
 import { startClip, writeSheet, type Panel } from './scenario/media.ts';
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {
     help: { type: 'boolean' }, list: { type: 'boolean' }, 'list-shots': { type: 'boolean' }, headed: { type: 'boolean' },
-    game: { type: 'boolean' }, out: { type: 'string' }, seed: { type: 'string' },
+    game: { type: 'boolean' }, built: { type: 'boolean' }, out: { type: 'string' }, seed: { type: 'string' },
     param: { type: 'string', multiple: true }, shot: { type: 'string', multiple: true },
     spread: { type: 'boolean' }, target: { type: 'string' }, clip: { type: 'string' }, sheet: { type: 'string' },
   },
 });
 if (values.help) {
   console.log(`npm run scenario -- <id> [--game] [--seed N] [--param key=value]
+  --built                 Run against dist/ from npm run build
   --list                  List scenario IDs
   --list-shots            Rehearse this scenario and list its available checkpoints
   --shot NAME             Capture a checkpoint (repeat to select several)
@@ -72,10 +74,11 @@ const entry = (values.game ? '/' : '/workbench.html') + '?' + params;
 const capture = !listing && (values.out !== undefined || values.spread || values.target || requested.length > 0 || seconds > 0);
 const folder = capture ? (values.out ? resolve(values.out) : await mkdtemp(join(tmpdir(), id + '-'))) : undefined;
 if (folder) await mkdir(folder, { recursive: true });
-const server = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
+const local = { host: '127.0.0.1', port: 0 };
+const server = values.built ? await preview({ preview: local, logLevel: 'error' }) : await createServer({ server: local, logLevel: 'error' });
 let browser;
 try {
-  await server.listen();
+  if ('listen' in server) await server.listen();
   const address = server.httpServer!.address();
   if (!address || typeof address === 'string') throw new Error('No HTTP port available.');
   const asset = params.get('asset') ?? '';
@@ -87,7 +90,7 @@ try {
   const shots: Shot[] = [];
   let clip: { file: string; from: string; done: Promise<void> } | undefined;
   let trace: unknown;
-  let firstFrame: unknown;
+  let firstFrame: FirstFrame | undefined;
   let status = 'fail';
   let sheet: string | undefined;
   page.on('pageerror', err => errors.push(err.message));
@@ -127,10 +130,11 @@ try {
     status = await target.evaluate(el => el.dataset.error ?? el.dataset.verdict ?? 'ready');
     if (values.game && status === 'pass') {
       await page.locator('canvas[data-first-frame]').waitFor();
-      firstFrame = await page.evaluate(() => ({
+      firstFrame = await page.evaluate((): FirstFrame => ({
         ms: Math.round(performance.getEntriesByName('game:first-frame')[0].startTime),
         ...JSON.parse(document.querySelector('canvas')!.dataset.firstFrame!),
       }));
+      verifyFirstFrame(params, firstFrame);
     }
     const raw = await page.locator('[data-trace]').first().evaluateAll(nodes => nodes[0]?.textContent);
     if (raw) trace = JSON.parse(raw);

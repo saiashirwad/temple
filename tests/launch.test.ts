@@ -24,3 +24,9 @@ test('story, encounter and free-camera entries resolve before scene creation', (
   assert.throws(() => open('at=bad'));
   assert.throws(() => open('scenario=story.bungalow-ending&from=bad'));
 });
+
+test('world captures honor the order of the requested views and custom cameras', () => {
+  assert.equal(open('scenario=world.walk&run=1&shot=bridge&shot=town').views[0].shot, 'bridge');
+  assert.equal(open('scenario=world.walk&run=1&at=2,4,0,0').views[0].shot, 'camera');
+  assert.throws(() => open('scenario=story.bungalow-ending&from=ending&shot=seated'));
+});
